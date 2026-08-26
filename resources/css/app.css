@@ -1,0 +1,35 @@
+@import 'tailwindcss';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+
+/**
+ * Locked light, professional theme (see CLAUDE.md).
+ * This app does not support a dark mode — never add `dark:` variants.
+ */
+@theme {
+    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji',
+        'Segoe UI Symbol', 'Noto Color Emoji';
+
+    --color-brand-50: oklch(97.2% 0.02 255);
+    --color-brand-100: oklch(93.5% 0.035 255);
+    --color-brand-200: oklch(86% 0.06 255);
+    --color-brand-300: oklch(76% 0.09 255);
+    --color-brand-400: oklch(64% 0.12 258);
+    --color-brand-500: oklch(53% 0.14 260);
+    --color-brand-600: oklch(45% 0.13 262);
+    --color-brand-700: oklch(37% 0.11 262);
+    --color-brand-800: oklch(29% 0.085 262);
+    --color-brand-900: oklch(22% 0.06 262);
+
+    --color-surface: var(--color-white);
+    --color-surface-muted: var(--color-slate-50);
+    --color-line: var(--color-slate-200);
+    --color-ink: var(--color-slate-900);
+    --color-ink-muted: var(--color-slate-500);
+}
+
+body {
+    background-color: var(--color-surface-muted);
+    color: var(--color-ink);
+}
