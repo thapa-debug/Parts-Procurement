@@ -29,7 +29,8 @@ Favour boring, obvious solutions over clever ones. Readability wins over brevity
 - AWS S3 (private bucket + signed URLs) for photos; AWS SES for email
 - spatie/laravel-permission (roles) + spatie/laravel-activitylog (audit)
 - Telescope + Horizon in local/dev only
-- GitLab CI/CD (`.gitlab-ci.yml`): Pint → Larastan → Pest, with MySQL + Redis service containers
+- GitHub Actions (`.github/workflows/ci.yml`): Pint → Larastan → Pest, with MySQL + Redis service containers
+- UI: light professional theme, English-language UI, i18n-ready (lang files, no hardcoded strings)
 
 **Verify the current stable version of Laravel and every package at install time — do not trust hardcoded version numbers. Ask before adding any package not listed above.**
 
@@ -175,7 +176,7 @@ All money stored as integers (yen, no decimals).
 4. **When a decision is money-critical or genuinely ambiguous, STOP and ask** — do not guess on pricing, payments, or isolation.
 5. Reference the prototype HTML for UI and fields; rebuild logic properly.
 6. Run Pint + Larastan + Pest before declaring a task done.
-7. Commit in small logical units with conventional commit messages. Keep secrets in GitLab CI/CD variables, never in the repo.
+7. Commit in small logical units with conventional commit messages. Keep secrets in GitHub Actions secrets, never in the repo.
 8. Update `CONVENTIONS.md` / `README.md` when a new pattern is introduced.
 
 ---
@@ -195,7 +196,7 @@ All money stored as integers (yen, no decimals).
 
 ## 14. Phased build order
 
-- **Phase 0 — Foundation**: project skeleton, `README.md` + `CONVENTIONS.md`, config (S3/SES/Redis/queue/Reverb), auth + roles (Spatie), base Blade/Tailwind layout, GitLab CI pipeline. Then the **`settings` + `PricingService` slice with its full Pest suite** — our reference implementation that sets the quality bar.
+- **Phase 0 — Foundation**: project skeleton, `README.md` + `CONVENTIONS.md`, config (S3/SES/Redis/queue/Reverb), auth + roles (Spatie), base Blade/Tailwind layout, GitHub Actions CI pipeline. Then the **`settings` + `PricingService` slice with its full Pest suite** — our reference implementation that sets the quality bar.
 - **Phase 1 — Accounts & masters**: buyer + vendor registration (self-register + admin-created; vendors require admin approval before active), vendor master CRUD + suspend/resume, settings admin UI (margin, shipping fees, sender email).
 - **Phase 2 — Core lifecycle**: buyer request form → admin board with status tabs → broadcast to vendors → vendor response with S3 photo upload → admin presents priced quote (pricing snapshot).
 - **Phase 3 — Messaging**: two chat channels (buyer/vendor, single-target + broadcast), read/unread badges, SES notifications via events/listeners.
@@ -209,4 +210,4 @@ Deferred to Phase 2-post-launch (client meeting pending): **refunds**.
 
 ## 15. Start here
 
-Begin Phase 0. First: confirm the current stable Laravel + package versions, then scaffold the project and set up the GitLab CI pipeline. Before writing any feature code, produce the `settings` + `PricingService` slice test-first, and show me the Pest tests for the three margin cases before the implementation. Ask me if anything in this file is unclear.
+Begin Phase 0. First: confirm the current stable Laravel + package versions, then scaffold the project and set up the GitHub Actions CI pipeline. Before writing any feature code, produce the `settings` + `PricingService` slice test-first, and show me the Pest tests for the three margin cases before the implementation. Ask me if anything in this file is unclear.
