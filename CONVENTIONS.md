@@ -22,6 +22,16 @@ Laravel 11+ supports both `protected $casts = [...]` and `protected function cas
 
 Livewire 3 ships its own internal build of Alpine.js and boots it automatically via `@livewireScripts`. Installing `alpinejs` as a separate npm dependency causes a double-initialization conflict. Alpine is available on every page that includes `@livewireScripts` — no extra import needed.
 
+## spatie/laravel-activitylog: attribute changes live in `attribute_changes`
+
+On the installed 5.x line, a logged model's attribute diff is on the `attribute_changes` column (`['attributes' => [...], 'old' => [...]]`), not on `properties` (which comes back empty for a plain `LogsActivity` model) and not via a `changes()` method — both exist in older docs/versions but not this one. See `VendorProfile`/`VendorProfileTest` for the working pattern.
+
+## Vendor status is a flag only — not enforced anywhere yet
+
+`vendor_profiles.status` (`active`/`suspended`) is pure data right now. Nothing reads it. Two places will need to start respecting it and don't yet:
+- **Phase 2 broadcast logic**: selecting which vendors a request goes out to must exclude suspended vendors.
+- **The `act`/login gates** (`app/Providers/AppServiceProvider.php`'s `act` gate, and login itself): currently only check email verification, not vendor status. Whether a suspended vendor should be blocked from logging in at all, or only from acting, is an open decision for whoever builds that enforcement — don't assume either way without deciding it explicitly first.
+
 ## Theme: light only, no dark mode
 
 The design tokens in `resources/css/app.css` (`@theme` block: `--color-brand-*`, `--color-surface*`, `--color-ink*`, `--color-line`) define a locked light, professional palette. Never add `dark:` variants — this app does not support a dark theme.
