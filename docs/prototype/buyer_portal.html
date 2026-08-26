@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自動車パーツ調達システム - BUYER VIEW</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+    .dark-card { background-color: #1e293b; border: 1px solid #334155; }
+    .sidebar-btn-active { background-color: #0284c7 !important; color: #ffffff !important; font-weight: bold; border-color: #38bdf8 !important; }
+    .status-tab-active { background-color: #0284c7 !important; color: #ffffff !important; border-color: #38bdf8 !important; }
+    .input-dark { background-color: #090d16; border: 1px solid #1e293b; color: #ffffff; }
+    .input-dark:focus { border-color: #0284c7; outline: none; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- 🔒 1. ログイン画面 -->
+  <div id="login-screen" class="fixed inset-0 bg-[#0b1329] z-[100] flex items-center justify-center p-4">
+    <div class="dark-card rounded-2xl w-full max-w-md p-8 space-y-6 shadow-2xl border border-slate-700">
+      <div class="text-center space-y-2">
+        <div class="w-16 h-16 bg-cyan-950 text-cyan-400 border border-cyan-700 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-inner">
+          <i class="fa-solid fa-lock"></i>
+        </div>
+        <h1 class="text-xl font-black text-white tracking-wide">自動車パーツ調達システム</h1>
+        <p class="text-xs text-cyan-400 font-bold tracking-wider">BUYER PORTAL LOGIN</p>
+      </div>
+
+      <form onsubmit="handleLogin(event)" class="space-y-4 text-xs">
+        <div id="login-error" class="hidden bg-red-950/80 border border-red-500 text-red-200 p-2.5 rounded-lg text-center font-bold animate-pulse">
+          IDまたはパスワードが正しくありません
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">バイヤーID / ユーザー名</label>
+          <input type="text" id="login-id" placeholder="例: abc" class="w-full input-dark rounded-xl p-3 text-sm" required>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">パスワード</label>
+          <input type="password" id="login-pass" value="1234" class="w-full input-dark rounded-xl p-3 text-sm" required>
+        </div>
+
+        <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[10px] text-slate-400 space-y-1">
+          <span class="text-cyan-400 font-bold block"><i class="fa-solid fa-key mr-1"></i>ログイン情報:</span>
+          <div>ID: <span class="text-white font-mono font-bold">abc</span></div>
+          <div>パスワード: <span class="text-white font-mono font-bold">1234</span></div>
+        </div>
+
+        <button type="submit" class="w-full bg-cyan-600 hover:bg-cyan-500 text-white font-black py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">
+          <i class="fa-solid fa-right-to-bracket"></i> ログインしてポータルに入る
+        </button>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🌟 2. メインポータル -->
+  <div id="portal-content" class="hidden min-h-screen flex flex-col flex-1">
+
+    <!-- トップヘッダー -->
+    <header class="bg-[#0b1329] border-b border-slate-800 px-6 py-3 flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <h1 class="text-lg font-black text-white tracking-wide">自動車パーツ調達システム</h1>
+        <span class="bg-cyan-950 text-cyan-400 border border-cyan-700 text-[10px] font-black px-2 py-0.5 rounded">BUYER VIEW</span>
+      </div>
+      <div class="flex items-center gap-4 text-xs">
+        <span class="text-slate-400 hidden sm:inline">マイページ（依頼・発送・お見積り写真確認）</span>
+        <button onclick="handleLogout()" class="bg-slate-800 hover:bg-red-950 hover:text-red-300 text-slate-300 border border-slate-700 hover:border-red-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+          <i class="fa-solid fa-right-from-bracket"></i> ログアウト
+        </button>
+      </div>
+    </header>
+
+    <!-- メインレイアウト -->
+    <div class="flex flex-1">
+
+      <!-- 👈 左側サイドバー -->
+      <aside class="w-64 bg-[#0b1329]/80 border-r border-slate-800 p-4 space-y-4 flex flex-col justify-between flex-shrink-0">
+        
+        <div class="space-y-2">
+          <button id="nav-dashboard" onclick="switchTab('dashboard')" class="sidebar-btn-active w-full text-left px-4 py-3 rounded-xl border border-slate-700 text-white transition flex items-center gap-3 text-xs">
+            <i class="fa-solid fa-chart-line text-cyan-400 text-sm"></i>
+            <span>マイページ (ダッシュボード)</span>
+          </button>
+
+          <button id="nav-new-request" onclick="switchTab('new-request')" class="w-full text-left px-4 py-3 rounded-xl border border-transparent text-slate-300 hover:bg-slate-800/60 transition flex items-center gap-3 text-xs">
+            <i class="fa-solid fa-pen-to-square text-cyan-300 text-sm"></i>
+            <span>新規パーツ依頼</span>
+          </button>
+        </div>
+
+        <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-3 space-y-2 text-xs">
+          <div class="text-[10px] font-bold text-orange-400 border-b border-slate-800 pb-1 flex items-center gap-1">
+            <i class="fa-solid fa-building"></i> アカウント登録情報
+          </div>
+          <div>
+            <span class="text-slate-400 text-[10px] block">企業名 / 会員ID</span>
+            <span class="font-bold text-white block truncate">Self Service (テストユーザー)</span>
+            <span class="text-[9px] text-cyan-400 font-mono">ID: BUYER-88402</span>
+          </div>
+          <div class="pt-1 border-t border-slate-800/60">
+            <span class="text-slate-400 text-[10px] block">既定の配送先国/ヤード</span>
+            <span class="text-[11px] text-slate-300 block leading-tight">Australia / Oceania Yard</span>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- 👉 右側メインコンテンツ -->
+      <main class="flex-1 p-6 overflow-y-auto">
+
+        <!-- 📋 ダッシュボード -->
+        <div id="page-dashboard" class="space-y-6 max-w-5xl">
+          
+          <div class="dark-card rounded-2xl p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+              <h2 class="text-base font-bold text-white flex items-center gap-2">
+                <i class="fa-solid fa-list-check text-cyan-400"></i> 登録済みパーツ調達依頼 一覧
+              </h2>
+              <span class="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded">リアルタイム同期中</span>
+            </div>
+
+            <div class="flex gap-2 text-xs font-bold border-b border-slate-800 pb-3">
+              <button id="buyer-tab-active" onclick="filterBuyerStatus('active')" class="status-tab-active bg-slate-900 border border-slate-700 hover:border-cyan-500 text-slate-300 px-4 py-2 rounded-xl transition flex items-center gap-2">
+                <i class="fa-solid fa-clock text-cyan-400"></i>
+                <span>⌛ 進行中の案件 (手配中・発送待ち)</span>
+                <span id="buyer-badge-active" class="bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded-full text-[10px] border border-cyan-800">0</span>
+              </button>
+
+              <button id="buyer-tab-completed" onclick="filterBuyerStatus('completed')" class="bg-slate-900 border border-slate-700 hover:border-emerald-500 text-slate-300 px-4 py-2 rounded-xl transition flex items-center gap-2">
+                <i class="fa-solid fa-circle-check text-emerald-400"></i>
+                <span>✅ 受取・完了済みの案件</span>
+                <span id="buyer-badge-completed" class="bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded-full text-[10px] border border-emerald-800">0</span>
+              </button>
+            </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-left text-xs border-collapse">
+                <thead>
+                  <tr class="bg-[#090d16] text-slate-400 border-b border-slate-800">
+                    <th class="p-3">案件ID / 製造年月</th>
+                    <th class="p-3">希望区分</th>
+                    <th class="p-3">車種・パーツ名</th>
+                    <th class="p-3">ステータス</th>
+                    <th class="p-3">提示金額</th>
+                    <th class="p-3 text-center">操作</th>
+                  </tr>
+                </thead>
+                <tbody id="buyer-table-body" class="divide-y divide-slate-800 text-slate-300">
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 📝 新規パーツ調達依頼フォーム -->
+        <div id="page-new-request" class="hidden dark-card rounded-2xl p-6 space-y-6 max-w-5xl">
+          
+          <div class="flex justify-between items-center border-b border-slate-700/60 pb-3">
+            <h2 class="text-base font-bold text-white flex items-center gap-2">
+              <i class="fa-solid fa-pen-to-square text-cyan-400"></i> 新規パーツ調達依頼フォーム
+            </h2>
+            <span class="bg-cyan-950 text-cyan-400 border border-cyan-800 text-[10px] font-black px-2.5 py-1 rounded">NEW REQUEST</span>
+          </div>
+
+          <form onsubmit="handleNewRequestSubmit(event)" class="space-y-5 text-xs">
+            
+            <div class="bg-[#090d16] p-4 rounded-xl border border-slate-800 space-y-2">
+              <label class="text-orange-400 font-bold block flex items-center gap-1.5">
+                <i class="fa-solid fa-tag"></i> 希望パーツの区分を選択してください <span class="text-red-400">*</span>
+              </label>
+              <div class="flex flex-wrap gap-3 pt-1">
+                <label class="bg-slate-900 border border-slate-700 hover:border-cyan-500 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 transition">
+                  <input type="radio" name="part-type-option" value="中古パーツ希望" class="accent-cyan-400">
+                  <span class="text-white font-bold">中古パーツ希望</span>
+                </label>
+                <label class="bg-slate-900 border border-slate-700 hover:border-cyan-500 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 transition">
+                  <input type="radio" name="part-type-option" value="新品 (純正/社外) 希望" class="accent-cyan-400">
+                  <span class="text-white font-bold">新品 (純正/社外) 希望</span>
+                </label>
+                <label class="bg-slate-900 border border-slate-700 hover:border-cyan-500 px-4 py-2 rounded-lg cursor-pointer flex items-center gap-2 transition">
+                  <input type="radio" name="part-type-option" value="新品・中古の両方の見積もりが欲しい" checked class="accent-cyan-400">
+                  <span class="text-white font-bold">新品・中古の両方の見積もりが欲しい</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">自動車メーカー <span class="text-red-400">*</span></label>
+                <select id="input-maker" class="w-full input-dark rounded-lg p-2.5">
+                  <option value="トヨタ (Toyota)">トヨタ (Toyota)</option>
+                  <option value="日産 (Nissan)">日産 (Nissan)</option>
+                  <option value="ホンダ (Honda)">ホンダ (Honda)</option>
+                  <option value="マツダ (Mazda)">マツダ (Mazda)</option>
+                  <option value="スバル (Subaru)">スバル (Subaru)</option>
+                  <option value="三菱 (Mitsubishi)">三菱 (Mitsubishi)</option>
+                  <option value="スズキ (Suzuki)">スズキ (Suzuki)</option>
+                  <option value="ダイハツ (Daihatsu)">ダイハツ (Daihatsu)</option>
+                  <option value="輸入車 / その他">輸入車 / その他</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">車種名 <span class="text-red-400">*</span></label>
+                <input type="text" id="input-car-model" placeholder="例: クラウン / ランドクルーザー" class="w-full input-dark rounded-lg p-2.5" required>
+              </div>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">車台番号 (VIN / Chassis Number) <span class="text-red-400">*</span></label>
+                <input type="text" id="input-vin" placeholder="例: GRS184-0002255" class="w-full input-dark rounded-lg p-2.5 font-mono" required>
+                <span class="text-[10px] text-cyan-400 mt-0.5 block">※ 例: GRS184-0002255 ➜ PartsOuq適合参照 (製造年月: 2005/10)</span>
+              </div>
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">パーツ番号 / 純正品番 (OEM Part Number)</label>
+                <input type="text" id="input-part-num" placeholder="例: 81110-60M00" class="w-full input-dark rounded-lg p-2.5 font-mono text-cyan-300">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">探しているパーツ名 & 詳細条件 <span class="text-red-400">*</span></label>
+              <input type="text" id="input-part-name" placeholder="例: 右LEDヘッドライト" class="w-full input-dark rounded-lg p-2.5" required>
+            </div>
+
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">ヤフオク・指定Webサイトの参照URL (任意)</label>
+              <input type="url" id="input-url" placeholder="https://page.auctions.yahoo.co.jp/jp/auction/..." class="w-full input-dark rounded-lg p-2.5 text-slate-400 font-mono">
+            </div>
+
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">詳細メモ / 備考</label>
+              <textarea id="input-memo" rows="3" placeholder="仕様や希望納期などがあればご記入ください" class="w-full input-dark rounded-lg p-2.5"></textarea>
+            </div>
+
+            <div class="pt-2 text-right">
+              <button type="submit" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-8 py-3 rounded-xl text-xs shadow-lg transition">
+                <i class="fa-solid fa-paper-plane mr-1"></i> 見積もり依頼を送信する
+              </button>
+            </div>
+
+          </form>
+        </div>
+
+      </main>
+
+    </div>
+
+  </div>
+
+  <!-- 💬 詳細・チャット モーダル -->
+  <div id="modal-buyer-detail" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-5xl max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl">
+      
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span id="b-modal-id" class="text-lg font-black text-orange-400 font-mono">#REQ-xxx</span>
+          <span id="b-modal-car" class="text-xs font-bold text-white">車種パーツ名</span>
+          <span id="b-modal-mfg" class="bg-cyan-950 text-cyan-300 px-2 py-0.5 rounded text-[10px] font-mono border border-cyan-800">製造年月: ----/--</span>
+          <span id="b-modal-part-type" class="font-bold text-xs"></span>
+        </div>
+        <button onclick="closeBuyerDetailModal()" class="text-slate-400 hover:text-white text-xl ml-2"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <div class="lg:col-span-7 space-y-4">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <h3 class="text-xs font-bold text-cyan-400 flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <i class="fa-solid fa-camera"></i> 管理者からの提示見積・パーツ実物写真
+            </h3>
+            
+            <div id="buyer-part-preview-box">
+            </div>
+          </div>
+        </div>
+
+        <div class="lg:col-span-5 space-y-4">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 flex flex-col h-full">
+            <h3 class="text-xs font-bold text-cyan-400 flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <i class="fa-solid fa-comments"></i> 管理者 (Admin) とのメッセージやり取り
+            </h3>
+            
+            <div id="buyer-chat-box" class="h-80 overflow-y-auto space-y-2.5 text-xs p-1">
+            </div>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-800">
+              <input type="text" id="buyer-chat-input" placeholder="管理者へメッセージを送信..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-cyan-500" onkeypress="if(event.key==='Enter') sendBuyerChat()">
+              <button onclick="sendBuyerChat()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-4 py-2 rounded-lg text-xs whitespace-nowrap transition">
+                送信
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 🛒 購入手続きモーダル -->
+  <div id="modal-checkout" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-5">
+      
+      <div id="checkout-step-1" class="space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 class="text-sm font-bold text-cyan-400 flex items-center gap-2">
+            <i class="fa-solid fa-truck-ram"></i> Step 1: 配送方法の選択
+          </h3>
+          <button onclick="closeCheckoutModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="space-y-2 text-xs">
+          <p class="text-slate-300 font-bold">ご希望の配送方法を選択してください：</p>
+
+          <label class="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-[#090d16] hover:border-cyan-500 cursor-pointer transition">
+            <div class="flex items-center gap-3">
+              <input type="radio" name="shipping-method" value="dhl" class="accent-cyan-400" checked>
+              <div>
+                <div class="font-bold text-white"><i class="fa-solid fa-plane text-yellow-400 mr-1"></i> DHL / 国際速達便 (国・重量・サイズ別)</div>
+                <div class="text-[10px] text-slate-400">個別確定送料が適用されます</div>
+              </div>
+            </div>
+            <span id="checkout-shipping-dhl-badge" class="text-[11px] font-bold text-emerald-400">送料確定済み</span>
+          </label>
+
+          <label class="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-[#090d16] hover:border-cyan-500 cursor-pointer transition">
+            <div class="flex items-center gap-3">
+              <input type="radio" name="shipping-method" value="vehicle" class="accent-cyan-400">
+              <div>
+                <div class="font-bold text-white"><i class="fa-solid fa-car text-cyan-400 mr-1"></i> 車両に積み込み (車内混載)</div>
+                <div class="text-[10px] text-slate-400">購入・輸出品の車内に積み込んで輸送</div>
+              </div>
+            </div>
+            <span id="label-vehicle-fee" class="text-[11px] font-bold text-emerald-400">送料: ¥15,000</span>
+          </label>
+
+          <label class="flex items-center justify-between p-3 rounded-xl border border-slate-800 bg-[#090d16] hover:border-cyan-500 cursor-pointer transition">
+            <div class="flex items-center gap-3">
+              <input type="radio" name="shipping-method" value="container" class="accent-cyan-400">
+              <div>
+                <div class="font-bold text-white"><i class="fa-solid fa-boxes-packing text-orange-400 mr-1"></i> コンテナ輸送 (海上便)</div>
+                <div class="text-[10px] text-slate-400">大型パーツ・複数バンニング輸送</div>
+              </div>
+            </div>
+            <span id="label-container-fee" class="text-[11px] font-bold text-emerald-400">送料: ¥30,000</span>
+          </label>
+        </div>
+
+        <div class="pt-2 text-right">
+          <button onclick="goToStep2()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-5 py-2 rounded-lg text-xs transition shadow">
+            確認画面へ進む <i class="fa-solid fa-arrow-right ml-1"></i>
+          </button>
+        </div>
+      </div>
+
+      <div id="checkout-step-2" class="hidden space-y-4">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+          <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+            <i class="fa-solid fa-file-invoice-dollar"></i> Step 2: お支払い料金の確認
+          </h3>
+          <button onclick="closeCheckoutModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div class="bg-[#090d16] p-4 rounded-xl border border-slate-800 space-y-3 text-xs">
+          <div class="flex justify-between border-b border-slate-800 pb-2">
+            <span class="text-slate-400">対象パーツ:</span>
+            <span id="summary-part-name" class="font-bold text-white">---</span>
+          </div>
+
+          <div class="flex justify-between border-b border-slate-800 pb-2">
+            <span class="text-slate-400">選択した配送方法:</span>
+            <span id="summary-shipping-method" class="font-bold text-cyan-300">---</span>
+          </div>
+
+          <div class="space-y-1.5 pt-1">
+            <div class="flex justify-between text-slate-300">
+              <span>パーツ本体価格:</span>
+              <span id="summary-item-price" class="font-mono">¥0</span>
+            </div>
+            
+            <div class="flex justify-between text-slate-300">
+              <span class="flex items-center gap-1">
+                <span>システム手数料 (15%):</span>
+                <span id="fee-guarantee-badge" class="hidden text-[9px] bg-orange-950 text-orange-400 px-1.5 py-0.2 rounded border border-orange-800">最低保証適用</span>
+              </span>
+              <span id="summary-fee-price" class="font-mono text-orange-400">¥0</span>
+            </div>
+
+            <div class="flex justify-between text-slate-300">
+              <span>配送送料 / 手間賃:</span>
+              <span id="summary-shipping-fee" class="font-mono font-bold">¥0</span>
+            </div>
+          </div>
+
+          <div class="border-t border-slate-700 pt-3 flex justify-between items-end">
+            <span class="font-bold text-white text-sm">お支払い合計:</span>
+            <div class="text-right">
+              <span id="summary-total-price" class="text-xl font-black text-emerald-400 font-mono">¥0</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="flex justify-between items-center pt-2">
+          <button onclick="backToStep1()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg text-xs font-bold hover:bg-slate-700">
+            <i class="fa-solid fa-arrow-left mr-1"></i> 戻る
+          </button>
+          <button onclick="confirmOrder()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-6 py-2 rounded-lg text-xs transition shadow">
+            この内容で購入を確定する
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    const defaultOrders = [
+      {
+        id: "#REQ-2026-809",
+        car: "トヨタ クラウン / リアバンパー",
+        partType: "新品",
+        partNum: "52159-30400",
+        vin: "GRS184-0002255",
+        mfgDate: "2005/10",
+        date: "2026/07/28",
+        status: "見積もり回答済み",
+        price: 58000,
+        shippingFee: 18500,
+        buyer: "Self Service (テストユーザー)",
+        readByBuyer: false,
+        hasNewPriceNotice: true,
+        selectedPart: {
+          vendor: "中古パーツ業者C (中部パーツリサイクル)",
+          img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800",
+          quality: "Sランク (ほぼ新品・OEM互換)",
+          comment: "【メール返信本文】未使用に近い状態で在庫が見つかりました。即納可能です。"
+        },
+        messages: [
+          { sender: "admin", text: "【見積もり提示】中古パーツ業者C (中部パーツリサイクル)より取り寄せたパーツの実物写真を提示いたします。" }
+        ]
+      }
+    ];
+
+    let currentBuyerChatId = null;
+    let currentSelectedOrderId = null;
+    let currentBuyerFilter = 'active';
+
+    function getShippingFeeConfig() {
+      const config = localStorage.getItem('portal_shipping_fee_config');
+      return config ? JSON.parse(config) : { vehicle: 15000, container: 30000 };
+    }
+
+    function checkAuth() {
+      const isAuth = sessionStorage.getItem('buyer_authenticated');
+      const loginScreen = document.getElementById('login-screen');
+      const portalContent = document.getElementById('portal-content');
+
+      if (isAuth === 'true') {
+        loginScreen.classList.add('hidden');
+        portalContent.classList.remove('hidden');
+        renderBuyerTable();
+      } else {
+        loginScreen.classList.remove('hidden');
+        portalContent.classList.add('hidden');
+      }
+    }
+
+    function handleLogin(e) {
+      e.preventDefault();
+      const id = document.getElementById('login-id').value.trim().toLowerCase();
+      const pass = document.getElementById('login-pass').value.trim();
+      const errorDiv = document.getElementById('login-error');
+
+      if ((id === 'abc' || id === 'oceania' || id === 'buyer') && pass === '1234') {
+        sessionStorage.setItem('buyer_authenticated', 'true');
+        errorDiv.classList.add('hidden');
+        checkAuth();
+      } else {
+        errorDiv.classList.remove('hidden');
+      }
+    }
+
+    function handleLogout() {
+      if (confirm('ログアウトしますか？')) {
+        sessionStorage.removeItem('buyer_authenticated');
+        checkAuth();
+      }
+    }
+
+    function getOrders() {
+      const data = localStorage.getItem('portal_orders');
+      return data ? JSON.parse(data) : defaultOrders;
+    }
+
+    function saveOrders(orders) {
+      localStorage.setItem('portal_orders', JSON.stringify(orders));
+      renderBuyerTable();
+    }
+
+    function switchTab(tabKey) {
+      const navDashboard = document.getElementById('nav-dashboard');
+      const navNewRequest = document.getElementById('nav-new-request');
+      const pageDashboard = document.getElementById('page-dashboard');
+      const pageNewRequest = document.getElementById('page-new-request');
+
+      if (tabKey === 'new-request') {
+        navNewRequest.classList.add('sidebar-btn-active');
+        navDashboard.classList.remove('sidebar-btn-active');
+        pageNewRequest.classList.remove('hidden');
+        pageDashboard.classList.add('hidden');
+      } else {
+        navDashboard.classList.add('sidebar-btn-active');
+        navNewRequest.classList.remove('sidebar-btn-active');
+        pageDashboard.classList.remove('hidden');
+        pageNewRequest.classList.add('hidden');
+      }
+    }
+
+    function filterBuyerStatus(filter) {
+      currentBuyerFilter = filter;
+      const btnActive = document.getElementById('buyer-tab-active');
+      const btnCompleted = document.getElementById('buyer-tab-completed');
+
+      if (filter === 'active') {
+        btnActive.classList.add('status-tab-active');
+        btnCompleted.classList.remove('status-tab-active');
+      } else {
+        btnCompleted.classList.add('status-tab-active');
+        btnActive.classList.remove('status-tab-active');
+      }
+
+      renderBuyerTable();
+    }
+
+    function deriveMfgDateFromVin(vin) {
+      if (!vin) return "未入力";
+      const cleanVin = vin.toUpperCase().replace(/\s+/g, '');
+
+      if (cleanVin.includes("GRS184")) return "2005/10";
+      if (cleanVin.includes("URJ202")) return "2009/08";
+      if (cleanVin.includes("ZVW30")) return "2009/05";
+      if (cleanVin.includes("C27"))   return "2016/08";
+      if (cleanVin.includes("970"))   return "2018/05";
+
+      return "PartsSouqで確認";
+    }
+
+    function handleNewRequestSubmit(e) {
+      e.preventDefault();
+      const selectedTypeOption = document.querySelector('input[name="part-type-option"]:checked').value;
+      const maker = document.getElementById('input-maker').value;
+      const carModel = document.getElementById('input-car-model').value;
+      const partName = document.getElementById('input-part-name').value;
+      const vin = document.getElementById('input-vin').value;
+      const partNum = document.getElementById('input-part-num').value;
+      const memo = document.getElementById('input-memo').value;
+
+      const mfgDate = deriveMfgDateFromVin(vin);
+
+      const orders = getOrders();
+      const newOrder = {
+        id: `#REQ-2026-0${orders.length + 82}`,
+        car: `${maker.split(' ')[0]} ${carModel} / ${partName}`,
+        partType: selectedTypeOption,
+        partNum: partNum || '-',
+        vin: vin || '-',
+        mfgDate: mfgDate,
+        date: new Date().toLocaleDateString('ja-JP'),
+        status: "新規依頼",
+        buyer: "Self Service (テストユーザー)",
+        readByBuyer: true,
+        hasNewPriceNotice: false,
+        shippingFee: 15000,
+        messages: [{ sender: 'buyer', text: memo || '新規の調達依頼を送信しました。' }]
+      };
+
+      orders.unshift(newOrder);
+      saveOrders(orders);
+
+      alert(`【送信完了】新規パーツ見積もり依頼を送信しました！`);
+      e.target.reset();
+      switchTab('dashboard');
+    }
+
+    function markAsReceived(id) {
+      if (confirm('パーツを受け取り、取引を完了としますか？')) {
+        const orders = getOrders();
+        const order = orders.find(o => o.id === id);
+        if (order) {
+          order.status = "受取完了";
+          if (!order.messages) order.messages = [];
+          order.messages.push({
+            sender: 'buyer',
+            text: '【受取完了】無事にパーツを受領いたしました。ありがとうございました！'
+          });
+          order.readByAdmin = false;
+          saveOrders(orders);
+          alert('【受取完了】パーツの受領を登録いたしました。');
+        }
+      }
+    }
+
+    function renderBuyerTable() {
+      const orders = getOrders();
+      const tbody = document.getElementById('buyer-table-body');
+      if (!tbody) return;
+      tbody.innerHTML = '';
+
+      let countActive = 0, countCompleted = 0;
+
+      orders.forEach(item => {
+        if (item.status === '受取完了' || item.status === '発送完了・完了案件') countCompleted++;
+        else countActive++;
+      });
+
+      document.getElementById('buyer-badge-active').innerText = countActive;
+      document.getElementById('buyer-badge-completed').innerText = countCompleted;
+
+      const filteredOrders = orders.filter(item => {
+        if (currentBuyerFilter === 'completed') {
+          return item.status === '受取完了' || item.status === '発送完了・完了案件';
+        } else {
+          return item.status !== '受取完了' && item.status !== '発送完了・完了案件';
+        }
+      });
+
+      if (filteredOrders.length === 0) {
+        tbody.innerHTML = `<tr><td colspan="6" class="text-center py-8 text-slate-500">該当する案件はありません</td></tr>`;
+        return;
+      }
+
+      filteredOrders.forEach(item => {
+        // 🌟【カイゼン】目立ちやすい超鮮やかネオンカラー背景デザインへ強化
+        let unreadBadge = '';
+        if (item.hasNewPriceNotice) {
+          unreadBadge = `<span class="ml-1 bg-yellow-300 text-red-700 font-black text-[9px] px-2 py-0.5 rounded-full border border-red-500 animate-bounce shadow-lg">🎁 NEW見積あり</span>`;
+        } else if (item.messages && item.messages.length > 0 && item.messages[item.messages.length - 1].sender === 'admin' && item.readByBuyer === false) {
+          unreadBadge = `<span class="ml-1 bg-fuchsia-500 text-black font-black text-[9px] px-2 py-0.5 rounded-full animate-pulse shadow-lg">💬 NEW</span>`;
+        }
+
+        let actionBtn = `<button onclick="openBuyerDetailModal('${item.id}')" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-3 py-1 rounded text-[11px] transition">詳細・チャット</button>`;
+
+        if (item.status === '発送完了') {
+          actionBtn = `
+            <div class="flex items-center justify-center gap-1.5">
+              <button onclick="openBuyerDetailModal('${item.id}')" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2 py-1 rounded text-[11px]">詳細・チャット</button>
+              <button onclick="markAsReceived('${item.id}')" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-2 py-1 rounded text-[11px] shadow transition flex items-center gap-1">
+                <i class="fa-solid fa-box-open"></i> 受け取り完了
+              </button>
+            </div>
+          `;
+        }
+
+        let priceText = item.price ? `¥${item.price.toLocaleString()}` : '見積もり中';
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-800/60 transition">
+            <td class="p-3 font-bold text-orange-400 font-mono">
+              ${item.id} ${unreadBadge}
+              <br><span class="text-[9px] text-cyan-400 font-normal">年式: ${item.mfgDate || '未算定'}</span>
+            </td>
+            <td class="p-3"><span class="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded border border-slate-700">${item.partType}</span></td>
+            <td class="p-3 font-bold text-white">${item.car}</td>
+            <td class="p-3"><span class="bg-cyan-950 text-cyan-300 text-[10px] px-2 py-0.5 rounded border border-cyan-800">${item.status}</span></td>
+            <td class="p-3 font-bold text-emerald-400 font-mono">${priceText}</td>
+            <td class="p-3 text-center">${actionBtn}</td>
+          </tr>
+        `;
+      });
+
+      if (currentBuyerChatId) renderBuyerModalContent();
+    }
+
+    function openBuyerDetailModal(id) {
+      currentBuyerChatId = id;
+      const orders = getOrders();
+      const item = orders.find(o => o.id === id);
+      if (!item) return;
+
+      item.readByBuyer = true;
+      item.hasNewPriceNotice = false;
+      saveOrders(orders);
+
+      document.getElementById('b-modal-id').innerText = item.id;
+      document.getElementById('b-modal-car').innerText = item.car;
+      document.getElementById('b-modal-mfg').innerText = `製造年月: ${item.mfgDate || '未算定'}`;
+      document.getElementById('b-modal-part-type').innerHTML = `<span class="bg-purple-950 text-purple-300 px-2 py-0.5 rounded border border-purple-800">希望: ${item.partType}</span>`;
+
+      document.getElementById('modal-buyer-detail').classList.remove('hidden');
+      renderBuyerModalContent();
+    }
+
+    function closeBuyerDetailModal() {
+      currentBuyerChatId = null;
+      document.getElementById('modal-buyer-detail').classList.add('hidden');
+    }
+
+    function renderBuyerModalContent() {
+      if (!currentBuyerChatId) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentBuyerChatId);
+      if (!order) return;
+
+      const previewBox = document.getElementById('buyer-part-preview-box');
+      if (order.selectedPart) {
+        let buyBtnHtml = '';
+        if (order.status === '見積もり回答済み') {
+          buyBtnHtml = `
+            <button onclick="closeBuyerDetailModal(); openCheckoutModal('${order.id}')" class="w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-2.5 rounded-xl text-xs shadow-lg transition flex items-center justify-center gap-2 mt-2">
+              <i class="fa-solid fa-cart-shopping text-sm"></i> 🛒 この提示内容で購入手続きへ進む
+            </button>
+          `;
+        } else if (order.status === '発注・検品中' || order.status === '発送完了' || order.status === '受取完了') {
+          buyBtnHtml = `
+            <div class="bg-slate-900 border border-emerald-800 text-emerald-400 p-2.5 rounded-xl text-center font-bold text-xs mt-2">
+              <i class="fa-solid fa-circle-check mr-1"></i> ご注文確定済み案件です（${order.status}）
+            </div>
+          `;
+        }
+
+        previewBox.innerHTML = `
+          <div class="space-y-3 text-xs">
+            <img src="${order.selectedPart.img}" class="rounded-xl object-cover h-52 w-full border border-slate-700 shadow-md">
+            <div class="flex justify-between items-center">
+              <span class="font-bold text-orange-400 text-sm">${order.selectedPart.vendor || '提携解体業者'}</span>
+              <span class="bg-blue-950 text-blue-300 px-2.5 py-0.5 rounded text-[10px] border border-blue-800">${order.selectedPart.quality || 'Aランク'}</span>
+            </div>
+            <div class="text-slate-300 bg-slate-900 p-2.5 rounded-lg border border-slate-800">${order.selectedPart.comment || '提示写真・状態をご確認ください。'}</div>
+            <div class="bg-emerald-950/60 border border-emerald-800 p-3 rounded-xl flex justify-between items-center">
+              <span class="text-slate-300 font-bold">提示パーツ本体代:</span>
+              <span class="text-xl font-black text-emerald-400 font-mono">¥${order.price ? order.price.toLocaleString() : '0'}</span>
+            </div>
+            ${buyBtnHtml}
+          </div>
+        `;
+      } else {
+        previewBox.innerHTML = `
+          <div class="text-slate-500 text-xs text-center py-12 border border-dashed border-slate-800 rounded-xl">
+            現在、管理者からの見積写真打診を待機中です。
+          </div>
+        `;
+      }
+
+      const box = document.getElementById('buyer-chat-box');
+      box.innerHTML = '';
+      if (order.messages) {
+        order.messages.forEach(msg => {
+          box.innerHTML += `
+            <div class="${msg.sender === 'buyer' ? 'bg-slate-900 border-slate-800' : 'bg-orange-950/90 border-orange-800'} border p-2.5 rounded-xl text-xs space-y-0.5">
+              <span class="text-[9px] font-bold block ${msg.sender === 'buyer' ? 'text-cyan-400' : 'text-orange-400 text-right'}">${msg.sender === 'buyer' ? 'バイヤー (あなた)' : '管理者'}</span>
+              <div class="text-[11px] leading-relaxed text-slate-200">${msg.text}</div>
+            </div>
+          `;
+        });
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function sendBuyerChat() {
+      const input = document.getElementById('buyer-chat-input');
+      if (!input.value || !currentBuyerChatId) return;
+
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentBuyerChatId);
+      if (order) {
+        if (!order.messages) order.messages = [];
+        order.messages.push({ sender: 'buyer', text: input.value });
+        order.readByAdmin = false;
+        saveOrders(orders);
+        input.value = '';
+      }
+    }
+
+    function openCheckoutModal(id) {
+      currentSelectedOrderId = id;
+
+      const cfg = getShippingFeeConfig();
+      document.getElementById('label-vehicle-fee').innerText = `送料: ¥${cfg.vehicle.toLocaleString()}`;
+      document.getElementById('label-container-fee').innerText = `送料: ¥${cfg.container.toLocaleString()}`;
+
+      document.getElementById('checkout-step-1').classList.remove('hidden');
+      document.getElementById('checkout-step-2').classList.add('hidden');
+      document.getElementById('modal-checkout').classList.remove('hidden');
+    }
+
+    function closeCheckoutModal() {
+      document.getElementById('modal-checkout').classList.add('hidden');
+    }
+
+    function goToStep2() {
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentSelectedOrderId);
+      if (!order) return;
+
+      const selectedMethod = document.querySelector('input[name="shipping-method"]:checked').value;
+      const badge = document.getElementById('fee-guarantee-badge');
+
+      const itemPrice = order.price || 0;
+
+      let calcFee = Math.round(itemPrice * 0.15);
+      let systemFee = calcFee < 2000 ? 2000 : calcFee;
+      if (calcFee < 2000) badge.classList.remove('hidden'); else badge.classList.add('hidden');
+
+      document.getElementById('summary-part-name').innerText = order.car;
+      document.getElementById('summary-item-price').innerText = `¥${itemPrice.toLocaleString()}`;
+      document.getElementById('summary-fee-price').innerText = `¥${systemFee.toLocaleString()}`;
+
+      let shippingFee = 0;
+      let shippingName = "";
+
+      const cfg = getShippingFeeConfig();
+
+      if (selectedMethod === 'dhl') {
+        shippingName = "DHL / 国際速達便";
+        shippingFee = order.shippingFee || 18500;
+      } else if (selectedMethod === 'vehicle') {
+        shippingName = "車両に積み込み";
+        shippingFee = cfg.vehicle;
+      } else if (selectedMethod === 'container') {
+        shippingName = "コンテナ輸送";
+        shippingFee = cfg.container;
+      }
+
+      document.getElementById('summary-shipping-fee').innerText = `¥${shippingFee.toLocaleString()}`;
+      document.getElementById('summary-shipping-method').innerText = shippingName;
+      let total = itemPrice + systemFee + shippingFee;
+      document.getElementById('summary-total-price').innerText = `¥${total.toLocaleString()}`;
+
+      document.getElementById('checkout-step-1').classList.add('hidden');
+      document.getElementById('checkout-step-2').classList.remove('hidden');
+    }
+
+    function backToStep1() {
+      document.getElementById('checkout-step-2').classList.add('hidden');
+      document.getElementById('checkout-step-1').classList.remove('hidden');
+    }
+
+    function confirmOrder() {
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentSelectedOrderId);
+      
+      if (order) {
+        order.status = "発注・検品中";
+        if (!order.messages) order.messages = [];
+        order.messages.push({
+          sender: 'buyer',
+          text: '【購入確定】購入手続きを完了しました。手配よろしくお願いいたします。'
+        });
+        order.readByAdmin = false;
+
+        saveOrders(orders);
+        alert('【発注完了】ご注文を確定しました！アドミン側へ発送手配が送信されました。');
+        closeCheckoutModal();
+      }
+    }
+
+    window.addEventListener('storage', checkAuth);
+    checkAuth();
+  </script>
+</body>
+</html>

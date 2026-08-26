@@ -1,0 +1,1689 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自動車パーツ調達システム - 管理者ポータル</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #0b132b; color: #e0e6ed; font-family: 'Segoe UI', sans-serif; }
+    .dark-card { background-color: #1c2541; border: 1px solid #2a385b; }
+    .main-tab-active { background-color: #0077b6 !important; color: #ffffff !important; font-weight: bold; border-color: #00b4d8 !important; }
+    .status-tab-active { background-color: #0077b6 !important; color: #ffffff !important; border-color: #00b4d8 !important; }
+    @media print {
+      body * { visibility: hidden; }
+      #printable-invoice, #printable-invoice * { visibility: visible; }
+      #printable-invoice { position: absolute; left: 0; top: 0; width: 100%; color: #000 !important; background: #fff !important; }
+    }
+  </style>
+</head>
+<body class="p-4 md:p-6 min-h-screen">
+
+  <div class="max-w-7xl mx-auto dark-card rounded-2xl p-6 shadow-2xl space-y-6">
+
+    <!-- ダッシュボードヘッダー -->
+    <div class="border-b border-slate-700/60 pb-4 space-y-1">
+      <div class="flex justify-between items-center">
+        <h1 class="text-xl font-black text-orange-400 tracking-wide">B1. アドミン 全体ダッシュボード</h1>
+        <div class="flex items-center gap-3 flex-wrap">
+          <button onclick="openAdminEmailModal()" class="bg-purple-950 hover:bg-purple-900 text-purple-300 border border-purple-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow">
+            <i class="fa-solid fa-at"></i> Adminメール: <span id="current-admin-email-badge" class="font-mono text-white">admin@parts-procurement.jp</span>
+          </button>
+          <button onclick="openShippingFeeModal()" class="bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow">
+            <i class="fa-solid fa-truck-ramp-box"></i> 輸送手間賃設定
+          </button>
+          <button onclick="openMarginModal()" class="bg-emerald-950 hover:bg-emerald-900 text-emerald-400 border border-emerald-700 text-xs font-bold px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition shadow">
+            <i class="fa-solid fa-calculator"></i> 提示額マージン: <span id="current-margin-badge" class="font-black text-white font-mono">20% (最低¥2,000)</span>
+          </button>
+          <span class="text-xs text-slate-500 font-mono">ADMIN SPEC</span>
+        </div>
+      </div>
+      <p class="text-xs text-slate-400 font-medium">全案件の一元管理・提携中古パーツ解体業者メール打診・自動反映システム</p>
+    </div>
+
+    <!-- 4つのKPIカード -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+        <div class="text-slate-400">未打診 / 新規依頼</div>
+        <div id="admin-new-count" class="text-2xl font-black text-red-400 my-1">0 <span class="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded">NEW</span></div>
+        <div class="text-[10px] text-red-400/80">要メール打診</div>
+      </div>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+        <div class="text-slate-400">登録提携業者数</div>
+        <div id="admin-vendor-count" class="text-2xl font-black text-cyan-400 my-1">0 社</div>
+        <div class="text-[10px] text-slate-500">一斉メール送信可能</div>
+      </div>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+        <div class="text-slate-400">当月売上合計</div>
+        <div class="text-2xl font-black text-emerald-400 my-1">¥ 4,850,000</div>
+        <div class="text-[10px] text-emerald-400/80">前月比 +18.5%</div>
+      </div>
+      <div class="bg-slate-900/80 p-4 rounded-xl border border-slate-800">
+        <div class="text-slate-400">設定中のマージン率 / 最低保証</div>
+        <div id="kpi-margin-rate" class="text-xl font-black text-orange-400 my-1">20.0% (保証¥2,000)</div>
+        <div class="text-[10px] text-slate-500">自動優先判定適用中</div>
+      </div>
+    </div>
+
+    <!-- メイン切替ナビゲーション -->
+    <div class="flex gap-3 border-b border-slate-700/80 pb-3 text-xs font-bold">
+      <button id="main-tab-orders" onclick="switchMainTab('orders')" class="main-tab-active bg-slate-900 border border-slate-700 hover:border-cyan-500 px-5 py-2.5 rounded-xl transition flex items-center gap-2">
+        <i class="fa-solid fa-list-check text-cyan-400"></i>
+        <span>📋 案件進捗・打診管理</span>
+      </button>
+      <button id="main-tab-vendors" onclick="switchMainTab('vendors')" class="bg-slate-900 border border-slate-700 hover:border-orange-500 text-slate-300 px-5 py-2.5 rounded-xl transition flex items-center gap-2">
+        <i class="fa-solid fa-warehouse text-orange-400"></i>
+        <span>🏢 提携解体業者リスト管理</span>
+      </button>
+    </div>
+
+    <!-- 📋 案件進捗管理画面 -->
+    <div id="main-section-orders" class="dark-card rounded-xl p-5 border border-slate-700/80 space-y-4">
+      <div class="flex flex-wrap justify-between items-center gap-3">
+        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+          <span>案件進捗一覧</span>
+          <span class="text-[10px] bg-emerald-950 text-emerald-400 px-2 py-0.5 rounded border border-emerald-800">リアルタイム同期中 (新着順最優先表示)</span>
+        </h2>
+        <button onclick="resetData()" class="text-[10px] bg-slate-800 hover:bg-slate-700 text-slate-400 px-2.5 py-1 rounded">初期データにリセット</button>
+      </div>
+
+      <!-- サブタブ -->
+      <div class="flex flex-wrap gap-2 border-b border-slate-800 pb-3 text-xs font-bold">
+        <button id="tab-btn-new" onclick="filterStatus('new')" class="bg-slate-900 border border-slate-700 hover:border-red-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-red-500"></span>
+          <span>① 新規注文 / 未打診</span>
+          <span id="badge-count-new" class="bg-red-950 text-red-400 px-2 py-0.5 rounded-full text-[10px] border border-red-800">0</span>
+        </button>
+        <button id="tab-btn-progress" onclick="filterStatus('progress')" class="bg-slate-900 border border-slate-700 hover:border-orange-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-orange-500"></span>
+          <span>② 進行中 (照会・提示)</span>
+          <span id="badge-count-progress" class="bg-orange-950 text-orange-400 px-2 py-0.5 rounded-full text-[10px] border border-orange-800">0</span>
+        </button>
+        
+        <button id="tab-btn-purchased" onclick="filterStatus('purchased')" class="bg-slate-900 border border-slate-700 hover:border-emerald-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+          <i class="fa-solid fa-cart-check text-emerald-400"></i>
+          <span class="text-emerald-300 font-bold">🛒 受注確定・発送待ち</span>
+          <span id="badge-count-purchased" class="bg-emerald-500 text-black font-black px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </button>
+
+        <button id="tab-btn-completed" onclick="filterStatus('completed')" class="bg-slate-900 border border-slate-700 hover:border-blue-500 text-slate-300 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+          <span>④ 発送完了・完了案件</span>
+          <span id="badge-count-completed" class="bg-blue-950 text-blue-400 px-2 py-0.5 rounded-full text-[10px] border border-blue-800">0</span>
+        </button>
+
+        <button id="tab-btn-all" onclick="filterStatus('all')" class="status-tab-active bg-slate-900 border border-slate-700 hover:border-cyan-500 px-3 py-1.5 rounded-lg transition flex items-center gap-2">
+          <span>全件表示</span>
+          <span id="badge-count-all" class="bg-slate-800 text-slate-300 px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-[11px] border-collapse">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-800">
+              <th class="p-2.5">案件ID / 製造年月</th>
+              <th class="p-2.5">希望区分</th>
+              <th class="p-2.5">車種・パーツ名 / 最新メッセージ</th>
+              <th class="p-2.5">依頼日</th>
+              <th class="p-2.5 text-center">ステータス変更</th>
+              <th class="p-2.5 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody id="admin-table-body" class="divide-y divide-slate-800/60 text-slate-300">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- 🏢 提携業者リスト管理画面 -->
+    <div id="main-section-vendors" class="hidden dark-card rounded-xl p-5 border border-slate-700/80 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div>
+          <h2 class="text-sm font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-warehouse text-orange-400"></i> 提携中古パーツ解体業者 マスター管理
+          </h2>
+          <p class="text-[11px] text-slate-400">見積照会を一斉送信する提携業者のログイン情報・取引状態の管理</p>
+        </div>
+        <button onclick="openNewVendorModal()" class="bg-orange-500 hover:bg-orange-400 text-black font-black px-4 py-2 rounded-lg text-xs transition shadow flex items-center gap-1.5">
+          <i class="fa-solid fa-plus"></i> 新規業者を追加
+        </button>
+      </div>
+
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs border-collapse">
+          <thead>
+            <tr class="bg-slate-900 text-slate-400 border-b border-slate-800">
+              <th class="p-3">業者ID / ログインPASS</th>
+              <th class="p-3">業者名 / 会社名</th>
+              <th class="p-3">送信先メールアドレス</th>
+              <th class="p-3">電話 / 担当者</th>
+              <th class="p-3 text-center">取引ステータス</th>
+              <th class="p-3 text-center">操作</th>
+            </tr>
+          </thead>
+          <tbody id="vendor-table-body" class="divide-y divide-slate-800 text-slate-300">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Admin 送信用メールアドレス設定 モーダル -->
+  <div id="modal-admin-email-setting" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-purple-400 flex items-center gap-2">
+          <i class="fa-solid fa-at"></i> 送信用 Admin メールアドレス設定
+        </h3>
+        <button onclick="closeAdminEmailModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <p class="text-slate-300">
+          業者への打診メールや、新着チャット通知メールの送信元（差出人）として登録する管理者メールアドレスを設定してください。
+        </p>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">管理者メールアドレス (Admin Email)</label>
+          <input type="email" id="input-admin-email" value="admin@parts-procurement.jp" placeholder="admin@parts-procurement.jp" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-sm text-cyan-300 font-mono" required>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button onclick="closeAdminEmailModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-bold">キャンセル</button>
+          <button onclick="saveAdminEmailSetting()" class="bg-purple-600 hover:bg-purple-500 text-white font-bold px-5 py-2 rounded-lg shadow">保存する</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 粗利（マージン）設定 モーダル -->
+  <div id="modal-margin-setting" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <i class="fa-solid fa-calculator"></i> 提示額マージン (利益率 & 最低保証) 設定
+        </h3>
+        <button onclick="closeMarginModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">① 上乗せマージン率 (%)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="input-margin-rate" min="0" max="100" value="20" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-base text-emerald-400 font-bold font-mono">
+            <span class="text-white font-bold">% 上乗せ</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">② 最低保証マージン金額 (円)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="input-margin-min" min="0" step="500" value="2000" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-base text-orange-400 font-bold font-mono">
+            <span class="text-white font-bold">円 保証</span>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button onclick="closeMarginModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-bold">キャンセル</button>
+          <button onclick="saveMarginRate()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-5 py-2 rounded-lg shadow">設定を保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 車両積み込み ＆ コンテナ輸送 手間賃設定 モーダル -->
+  <div id="modal-shipping-fee-setting" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[80]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-cyan-400 flex items-center gap-2">
+          <i class="fa-solid fa-truck-ramp-box"></i> 輸送作業手間賃の規定額設定
+        </h3>
+        <button onclick="closeShippingFeeModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">車両に積み込み (車内混載) 手間賃 (円)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="input-vehicle-fee" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-base text-cyan-300 font-bold font-mono">
+            <span class="text-white font-bold">円</span>
+          </div>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">コンテナ輸送 (バンニング) 手間賃 (円)</label>
+          <div class="flex items-center gap-2">
+            <input type="number" id="input-container-fee" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-3 text-base text-orange-400 font-bold font-mono">
+            <span class="text-white font-bold">円</span>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button onclick="closeShippingFeeModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-bold">キャンセル</button>
+          <button onclick="saveShippingFeeConfig()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-5 py-2 rounded-lg shadow">設定を保存</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ➕/✏️ 業者追加・編集 モーダル -->
+  <div id="modal-add-vendor" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-4">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 id="vendor-modal-title" class="text-sm font-bold text-orange-400 flex items-center gap-2">
+          <i class="fa-solid fa-building-circle-check"></i> 提携中古パーツ業者の登録・編集
+        </h3>
+        <button onclick="closeNewVendorModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <form id="vendor-form" onsubmit="saveVendor(event)" class="space-y-3 text-xs">
+        <input type="hidden" id="v-edit-id">
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">業者名・会社名 <span class="text-red-400">*</span></label>
+          <input type="text" id="v-name" placeholder="例: 関東オートパーツ" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white" required>
+        </div>
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">見積打診用メールアドレス <span class="text-red-400">*</span></label>
+          <input type="email" id="v-email" placeholder="例: kanto-autoparts@example.com" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-cyan-300 font-mono" required>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-300 font-bold block mb-1">業者ポータル用パスワード</label>
+            <input type="text" id="v-pass" value="1234" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white font-mono" required>
+          </div>
+          <div>
+            <label class="text-slate-300 font-bold block mb-1">電話番号</label>
+            <input type="text" id="v-phone" placeholder="例: 048-700-1122" class="w-full bg-slate-950 border border-slate-700 rounded p-2 text-white">
+          </div>
+        </div>
+
+        <div class="pt-3 text-right flex justify-end gap-2">
+          <button type="button" onclick="closeNewVendorModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded font-bold">キャンセル</button>
+          <button type="submit" class="bg-orange-500 hover:bg-orange-400 text-black font-black px-5 py-2 rounded shadow">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 🏭 案件詳細＆チャット モーダル -->
+  <div id="modal-detail" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+    <div class="bg-[#0f172a] border border-slate-700 rounded-2xl w-full max-w-6xl max-h-[92vh] overflow-y-auto p-6 space-y-5 shadow-2xl relative">
+      
+      <!-- モーダルヘッダー -->
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <div class="flex items-center gap-3 flex-wrap">
+          <span id="modal-id" class="text-lg font-black text-orange-400 font-mono">#REQ-2026-809</span>
+          <span id="modal-buyer" class="text-xs text-slate-300">バイヤー: Self Service (テストユーザー)</span>
+          <span id="modal-part-type" class="font-bold text-xs">
+            <span class="bg-purple-950 text-purple-300 px-2.5 py-1 rounded border border-purple-800">希望: 新品</span>
+          </span>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="invoice-btn" onclick="openInvoiceModal()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs transition shadow flex items-center gap-1.5">
+            <i class="fa-solid fa-file-invoice-dollar"></i> 🖨️ 請求書・納品書プレビュー / 印刷
+          </button>
+          <button onclick="toggleEditMode()" class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-600 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+            <i class="fa-solid fa-pen-to-square"></i> 依頼内容を修正
+          </button>
+          <button onclick="closeModal()" class="text-slate-400 hover:text-white text-xl ml-2"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <!-- 依頼内容修正用フォーム (トグル表示) -->
+      <div id="edit-form-box" class="hidden bg-slate-950 p-4 rounded-xl border border-cyan-800/80 space-y-3 text-xs">
+        <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+          <span class="text-cyan-400 font-bold"><i class="fa-solid fa-sliders mr-1"></i> 依頼内容の修正</span>
+          <span class="text-[10px] text-slate-400">保存するとバイヤー側画面にもリアルタイムで反映されます</span>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">車種・希望パーツ名</label>
+            <input type="text" id="edit-car" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+          </div>
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">希望区分</label>
+            <select id="edit-parttype" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white">
+              <option value="中古">中古パーツ希望</option>
+              <option value="新品">新品 (純正/社外) 希望</option>
+              <option value="両方見積もり">新品・中古の両方の見積もりが欲しい</option>
+            </select>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">純正品番 (OEM Part Number)</label>
+            <input type="text" id="edit-partnum" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-cyan-300 font-mono">
+          </div>
+          <div>
+            <label class="text-slate-400 font-bold block mb-1">車台番号 (VIN)</label>
+            <input type="text" id="edit-vin" class="w-full bg-slate-900 border border-slate-700 rounded p-2 text-white font-mono">
+          </div>
+        </div>
+        <div class="text-right pt-1">
+          <button onclick="saveOrderEdits()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-4 py-1.5 rounded-lg text-xs shadow">
+            <i class="fa-solid fa-floppy-disk mr-1"></i> 修正内容を保存する
+          </button>
+        </div>
+      </div>
+
+      <!-- 2カラム構成 -->
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-5">
+        
+        <div class="lg:col-span-8 space-y-4">
+
+          <!-- 依頼パーツ詳細サマリー -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-cyan-900/60 space-y-2.5">
+            <h3 class="text-xs font-bold text-cyan-400 flex items-center justify-between border-b border-slate-800 pb-2">
+              <span class="flex items-center gap-1.5">
+                <i class="fa-solid fa-car-side"></i> 📌 依頼パーツ詳細サマリー
+              </span>
+              <span class="text-[10px] text-slate-400 font-mono">依頼日: <span id="detail-date" class="text-slate-200">----/--/--</span></span>
+            </h3>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-400 text-[10px] block font-bold">対象車種 / パーツ名:</span>
+                <span id="detail-car" class="font-bold text-white text-sm block mt-0.5">---</span>
+              </div>
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800">
+                <span class="text-slate-400 text-[10px] block font-bold">純正品番 (OEM) / 車台番号 (VIN):</span>
+                <div class="font-mono text-cyan-300 mt-0.5">
+                  品番: <span id="detail-partnum">---</span><br>
+                  VIN: <span id="detail-vin" class="text-slate-300">---</span>
+                </div>
+              </div>
+              <div class="bg-slate-900/90 p-2.5 rounded-lg border border-slate-800 flex flex-col justify-between">
+                <div>
+                  <span class="text-slate-400 text-[10px] block font-bold">車台番号よりの製造年月:</span>
+                  <span id="detail-mfg" class="font-mono font-bold text-cyan-300 text-sm block mt-0.5">----/--</span>
+                </div>
+                <a id="partsouq-link" href="https://partsouq.com/" target="_blank" class="mt-1 bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 px-2 py-1 rounded text-[10px] font-bold text-center transition flex items-center justify-center gap-1">
+                  <i class="fa-solid fa-up-right-from-square"></i> PartsOuqで車台番号検索
+                </a>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 送信先メールアドレス選択カード -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3">
+            <div class="flex justify-between items-center border-b border-slate-800 pb-2">
+              <h3 class="text-xs font-bold text-orange-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-envelope"></i> 送信先業者を選択して一斉打診メールを実行
+              </h3>
+            </div>
+            
+            <div id="vendor-checkbox-list" class="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-36 overflow-y-auto p-2 bg-slate-900 rounded-lg border border-slate-800 text-xs">
+            </div>
+
+            <div class="flex justify-between items-center pt-2 border-t border-slate-800">
+              <div id="broadcast-status-text" class="text-[11px] text-emerald-400 font-bold flex items-center gap-1">
+                <i class="fa-solid fa-circle-check"></i> 選択された業者へ一斉メール打診が可能です
+              </div>
+              <button onclick="broadcastToVendors()" class="bg-orange-500 hover:bg-orange-400 text-black font-black px-4 py-2 rounded-lg text-xs shadow flex items-center gap-1.5 transition">
+                <i class="fa-solid fa-paper-plane"></i> 選択業者へメール送信を実行
+              </button>
+            </div>
+          </div>
+
+          <!-- 返信メール・ポータル回答一覧 -->
+          <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <h3 class="text-xs font-bold text-white flex items-center gap-1.5">
+                <i class="fa-solid fa-inbox text-cyan-400"></i> 業者からの写真回答・反映一覧 (原価 ➜ 提示額自動換算)
+              </h3>
+              <span id="vendor-response-count" class="text-[10px] text-slate-400 font-mono">0通の回答を受信</span>
+            </div>
+            <div id="vendor-response-list" class="space-y-3 max-h-80 overflow-y-auto pr-1"></div>
+          </div>
+
+          <!-- 提携解体業者との個別チャットエリア -->
+          <div class="bg-slate-950 p-4 rounded-xl border border-amber-900/80 space-y-3">
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-2">
+              <label class="text-xs font-bold text-amber-400 whitespace-nowrap"><i class="fa-solid fa-comments"></i> 業者チャット表示切替:</label>
+              <select id="admin-vendor-chat-filter-select" onchange="setVendorChatFilter(this.value)" class="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-orange-400 font-bold focus:outline-none flex-1">
+              </select>
+            </div>
+
+            <div id="admin-vendor-chat-box" class="space-y-2.5 max-h-52 overflow-y-auto p-2 bg-slate-900/90 rounded-lg border border-slate-800">
+            </div>
+
+            <!-- アドミンから業者宛ての返信フォーム -->
+            <div class="flex gap-2 pt-1 border-t border-slate-800/80">
+              <select id="admin-vendor-reply-target" class="bg-slate-900 border border-slate-700 rounded-lg p-1.5 text-xs text-orange-400 font-bold focus:outline-none">
+                <option value="" disabled selected>-- 送信先の業者を選択 --</option>
+                <option value="ALL">全提携業者宛て</option>
+              </select>
+              <input type="text" id="admin-vendor-reply-input" placeholder="業者宛てに回答・メッセージを送信..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-orange-500" onkeypress="if(event.key==='Enter') sendAdminToVendorChat()">
+              <button onclick="sendAdminToVendorChat()" class="bg-orange-500 hover:bg-orange-400 text-black font-black px-4 py-2 rounded-lg text-xs whitespace-nowrap transition">
+                送信
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- 👉 右側 お客様チャットエリア -->
+        <div class="lg:col-span-4 space-y-4">
+          <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 flex flex-col h-full">
+            <h3 class="text-xs font-bold text-cyan-400 flex items-center gap-1.5 border-b border-slate-800 pb-2">
+              <i class="fa-solid fa-comments"></i> お客様チャット
+            </h3>
+            
+            <div id="admin-chat-box" class="h-80 overflow-y-auto space-y-2.5 text-xs p-1">
+            </div>
+
+            <!-- 🌟【新設】ヤフオク等URL一発提示ボタン -->
+            <button onclick="openExternalUrlModal()" class="w-full bg-emerald-950 hover:bg-emerald-900 text-emerald-300 border border-emerald-700 font-bold py-1.5 rounded-lg text-[11px] shadow transition flex items-center justify-center gap-1">
+              <i class="fa-solid fa-link"></i> 🔗 ヤフオク等のURL・提示額を一発送信
+            </button>
+
+            <div class="flex gap-2 pt-2 border-t border-slate-800">
+              <input type="text" id="admin-chat-input" placeholder="返信..." class="w-full bg-slate-900 border border-slate-700 rounded-lg p-2 text-xs text-white focus:outline-none focus:border-cyan-500" onkeypress="if(event.key==='Enter') sendAdminChat()">
+              <button onclick="sendAdminChat()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-4 py-2 rounded-lg text-xs whitespace-nowrap transition">
+                送信
+              </button>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 🌟【新設】ヤフオク等URL・代替提案の提示モーダル -->
+  <div id="modal-external-url" class="hidden fixed inset-0 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 z-[95]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <i class="fa-solid fa-link"></i> ヤフオク等URL・代替提示の送信
+        </h3>
+        <button onclick="closeExternalUrlModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">バイヤー提示金額 (円) <span class="text-red-400">*</span></label>
+          <input type="number" id="ext-price-input" placeholder="例: 35000" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-base text-emerald-400 font-bold font-mono" required>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">参照Webページ / ヤフオクURL <span class="text-red-400">*</span></label>
+          <input type="url" id="ext-url-input" placeholder="https://page.auctions.yahoo.co.jp/jp/auction/..." class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-cyan-300 font-mono" required>
+        </div>
+
+        <div>
+          <label class="text-slate-300 font-bold block mb-1">添えコメント・状態説明</label>
+          <textarea id="ext-comment-input" rows="2" placeholder="例: ヤフオク等にて該当パーツが見つかりました。コンディション良好です。" class="w-full bg-slate-950 border border-slate-700 rounded-xl p-2.5 text-white"></textarea>
+        </div>
+
+        <div class="pt-2 flex justify-end gap-2">
+          <button onclick="closeExternalUrlModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-bold">キャンセル</button>
+          <button onclick="submitExternalUrlToBuyer()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-5 py-2 rounded-lg shadow">
+            送信（自動で提示済みに更新）
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- バイヤー向け請求書メール内容 最終確認＆プレビュー モーダル -->
+  <div id="modal-invoice-confirm" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[95]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <i class="fa-solid fa-envelope-circle-check"></i> 請求書メール送信内容の最終確認
+        </h3>
+        <button onclick="closeInvoiceConfirmModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark"></i></button>
+      </div>
+
+      <div class="space-y-3 text-xs">
+        <p class="text-slate-300">以下の確定明細内容でバイヤーへ請求メールを自動送信いたします。よろしいですか？</p>
+
+        <div class="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2 font-mono">
+          <div class="flex justify-between border-b border-slate-800 pb-1">
+            <span class="text-slate-400">送信先バイヤー:</span>
+            <span id="confirm-buyer-name" class="font-bold text-white">---</span>
+          </div>
+          <div class="flex justify-between border-b border-slate-800 pb-1">
+            <span class="text-slate-400">対象パーツ:</span>
+            <span id="confirm-car-name" class="font-bold text-white">---</span>
+          </div>
+          <div class="flex justify-between text-slate-300 pt-1">
+            <span>① パーツ本体提示代金:</span>
+            <span id="confirm-item-price" class="font-bold text-white">¥0</span>
+          </div>
+          <div class="flex justify-between text-slate-300">
+            <span>② システム手数料 (15%):</span>
+            <span id="confirm-fee-price" class="font-bold text-orange-400">¥0</span>
+          </div>
+          <div class="flex justify-between text-slate-300">
+            <span>③ 国際発送送料/手間賃:</span>
+            <span id="confirm-ship-price" class="font-bold text-cyan-300">¥0</span>
+          </div>
+          <div class="flex justify-between text-base font-black text-emerald-400 border-t border-slate-700 pt-2">
+            <span>お支払いご請求合計:</span>
+            <span id="confirm-total-price">¥0</span>
+          </div>
+        </div>
+
+        <div class="pt-2 flex justify-between items-center">
+          <button onclick="openInvoiceModal(); closeInvoiceConfirmModal();" class="text-slate-400 hover:text-white underline text-[11px]">
+            🖨️ 正式な紙・PDF版で確認する
+          </button>
+          <div class="flex gap-2">
+            <button onclick="closeInvoiceConfirmModal()" class="bg-slate-800 text-slate-300 px-4 py-2 rounded-lg font-bold">キャンセル</button>
+            <button onclick="executeSendInvoiceEmail()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-5 py-2 rounded-lg shadow flex items-center gap-1">
+              <i class="fa-solid fa-paper-plane"></i> ✉️ この内容でバイヤーへメール送信
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 正式請求書・納品書印刷 モーダル -->
+  <div id="modal-invoice" class="hidden fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center p-4 z-[90]">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto p-6 space-y-4 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-800 pb-3">
+        <h3 class="text-sm font-bold text-emerald-400 flex items-center gap-2">
+          <i class="fa-solid fa-print"></i> 正式請求書・納品書 (Invoice) プレビュー＆印刷
+        </h3>
+        <div class="flex gap-2">
+          <button onclick="window.print()" class="bg-emerald-500 hover:bg-emerald-400 text-black font-black px-4 py-1.5 rounded-lg text-xs shadow flex items-center gap-1">
+            <i class="fa-solid fa-print"></i> 印刷 / PDF保存
+          </button>
+          <button onclick="closeInvoiceModal()" class="text-slate-400 hover:text-white text-lg"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <div id="printable-invoice" class="bg-white text-slate-900 p-8 rounded-xl space-y-6 text-xs shadow-lg font-sans">
+        <div class="flex justify-between items-start border-b-2 border-slate-900 pb-4">
+          <div>
+            <h1 class="text-2xl font-black text-slate-900 tracking-wider">請求書 / INVOICE</h1>
+            <p class="text-slate-600 font-mono text-[10px] mt-1">請求番号: <span id="inv-no">INV-2026-0809</span></p>
+            <p class="text-slate-600 font-mono text-[10px]">発行日: <span id="inv-date">2026年08月08日</span></p>
+          </div>
+          <div class="text-right space-y-0.5">
+            <div class="font-bold text-slate-900 text-sm">自動車パーツ調達 事務局</div>
+            <div class="text-[10px] text-slate-600">登録番号: T1234567890123 (適格請求書発行事業者)</div>
+            <div class="text-[10px] text-slate-600">神奈川県横浜市中区本町 1-2-3</div>
+            <div class="text-[10px] text-slate-600 font-mono">TEL: 045-123-4567 / info@parts-procurement.jp</div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 gap-6 pt-2">
+          <div class="bg-slate-50 p-4 rounded-lg border border-slate-200 space-y-1">
+            <span class="text-[10px] text-slate-500 font-bold block">ご請求先 (バイヤー様):</span>
+            <span id="inv-buyer-name" class="font-bold text-base text-slate-900 block">Self Service (テストユーザー) 様</span>
+            <span class="text-[10px] text-slate-600 block">納品先: Yokohama Port Yard / Australia Export</span>
+          </div>
+
+          <div class="bg-emerald-50 p-4 rounded-lg border border-emerald-200 text-right space-y-1">
+            <span class="text-xs font-bold text-emerald-900 block">ご請求金額 (税込合計):</span>
+            <span id="inv-total-amount" class="text-2xl font-black text-emerald-700 font-mono">¥0</span>
+          </div>
+        </div>
+
+        <table class="w-full text-left border-collapse border border-slate-300 text-xs">
+          <thead>
+            <tr class="bg-slate-100 text-slate-700 border-b border-slate-300 font-bold">
+              <th class="p-2.5 border-r border-slate-300">項目・パーツ内容</th>
+              <th class="p-2.5 border-r border-slate-300 font-mono">VIN / 年式</th>
+              <th class="p-2.5 text-right border-r border-slate-300">数量</th>
+              <th class="p-2.5 text-right">金額 (JPY)</th>
+            </tr>
+          </thead>
+          <tbody class="divide-y divide-slate-200">
+            <tr>
+              <td id="inv-item-name" class="p-2.5 font-bold border-r border-slate-300">---</td>
+              <td id="inv-item-vin" class="p-2.5 font-mono text-[10px] border-r border-slate-300">---</td>
+              <td class="p-2.5 text-right border-r border-slate-300 font-mono">1</td>
+              <td id="inv-item-price" class="p-2.5 text-right font-mono font-bold">¥0</td>
+            </tr>
+            <tr>
+              <td class="p-2.5 text-slate-600 border-r border-slate-300">システム仲介・調達手数料 (15%)</td>
+              <td class="p-2.5 text-slate-400 font-mono text-[10px] border-r border-slate-300">-</td>
+              <td class="p-2.5 text-right border-r border-slate-300 font-mono">1</td>
+              <td id="inv-fee-price" class="p-2.5 text-right font-mono">¥0</td>
+            </tr>
+            <tr>
+              <td class="p-2.5 text-slate-600 border-r border-slate-300">国際発送送料 / 車両・コンテナ混載手数料</td>
+              <td class="p-2.5 text-slate-400 font-mono text-[10px] border-r border-slate-300">-</td>
+              <td class="p-2.5 text-right border-r border-slate-300 font-mono">1</td>
+              <td id="inv-ship-price" class="p-2.5 text-right font-mono">¥0</td>
+            </tr>
+          </tbody>
+        </table>
+
+        <div class="border-t border-slate-200 pt-3 text-[10px] text-slate-500 space-y-1">
+          <p>※ 本状はシステムより自動生成された正式な請求明細書です。</p>
+          <p>※ 銀行振込口座: 横浜銀行 本店営業部 (普通) 1234567 カ)ジドウシャパーツチョウタツ</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 写真拡大モーダル -->
+  <div id="image-modal" class="hidden fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-4 z-[70]" onclick="closeImageModal()">
+    <div class="relative max-w-4xl max-h-[90vh] flex flex-col items-center">
+      <img id="enlarged-image" src="" class="max-w-full max-h-[80vh] rounded-lg object-contain border border-slate-700 shadow-2xl">
+      <p class="text-slate-400 text-xs mt-3"><i class="fa-solid fa-xmark mr-1"></i> タップすると閉じます</p>
+    </div>
+  </div>
+
+  <script>
+    const defaultVendors = [
+      { id: "asd", name: "中古パーツ業者A (関東オートパーツ)", email: "kanto-autoparts@example.com", pass: "1234", phone: "048-700-1122", contact: "佐藤 健一", status: "active" },
+      { id: "qwe", name: "中古パーツ業者B (関西解体キング)", email: "info@kansai-king-parts.jp", pass: "1234", phone: "072-899-3344", contact: "田中 義雄", status: "active" },
+      { id: "V-003", name: "中古パーツ業者C (中部パーツリサイクル)", email: "estimate@chubu-recycle.co.jp", pass: "1234", phone: "0568-44-5566", contact: "鈴木 雅人", status: "active" }
+    ];
+
+    const defaultOrders = [
+      {
+        id: "#REQ-2026-809",
+        car: "トヨタ クラウン / リアバンパー",
+        partType: "新品",
+        partNum: "52159-30400",
+        vin: "GRS184-0002255",
+        mfgDate: "2005/10",
+        date: "2026/07/28",
+        status: "発注・検品中",
+        price: 58000,
+        shippingFee: 18500,
+        buyer: "Self Service (テストユーザー)",
+        readByAdmin: true,
+        hasNewVendorResponse: false,
+        vendorResponses: [
+          { vendor: "中古パーツ業者A (関東オートパーツ)", price: 45000, quality: "Aランク (美品・ステー正常)", shipDate: "即日〜2日以内に発送可能", comment: "在庫あり。即納可能です。", img: "https://images.unsplash.com/photo-1503376780353-7e6692767b70?w=800" },
+          { vendor: "中古パーツ業者B (関西解体キング)", price: 32000, quality: "Bランク (小傷あり・要再塗装)", shipDate: "3日〜1週間以内に発送可能", comment: "下部に擦り傷あり。修復前提であれば大変お得です。", img: "https://images.unsplash.com/photo-1486006920555-c77dce18193b?w=800" }
+        ],
+        messages: [{ sender: "buyer", text: "【購入確定】購入手続きを完了しました。手配よろしくお願いいたします。" }],
+        vendorChats: [
+          { sender: "中古パーツ業者A (関東オートパーツ)", target: "管理者 (Admin)", text: "状態の写真をアップロードいたしました。", date: "2026/08/17 13:40" },
+          { sender: "中古パーツ業者B (関西解体キング)", target: "管理者 (Admin)", text: "適合確認の件、回答します。", date: "2026/08/17 14:15" }
+        ]
+      }
+    ];
+
+    let currentAdminChatId = null;
+    let currentFilterStatus = 'all';
+    let pendingInvoiceOrderId = null;
+    let currentVendorChatFilter = 'ALL';
+
+    function getVendors() {
+      const data = localStorage.getItem('portal_vendors');
+      return data ? JSON.parse(data) : defaultVendors;
+    }
+
+    function saveVendors(vendors) {
+      localStorage.setItem('portal_vendors', JSON.stringify(vendors));
+      renderVendorTable();
+    }
+
+    function getOrders() {
+      const data = localStorage.getItem('portal_orders');
+      return data ? JSON.parse(data) : defaultOrders;
+    }
+
+    function saveOrders(orders) {
+      localStorage.setItem('portal_orders', JSON.stringify(orders));
+      renderAdminTable();
+    }
+
+    function getAdminEmail() {
+      const email = localStorage.getItem('portal_admin_email');
+      return email || "admin@parts-procurement.jp";
+    }
+
+    function saveAdminEmailData(email) {
+      localStorage.setItem('portal_admin_email', email);
+      updateAdminEmailUI();
+    }
+
+    function updateAdminEmailUI() {
+      const badge = document.getElementById('current-admin-email-badge');
+      if (badge) badge.innerText = getAdminEmail();
+    }
+
+    function openAdminEmailModal() {
+      document.getElementById('input-admin-email').value = getAdminEmail();
+      document.getElementById('modal-admin-email-setting').classList.remove('hidden');
+    }
+
+    function closeAdminEmailModal() {
+      document.getElementById('modal-admin-email-setting').classList.add('hidden');
+    }
+
+    function saveAdminEmailSetting() {
+      const email = document.getElementById('input-admin-email').value.trim();
+      if (!email || !email.includes('@')) {
+        alert("正しいメールアドレスを入力してください。");
+        return;
+      }
+      saveAdminEmailData(email);
+      alert(`【保存完了】差出人用 Admin メールアドレス（${email}）を保存しました！`);
+      closeAdminEmailModal();
+    }
+
+    function getMarginSetting() {
+      const mRate = localStorage.getItem('portal_margin_rate');
+      const mMin = localStorage.getItem('portal_margin_min');
+      return {
+        rate: mRate ? parseFloat(mRate) : 20,
+        minFee: mMin ? parseInt(mMin, 10) : 2000
+      };
+    }
+
+    function saveMarginSettingData(rate, minFee) {
+      localStorage.setItem('portal_margin_rate', rate);
+      localStorage.setItem('portal_margin_min', minFee);
+      updateMarginUI();
+      renderAdminTable();
+    }
+
+    function updateMarginUI() {
+      const setting = getMarginSetting();
+      const badge = document.getElementById('current-margin-badge');
+      const kpi = document.getElementById('kpi-margin-rate');
+      if (badge) badge.innerText = `${setting.rate}% (最低保証 ¥${setting.minFee.toLocaleString()})`;
+      if (kpi) kpi.innerText = `${setting.rate.toFixed(1)}% (保証¥${setting.minFee.toLocaleString()})`;
+    }
+
+    function openMarginModal() {
+      const setting = getMarginSetting();
+      document.getElementById('input-margin-rate').value = setting.rate;
+      document.getElementById('input-margin-min').value = setting.minFee;
+      document.getElementById('modal-margin-setting').classList.remove('hidden');
+    }
+
+    function closeMarginModal() {
+      document.getElementById('modal-margin-setting').classList.add('hidden');
+    }
+
+    function saveMarginRate() {
+      const rate = parseFloat(document.getElementById('input-margin-rate').value);
+      const minFee = parseInt(document.getElementById('input-margin-min').value, 10);
+
+      if (isNaN(rate) || rate < 0 || isNaN(minFee) || minFee < 0) {
+        alert('正しい数値を入力してください。');
+        return;
+      }
+      saveMarginSettingData(rate, minFee);
+      alert(`【保存完了】マージン設定を保存しました！`);
+      closeMarginModal();
+    }
+
+    function openInvoiceModal() {
+      if (!currentAdminChatId) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+      if (!order) return;
+
+      const itemPrice = order.price || 0;
+      let calcFee = Math.round(itemPrice * 0.15);
+      let systemFee = calcFee < 2000 ? 2000 : calcFee;
+      let shipFee = order.shippingFee || 15000;
+      let grandTotal = itemPrice + systemFee + shipFee;
+
+      document.getElementById('inv-no').innerText = `INV-${order.id.replace('#REQ-', '')}`;
+      document.getElementById('inv-date').innerText = new Date().toLocaleDateString('ja-JP', { year: 'numeric', month: 'long', day: 'numeric' });
+      document.getElementById('inv-buyer-name').innerText = `${order.buyer} 様`;
+      document.getElementById('inv-item-name').innerText = order.car;
+      document.getElementById('inv-item-vin').innerText = `VIN: ${order.vin || '-'} / 年式: ${order.mfgDate || '-'}`;
+      document.getElementById('inv-item-price').innerText = `¥${itemPrice.toLocaleString()}`;
+      document.getElementById('inv-fee-price').innerText = `¥${systemFee.toLocaleString()}`;
+      document.getElementById('inv-ship-price').innerText = `¥${shipFee.toLocaleString()}`;
+      document.getElementById('inv-total-amount').innerText = `¥${grandTotal.toLocaleString()}`;
+
+      document.getElementById('modal-invoice').classList.remove('hidden');
+    }
+
+    function closeInvoiceModal() {
+      document.getElementById('modal-invoice').classList.add('hidden');
+    }
+
+    function openExternalUrlModal() {
+      document.getElementById('ext-price-input').value = '';
+      document.getElementById('ext-url-input').value = '';
+      document.getElementById('ext-comment-input').value = '';
+      document.getElementById('modal-external-url').classList.remove('hidden');
+    }
+
+    function closeExternalUrlModal() {
+      document.getElementById('modal-external-url').classList.add('hidden');
+    }
+
+    // 🌟 ヤフオク等URL一発提案の処理（ステータス自動変更）
+    function submitExternalUrlToBuyer() {
+      if (!currentAdminChatId) return;
+      const price = parseInt(document.getElementById('ext-price-input').value, 10);
+      const url = document.getElementById('ext-url-input').value.trim();
+      const comment = document.getElementById('ext-comment-input').value.trim();
+
+      if (!price || !url) {
+        alert("提示金額とURLを入力してください。");
+        return;
+      }
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentAdminChatId);
+
+      if (order) {
+        order.price = price;
+        order.status = "見積もり回答済み"; // 全自動更新
+        order.hasNewPriceNotice = true;
+        order.readByBuyer = false;
+
+        if (!order.messages) order.messages = [];
+        order.messages.push({
+          sender: 'admin',
+          text: `【ヤフオク等パーツ提示】提示金額: ¥${price.toLocaleString()}\n▼該当商品URL:\n${url}\n${comment ? 'メモ: ' + comment : ''}`
+        });
+
+        saveOrders(orders);
+        alert(`【提示完了】バイヤー画面へヤフオク等の提示URL・お見積り（¥${price.toLocaleString()}）が送信され、ステータスが「見積もり回答済み」へ自動更新されました！`);
+        closeExternalUrlModal();
+        renderModalContent();
+      }
+    }
+
+    function sendInvoiceEmailToBuyer(orderId) {
+      pendingInvoiceOrderId = orderId;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === orderId);
+      if (!order) return;
+
+      const itemPrice = order.price || 0;
+      let calcFee = Math.round(itemPrice * 0.15);
+      let systemFee = calcFee < 2000 ? 2000 : calcFee;
+      let shipFee = order.shippingFee || 15000;
+      let grandTotal = itemPrice + systemFee + shipFee;
+
+      document.getElementById('confirm-buyer-name').innerText = order.buyer;
+      document.getElementById('confirm-car-name').innerText = order.car;
+      document.getElementById('confirm-item-price').innerText = `¥${itemPrice.toLocaleString()}`;
+      document.getElementById('confirm-fee-price').innerText = `¥${systemFee.toLocaleString()}`;
+      document.getElementById('confirm-ship-price').innerText = `¥${shipFee.toLocaleString()}`;
+      document.getElementById('confirm-total-price').innerText = `¥${grandTotal.toLocaleString()}`;
+
+      document.getElementById('modal-invoice-confirm').classList.remove('hidden');
+    }
+
+    function closeInvoiceConfirmModal() {
+      document.getElementById('modal-invoice-confirm').classList.add('hidden');
+      pendingInvoiceOrderId = null;
+    }
+
+    function executeSendInvoiceEmail() {
+      if (!pendingInvoiceOrderId) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === pendingInvoiceOrderId);
+      if (!order) return;
+
+      const itemPrice = order.price || 0;
+      let calcFee = Math.round(itemPrice * 0.15);
+      let systemFee = calcFee < 2000 ? 2000 : calcFee;
+      let shipFee = order.shippingFee || 15000;
+      let grandTotal = itemPrice + systemFee + shipFee;
+
+      if (!order.messages) order.messages = [];
+      order.messages.push({
+        sender: 'admin',
+        text: `【請求書メール送信完了】ご請求書明細をお送りいたしました。\n・対象パーツ: ${order.car}\n・お支払い合計金額: ¥${grandTotal.toLocaleString()} (本体: ¥${itemPrice.toLocaleString()} / 手数料: ¥${systemFee.toLocaleString()} / 送料: ¥${shipFee.toLocaleString()})\n指定口座へのお振込みをお願い申し上げます。`
+      });
+      order.readByBuyer = false;
+
+      saveOrders(orders);
+      alert(`【送信完了】バイヤー（${order.buyer}）宛てに正式請求書メール（合計金額: ¥${grandTotal.toLocaleString()}）を自動送信いたしました！`);
+      closeInvoiceConfirmModal();
+      renderModalContent();
+    }
+
+    function confirmOrderToVendor(index) {
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+
+      if (order && order.vendorResponses[index]) {
+        const targetVendor = order.vendorResponses[index];
+        order.selectedPart = targetVendor;
+        order.confirmedVendorName = targetVendor.vendor;
+        order.status = "発注・検品中";
+
+        if (!order.messages) order.messages = [];
+        order.messages.push({
+          sender: 'admin',
+          text: `【業者発注確定】${targetVendor.vendor} 宛てにパーツ購入確定通知メール（専用ポータルURL付き）を送信し、システム上で発注手配を行いました。`
+        });
+
+        saveOrders(orders);
+        alert(`【発注確定＆メール送信完了】\n${targetVendor.vendor} 宛てに「発注確定通知メール（ポータルURL付き）」を自動送信しました！`);
+        renderModalContent();
+      }
+    }
+
+    function toggleInlineChat(index) {
+      const chatBox = document.getElementById(`inline-chat-box-${index}`);
+      if (chatBox) chatBox.classList.toggle('hidden');
+    }
+
+    function sendInlineVendorChat(vendorName, index) {
+      const input = document.getElementById(`inline-chat-input-${index}`);
+      if (!input || !input.value || !currentAdminChatId) return;
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentAdminChatId);
+      const adminEmail = getAdminEmail();
+      const vendors = getVendors();
+      const targetVendorObj = vendors.find(v => v.name.includes(vendorName) || vendorName.includes(v.name));
+      const targetEmail = targetVendorObj ? targetVendorObj.email : "kanto-autoparts@example.com";
+
+      if (order) {
+        if (!order.vendorChats) order.vendorChats = [];
+        order.vendorChats.push({
+          sender: "管理者 (Admin)",
+          target: vendorName,
+          text: `[宛先: ${vendorName}] ${input.value}`,
+          date: new Date().toLocaleString('ja-JP')
+        });
+
+        saveOrders(orders);
+        alert(`【新着チャット通知メール送信完了】\n差出人: ${adminEmail}\n宛先: ${vendorName} (${targetEmail})`);
+        input.value = '';
+        renderModalContent();
+      }
+    }
+
+    function replyToVendorMessage(vendorName) {
+      currentVendorChatFilter = vendorName;
+      renderModalContent();
+
+      const replyTargetSelect = document.getElementById('admin-vendor-reply-target');
+      const replyInput = document.getElementById('admin-vendor-reply-input');
+      
+      if (!replyTargetSelect || !replyInput) return;
+
+      for (let i = 0; i < replyTargetSelect.options.length; i++) {
+        if (replyTargetSelect.options[i].value === vendorName || replyTargetSelect.options[i].text.includes(vendorName)) {
+          replyTargetSelect.selectedIndex = i;
+          break;
+        }
+      }
+
+      replyInput.focus();
+    }
+
+    function setVendorChatFilter(vendorName) {
+      currentVendorChatFilter = vendorName;
+      const targetSelect = document.getElementById('admin-vendor-reply-target');
+      if (targetSelect && vendorName !== 'ALL') {
+        targetSelect.value = vendorName;
+      }
+      renderModalContent();
+    }
+
+    function sendAdminToVendorChat() {
+      const input = document.getElementById('admin-vendor-reply-input');
+      const targetVendor = document.getElementById('admin-vendor-reply-target').value;
+      
+      if (!targetVendor) {
+        alert("送信先の解体業者を選択してください。");
+        return;
+      }
+      
+      if (!input || !input.value || !currentAdminChatId) return;
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentAdminChatId);
+      const adminEmail = getAdminEmail();
+      const vendors = getVendors();
+      const targetVendorObj = vendors.find(v => v.name.includes(targetVendor) || targetVendor.includes(v.name));
+      const targetEmail = targetVendorObj ? targetVendorObj.email : "指定業者のメールアドレス";
+
+      if (order) {
+        if (!order.vendorChats) order.vendorChats = [];
+        order.vendorChats.push({
+          sender: "管理者 (Admin)",
+          target: targetVendor,
+          text: targetVendor !== 'ALL' ? `[宛先: ${targetVendor}] ${input.value}` : `[全業者宛て] ${input.value}`,
+          date: new Date().toLocaleString('ja-JP')
+        });
+
+        saveOrders(orders);
+
+        const emailNoticeText = `【新着チャット通知メールを送信しました】\n・差出人: Admin事務局 (${adminEmail})\n・送信先: ${targetVendor} (${targetEmail})\n・送信本文概要:\n「管理者より新着メッセージが届きました。\n※本メールに直接返信することはできません。下記の解体業者ポータルURLよりログインし、チャットにてご返信ください」`;
+
+        alert(emailNoticeText);
+        input.value = '';
+        renderModalContent();
+      }
+    }
+
+    function toggleEditMode() {
+      const box = document.getElementById('edit-form-box');
+      box.classList.toggle('hidden');
+    }
+
+    function saveOrderEdits() {
+      if (!currentAdminChatId) return;
+
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+      if (order) {
+        order.car = document.getElementById('edit-car').value;
+        order.partType = document.getElementById('edit-parttype').value;
+        order.partNum = document.getElementById('edit-partnum').value;
+        order.vin = document.getElementById('edit-vin').value;
+
+        saveOrders(orders);
+        alert('【修正完了】案件情報を更新しました。バイヤー側にも即時反映されます！');
+        
+        document.getElementById('detail-car').innerText = order.car;
+        document.getElementById('detail-partnum').innerText = order.partNum || '未設定';
+        document.getElementById('detail-vin').innerText = order.vin || '未設定';
+
+        document.getElementById('edit-form-box').classList.add('hidden');
+        renderAdminTable();
+      }
+    }
+
+    function getShippingFeeConfig() {
+      const config = localStorage.getItem('portal_shipping_fee_config');
+      return config ? JSON.parse(config) : { vehicle: 15000, container: 30000 };
+    }
+
+    function saveShippingFeeConfigData(cfg) {
+      localStorage.setItem('portal_shipping_fee_config', JSON.stringify(cfg));
+    }
+
+    function openShippingFeeModal() {
+      const cfg = getShippingFeeConfig();
+      document.getElementById('input-vehicle-fee').value = cfg.vehicle;
+      document.getElementById('input-container-fee').value = cfg.container;
+      document.getElementById('modal-shipping-fee-setting').classList.remove('hidden');
+    }
+
+    function closeShippingFeeModal() {
+      document.getElementById('modal-shipping-fee-setting').classList.add('hidden');
+    }
+
+    function saveShippingFeeConfig() {
+      const vehicleFee = parseInt(document.getElementById('input-vehicle-fee').value, 10) || 15000;
+      const containerFee = parseInt(document.getElementById('input-container-fee').value, 10) || 30000;
+
+      saveShippingFeeConfigData({ vehicle: vehicleFee, container: containerFee });
+      alert(`【保存完了】輸送作業手間賃の規定額を保存しました！`);
+      closeShippingFeeModal();
+    }
+
+    function switchMainTab(tab) {
+      const btnOrders = document.getElementById('main-tab-orders');
+      const btnVendors = document.getElementById('main-tab-vendors');
+      const secOrders = document.getElementById('main-section-orders');
+      const secVendors = document.getElementById('main-section-vendors');
+
+      if (tab === 'orders') {
+        btnOrders.classList.add('main-tab-active');
+        btnVendors.classList.remove('main-tab-active');
+        secOrders.classList.remove('hidden');
+        secVendors.classList.add('hidden');
+      } else {
+        btnVendors.classList.add('main-tab-active');
+        btnOrders.classList.remove('main-tab-active');
+        secVendors.classList.remove('hidden');
+        secOrders.classList.add('hidden');
+      }
+    }
+
+    function zoomImage(url) {
+      document.getElementById('enlarged-image').src = url;
+      document.getElementById('image-modal').classList.remove('hidden');
+    }
+
+    function closeImageModal() {
+      document.getElementById('image-modal').classList.add('hidden');
+    }
+
+    function toggleVendorStatus(id) {
+      const vendors = getVendors();
+      const v = vendors.find(item => item.id === id);
+      if (v) {
+        if (v.status === 'suspended') {
+          v.status = 'active';
+          alert(`【再開】${v.name} との取引・サインイン許可を再開しました。`);
+        } else {
+          v.status = 'suspended';
+          alert(`【取引中止】${v.name} のアカウントを停止しました。`);
+        }
+        saveVendors(vendors);
+      }
+    }
+
+    function renderVendorTable() {
+      const vendors = getVendors();
+      const tbody = document.getElementById('vendor-table-body');
+      tbody.innerHTML = '';
+      document.getElementById('admin-vendor-count').innerText = `${vendors.length} 社`;
+
+      vendors.forEach(v => {
+        let isSuspended = (v.status === 'suspended');
+        let statusBadge = isSuspended ? 
+          `<span class="bg-red-950 text-red-400 border border-red-800 text-[10px] font-bold px-2 py-0.5 rounded">🛑 取引中止中</span>` :
+          `<span class="bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">✅ 通常取引中</span>`;
+
+        let toggleBtnText = isSuspended ? "取引再開" : "取引中止";
+        let toggleBtnClass = isSuspended ? "bg-emerald-950 hover:bg-emerald-800 text-emerald-300 border-emerald-800" : "bg-red-950 hover:bg-red-800 text-red-300 border-red-800";
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-800/60 transition">
+            <td class="p-3 font-bold text-orange-400 font-mono">${v.id}<br><span class="text-[10px] text-slate-400">PASS: ${v.pass || '1234'}</span></td>
+            <td class="p-3 font-bold text-white">${v.name}</td>
+            <td class="p-3 font-mono text-cyan-300">${v.email || '-'}</td>
+            <td class="p-3 font-mono text-slate-300">${v.phone || '-'}<br><span class="text-[10px] text-slate-400">担当: ${v.contact || 'なし'}</span></td>
+            <td class="p-3 text-center">${statusBadge}</td>
+            <td class="p-3 text-center space-x-1">
+              <button onclick="openEditVendorModal('${v.id}')" class="bg-cyan-950 hover:bg-cyan-800 text-cyan-300 border border-cyan-800 font-bold px-2 py-1 rounded text-[10px] transition">
+                <i class="fa-solid fa-pen-to-square mr-0.5"></i>編集
+              </button>
+              <button onclick="toggleVendorStatus('${v.id}')" class="${toggleBtnClass} border font-bold px-2.5 py-1 rounded text-[10px] transition">
+                ${toggleBtnText}
+              </button>
+            </td>
+          </tr>
+        `;
+      });
+    }
+
+    function openNewVendorModal() {
+      document.getElementById('v-edit-id').value = '';
+      document.getElementById('vendor-form').reset();
+      document.getElementById('vendor-modal-title').innerHTML = `<i class="fa-solid fa-building-circle-check"></i> 新規提携中古パーツ業者の登録`;
+      document.getElementById('modal-add-vendor').classList.remove('hidden');
+    }
+
+    function openEditVendorModal(id) {
+      const vendors = getVendors();
+      const v = vendors.find(item => item.id === id);
+      if (!v) return;
+
+      document.getElementById('v-edit-id').value = v.id;
+      document.getElementById('v-name').value = v.name;
+      document.getElementById('v-email').value = v.email;
+      document.getElementById('v-pass').value = v.pass || '1234';
+      document.getElementById('v-phone').value = v.phone || '';
+
+      document.getElementById('vendor-modal-title').innerHTML = `<i class="fa-solid fa-pen-to-square"></i> 提携業者情報の編集 (${v.id})`;
+      document.getElementById('modal-add-vendor').classList.remove('hidden');
+    }
+
+    function closeNewVendorModal() {
+      document.getElementById('modal-add-vendor').classList.add('hidden');
+      document.getElementById('vendor-form').reset();
+    }
+
+    function saveVendor(e) {
+      e.preventDefault();
+      const vendors = getVendors();
+      const editId = document.getElementById('v-edit-id').value;
+
+      if (editId) {
+        const v = vendors.find(item => item.id === editId);
+        if (v) {
+          v.name = document.getElementById('v-name').value;
+          v.email = document.getElementById('v-email').value;
+          v.pass = document.getElementById('v-pass').value;
+          v.phone = document.getElementById('v-phone').value;
+        }
+        alert(`【更新完了】${v.name} の情報を更新・保存しました！`);
+      } else {
+        const newVendor = {
+          id: `V-00${vendors.length + 1}`,
+          name: document.getElementById('v-name').value,
+          email: document.getElementById('v-email').value,
+          pass: document.getElementById('v-pass').value || '1234',
+          phone: document.getElementById('v-phone').value,
+          status: 'active'
+        };
+        vendors.push(newVendor);
+        alert(`【登録完了】${newVendor.name} (ID: ${newVendor.id}) を追加登録しました！`);
+      }
+
+      saveVendors(vendors);
+      closeNewVendorModal();
+    }
+
+    function filterStatus(statusKey) {
+      currentFilterStatus = statusKey;
+
+      const buttons = ['new', 'progress', 'purchased', 'completed', 'all'];
+      buttons.forEach(b => {
+        const btn = document.getElementById(`tab-btn-${b}`);
+        if (btn) {
+          if (b === statusKey) {
+            btn.classList.add('status-tab-active');
+          } else {
+            btn.classList.remove('status-tab-active');
+          }
+        }
+      });
+
+      renderAdminTable();
+    }
+
+    function changeStatus(id, newStatus) {
+      const orders = getOrders();
+      const order = orders.find(o => o.id === id);
+      if (order) {
+        order.status = newStatus;
+        saveOrders(orders);
+      }
+    }
+
+    function renderAdminTable() {
+      const orders = getOrders();
+      const tbody = document.getElementById('admin-table-body');
+      tbody.innerHTML = '';
+
+      let countNew = 0, countProgress = 0, countPurchased = 0, countCompleted = 0;
+
+      orders.forEach(item => {
+        if (item.status === '新規依頼') countNew++;
+        else if (item.status === '業者照会中' || item.status === '見積もり回答済み') countProgress++;
+        else if (item.status === '発注・検品中') countPurchased++;
+        else if (item.status === '発送完了') countCompleted++;
+      });
+
+      document.getElementById('badge-count-all').innerText = orders.length;
+      document.getElementById('badge-count-new').innerText = countNew;
+      document.getElementById('badge-count-progress').innerText = countProgress;
+      document.getElementById('badge-count-purchased').innerText = countPurchased;
+      document.getElementById('badge-count-completed').innerText = countCompleted;
+      document.getElementById('admin-new-count').innerHTML = `${countNew} <span class="text-[10px] bg-red-500 text-white px-1.5 py-0.5 rounded">NEW</span>`;
+
+      const filteredOrders = orders.filter(item => {
+        if (currentFilterStatus === 'new') return item.status === '新規依頼';
+        if (currentFilterStatus === 'progress') return item.status === '業者照会中' || item.status === '見積もり回答済み';
+        if (currentFilterStatus === 'purchased') return item.status === '発注・検品中';
+        if (currentFilterStatus === 'completed') return item.status === '発送完了';
+        return true;
+      });
+
+      // 🌟 新着・未読案件を常に頭（最上段）へ繰り上げる自動優先ソート
+      const sortedOrders = [...filteredOrders].sort((a, b) => {
+        const aHasNew = a.hasNewVendorResponse || a.hasNewVendorChat || (a.messages && a.messages.length > 0 && a.messages[a.messages.length - 1].sender === 'buyer' && a.readByAdmin === false) || a.status === '新規依頼';
+        const bHasNew = b.hasNewVendorResponse || b.hasNewVendorChat || (b.messages && b.messages.length > 0 && b.messages[b.messages.length - 1].sender === 'buyer' && b.readByAdmin === false) || b.status === '新規依頼';
+
+        if (aHasNew && !bHasNew) return -1;
+        if (!aHasNew && bHasNew) return 1;
+        return 0;
+      });
+
+      sortedOrders.forEach(item => {
+        let typeBadge = `<span class="bg-slate-800 text-slate-300 text-[10px] px-2 py-0.5 rounded border border-slate-700">${item.partType || '中古'}</span>`;
+
+        let statusSelectHtml = `
+          <select onclick="event.stopPropagation()" onchange="changeStatus('${item.id}', this.value)" class="bg-slate-900 border border-slate-700 rounded px-2 py-1 text-[10px] font-bold text-white cursor-pointer shadow">
+            <option value="新規依頼" ${item.status === '新規依頼' ? 'selected' : ''}>🔴 新規依頼 (未打診)</option>
+            <option value="業者照会中" ${item.status === '業者照会中' ? 'selected' : ''}>🟠 業者照会中</option>
+            <option value="見積もり回答済み" ${item.status === '見積もり回答済み' ? 'selected' : ''}>🟢 見積もり提示済み</option>
+            <option value="発注・検品中" ${item.status === '発注・検品中' ? 'selected' : ''}>🛒【購入確定済】発注・検品中</option>
+            <option value="発送完了" ${item.status === '発送完了' ? 'selected' : ''}>⚪ 発送完了</option>
+          </select>
+        `;
+
+        let unreadBadge = '';
+        if (item.hasNewVendorResponse) {
+          unreadBadge = `<span class="ml-1 bg-yellow-300 text-red-700 font-black text-[9px] px-2 py-0.5 rounded-full animate-bounce shadow">📸 業者回答あり(NEW)</span>`;
+        } else if (item.hasNewVendorChat) {
+          unreadBadge = `<span class="ml-1 bg-amber-400 text-black font-black text-[9px] px-2 py-0.5 rounded-full animate-bounce shadow">💬 業者チャットNEW</span>`;
+        } else if (item.messages && item.messages.length > 0 && item.messages[item.messages.length - 1].sender === 'buyer' && item.readByAdmin === false) {
+          unreadBadge = `<span class="ml-1 bg-fuchsia-500 text-black font-black text-[9px] px-2 py-0.5 rounded-full animate-pulse shadow">💬 NEW</span>`;
+        }
+
+        tbody.innerHTML += `
+          <tr class="hover:bg-slate-800/60 transition cursor-pointer" onclick="openModal('${item.id}')">
+            <td class="p-2.5 font-bold text-orange-400 font-mono">
+              ${item.id} ${unreadBadge}
+              <br><span class="text-[9px] text-cyan-400 font-normal">年式: ${item.mfgDate || '未算定'}</span>
+            </td>
+            <td class="p-2.5">${typeBadge}</td>
+            <td class="p-2.5"><div class="font-bold text-white">${item.car}</div></td>
+            <td class="p-2.5 text-slate-400">${item.date}</td>
+            <td class="p-2.5 text-center">${statusSelectHtml}</td>
+            <td class="p-2.5 text-center">
+              <button class="bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 px-2.5 py-1 rounded text-[10px]">詳細・チャット</button>
+            </td>
+          </tr>
+        `;
+      });
+
+      if (currentAdminChatId) renderModalContent();
+    }
+
+    function openModal(id) {
+      currentAdminChatId = id;
+      const orders = getOrders();
+      const item = orders.find(o => o.id === id);
+      if (!item) return;
+
+      item.readByAdmin = true;
+      item.hasNewVendorResponse = false;
+      item.hasNewVendorChat = false;
+      saveOrders(orders);
+
+      document.getElementById('modal-id').innerText = item.id;
+      document.getElementById('detail-date').innerText = item.date || '---';
+      document.getElementById('detail-car').innerText = item.car || '---';
+      document.getElementById('detail-partnum').innerText = item.partNum || '未設定';
+      document.getElementById('detail-vin').innerText = item.vin || '未設定';
+      document.getElementById('detail-mfg').innerText = item.mfgDate || '未算定';
+
+      document.getElementById('edit-car').value = item.car || '';
+      document.getElementById('edit-parttype').value = item.partType || '中古';
+      document.getElementById('edit-partnum').value = item.partNum || '';
+      document.getElementById('edit-vin').value = item.vin || '';
+      document.getElementById('edit-form-box').classList.add('hidden');
+
+      const partsouqBtn = document.getElementById('partsouq-link');
+      if (item.vin && item.vin !== '-') {
+        partsouqBtn.href = `https://partsouq.com/en/search/all?q=${encodeURIComponent(item.vin)}`;
+      } else {
+        partsouqBtn.href = `https://partsouq.com/`;
+      }
+
+      const vendors = getVendors().filter(v => v.status !== 'suspended');
+      const checkboxBox = document.getElementById('vendor-checkbox-list');
+      checkboxBox.innerHTML = '';
+      vendors.forEach(v => {
+        checkboxBox.innerHTML += `
+          <label class="flex items-center gap-2 cursor-pointer text-slate-300 hover:text-white p-1.5 rounded hover:bg-slate-800/50">
+            <input type="checkbox" checked class="vendor-checkbox accent-orange-500" value="${v.email}" data-name="${v.name}">
+            <div>
+              <div class="font-bold text-white text-[11px]">${v.name} (${v.id})</div>
+              <div class="text-[9px] text-cyan-400 font-mono">${v.email || 'メール未登録'}</div>
+            </div>
+          </label>
+        `;
+      });
+
+      const replyTargetSelect = document.getElementById('admin-vendor-reply-target');
+      if (replyTargetSelect) {
+        replyTargetSelect.innerHTML = `
+          <option value="" disabled selected>-- 送信先の業者を選択 --</option>
+          <option value="ALL">全提携業者宛て</option>
+        `;
+        vendors.forEach(v => {
+          replyTargetSelect.innerHTML += `<option value="${v.name}">${v.name}</option>`;
+        });
+      }
+
+      document.getElementById('modal-detail').classList.remove('hidden');
+      renderModalContent();
+    }
+
+    function closeModal() {
+      currentAdminChatId = null;
+      document.getElementById('modal-detail').classList.add('hidden');
+    }
+
+    function renderModalContent() {
+      if (!currentAdminChatId) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+      const marginSetting = getMarginSetting();
+      const vendors = getVendors();
+      
+      const list = document.getElementById('vendor-response-list');
+      list.innerHTML = '';
+
+      if (order && order.vendorResponses && order.vendorResponses.length > 0) {
+        document.getElementById('vendor-response-count').innerText = `${order.vendorResponses.length}通の回答を受信`;
+
+        order.vendorResponses.forEach((res, index) => {
+          let calculatedMargin = Math.round(res.price * (marginSetting.rate / 100));
+          let isMinFeeApplied = false;
+
+          if (calculatedMargin < marginSetting.minFee) {
+            calculatedMargin = marginSetting.minFee;
+            isMinFeeApplied = true;
+          }
+
+          let calculatedBuyerPrice = res.price + calculatedMargin;
+          let marginBadgeText = isMinFeeApplied ? 
+            `<span class="text-[9px] bg-orange-950 text-orange-400 border border-orange-800 px-1 rounded ml-1">最低保証適用</span>` : 
+            `<span class="text-[9px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1 rounded ml-1">${marginSetting.rate}%適用</span>`;
+          
+          let isConfirmed = (order.confirmedVendorName === res.vendor);
+          let confirmBtnHtml = isConfirmed ? 
+            `<div class="w-full bg-emerald-950 border border-emerald-700 text-emerald-300 font-black py-1.5 rounded text-xs text-center">🛒 発注確定済み (業者通知完了)</div>` :
+            `<div class="grid grid-cols-2 gap-2 mt-1">
+              <button onclick="selectAndSendToBuyer(${index}, ${calculatedBuyerPrice})" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold py-1.5 rounded text-[11px] shadow">
+                👉 バイヤーへ提示する
+              </button>
+              <button onclick="confirmOrderToVendor(${index})" class="bg-orange-500 hover:bg-orange-400 text-black font-black py-1.5 rounded text-[11px] shadow">
+                🛒 業者へ購入手配 (通知)
+              </button>
+            </div>`;
+
+          let myChats = order.vendorChats ? order.vendorChats.filter(c => c.sender.includes(res.vendor) || (c.target && c.target.includes(res.vendor)) || c.text.includes(res.vendor)) : [];
+          let chatHistoryHtml = myChats.length > 0 ? myChats.map(c => `
+            <div class="bg-slate-900 border border-slate-800 p-2 rounded text-[10px] space-y-0.5">
+              <span class="text-orange-400 font-bold block">${c.sender} <span class="text-slate-500 font-mono font-normal ml-1">${c.date || ''}</span></span>
+              <div class="text-white">${c.text}</div>
+            </div>
+          `).join('') : '<div class="text-slate-500 text-[10px] text-center py-2">やり取り履歴なし</div>';
+
+          // 「在庫なし」回答の特別バッジ表示
+          let qualityText = res.quality === "在庫なし" ? `<span class="bg-red-950 text-red-400 font-bold px-2 py-0.5 rounded border border-red-800">🚫 在庫なし</span>` : `<span class="bg-blue-950 text-blue-300 px-2 py-0.5 rounded text-[10px] border border-blue-800">${res.quality}</span>`;
+          let priceText = res.price === 0 ? `<strong class="text-red-400 font-mono">在庫なし</strong>` : `<strong class="text-white font-mono">¥${res.price.toLocaleString()}</strong>`;
+
+          list.innerHTML += `
+            <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2">
+              <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+                <div class="sm:col-span-4 relative group cursor-pointer" onclick="zoomImage('${res.img}')">
+                  <img src="${res.img}" class="rounded-lg object-cover h-24 w-full border border-slate-700 hover:opacity-80 transition">
+                </div>
+                <div class="sm:col-span-8 space-y-1 text-xs">
+                  <div class="flex justify-between items-center">
+                    <span class="font-bold text-orange-400">${res.vendor}</span>
+                    ${qualityText}
+                  </div>
+                  <div class="text-cyan-300 font-bold text-[10px]"><i class="fa-solid fa-truck-fast mr-1"></i>発送予定: ${res.shipDate || '未指定'}</div>
+                  <div class="text-slate-300 text-[11px] font-bold">${res.comment}</div>
+                  <div class="text-[11px] bg-slate-900 p-2 rounded border border-slate-800 flex justify-between items-center">
+                    <span>仕入原価: ${priceText}</span>
+                    ${res.price > 0 ? `<span class="text-emerald-400 font-bold">提示額: <strong class="text-emerald-300 font-mono text-sm">¥${calculatedBuyerPrice.toLocaleString()}</strong> ${marginBadgeText}</span>` : ''}
+                  </div>
+                  ${res.price > 0 ? confirmBtnHtml : ''}
+                </div>
+              </div>
+
+              <!-- 個別チャット枠 -->
+              <div class="border-t border-slate-800/80 pt-2 mt-2">
+                <button onclick="toggleInlineChat(${index})" class="text-[10px] text-cyan-400 font-bold hover:underline flex items-center gap-1">
+                  <i class="fa-solid fa-comments"></i> 💬 ${res.vendor} との個別チャット枠を開く / 閉じる
+                </button>
+                
+                <div id="inline-chat-box-${index}" class="hidden space-y-2 pt-2">
+                  <div class="space-y-1.5 max-h-36 overflow-y-auto bg-slate-900/90 p-2 rounded-lg border border-slate-800">
+                    ${chatHistoryHtml}
+                  </div>
+                  <div class="flex gap-2">
+                    <input type="text" id="inline-chat-input-${index}" placeholder="${res.vendor} 宛てに質問・返信..." class="w-full bg-slate-900 border border-slate-700 rounded p-1.5 text-[11px] text-white focus:outline-none focus:border-cyan-500">
+                    <button onclick="sendInlineVendorChat('${res.vendor}', ${index})" class="bg-cyan-600 hover:bg-cyan-500 text-white font-bold px-3 py-1.5 rounded text-[10px] whitespace-nowrap shadow">
+                      送信
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          `;
+        });
+      } else {
+        document.getElementById('vendor-response-count').innerText = `0通`;
+        list.innerHTML = `<div class="text-slate-500 text-xs text-center py-6">業者ポータルからの回答を受信するとリアルタイムでここに表示されます。</div>`;
+      }
+
+      // 業者切替ドロップダウンの生成 (50〜100社対応)
+      const chatSelect = document.getElementById('admin-vendor-chat-filter-select');
+      if (chatSelect) {
+        chatSelect.innerHTML = `<option value="ALL" ${currentVendorChatFilter === 'ALL' ? 'selected' : ''}>全業者のメッセージ一覧を表示</option>`;
+        vendors.forEach(v => {
+          const hasMsg = order.vendorChats && order.vendorChats.some(c => c.sender.includes(v.name) || (c.target && c.target.includes(v.name)));
+          const badgeText = hasMsg ? ' (💬やり取りあり)' : '';
+          chatSelect.innerHTML += `<option value="${v.name}" ${currentVendorChatFilter === v.name ? 'selected' : ''}>${v.name}${badgeText}</option>`;
+        });
+      }
+
+      // 選択した業者のメッセージのみ抽出・描画
+      const vChatBox = document.getElementById('admin-vendor-chat-box');
+      if (vChatBox) {
+        vChatBox.innerHTML = '';
+        if (order && order.vendorChats && order.vendorChats.length > 0) {
+          const filteredChats = order.vendorChats.filter(vc => {
+            if (currentVendorChatFilter === 'ALL') return true;
+            return vc.sender.includes(currentVendorChatFilter) || (vc.target && vc.target.includes(currentVendorChatFilter)) || vc.text.includes(currentVendorChatFilter);
+          });
+
+          if (filteredChats.length > 0) {
+            filteredChats.forEach(vc => {
+              let isVendorMsg = !vc.sender.includes('管理者');
+              let replyBtnHtml = isVendorMsg ? 
+                `<button onclick="replyToVendorMessage('${vc.sender}')" class="bg-cyan-950 hover:bg-cyan-800 text-cyan-300 border border-cyan-700 px-1.5 py-0.5 rounded text-[9px] transition flex items-center gap-0.5">
+                  <i class="fa-solid fa-reply"></i> 返信
+                </button>` : '';
+
+              vChatBox.innerHTML += `
+                <div class="bg-slate-950 border border-slate-800 p-2.5 rounded-lg space-y-1">
+                  <div class="flex justify-between items-center text-[9px] font-bold text-orange-400">
+                    <span>${vc.sender}</span>
+                    <div class="flex items-center gap-2">
+                      <span class="text-slate-500 font-mono">${vc.date || ''}</span>
+                      ${replyBtnHtml}
+                    </div>
+                  </div>
+                  <div class="text-xs text-white">${vc.text}</div>
+                </div>
+              `;
+            });
+          } else {
+            vChatBox.innerHTML = `<div class="text-slate-500 text-[10px] text-center py-3">${currentVendorChatFilter} とのチャット履歴はありません</div>`;
+          }
+        } else {
+          vChatBox.innerHTML = `<div class="text-slate-500 text-[10px] text-center py-3">業者からの事前質問・チャット履歴はありません</div>`;
+        }
+        vChatBox.scrollTop = vChatBox.scrollHeight;
+      }
+
+      // バイヤーチャット欄の描画
+      const box = document.getElementById('admin-chat-box');
+      box.innerHTML = '';
+      if (order && order.messages) {
+        order.messages.forEach(msg => {
+          let extraInvoiceBtn = (msg.sender === 'buyer' && msg.text.includes('【購入確定】')) ? 
+            `<button onclick="sendInvoiceEmailToBuyer('${order.id}')" class="mt-2 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black py-1.5 rounded text-[11px] shadow flex items-center justify-center gap-1">
+              <i class="fa-solid fa-paper-plane"></i> ✉️ 請求書メールをバイヤーへ送信 (確認画面を開く)
+            </button>` : '';
+
+          box.innerHTML += `
+            <div class="${msg.sender === 'admin' ? 'bg-orange-950/90 border-orange-800/80' : 'bg-slate-900 border-slate-800'} border p-2.5 rounded-xl text-xs">
+              <span class="text-[9px] font-bold block ${msg.sender === 'admin' ? 'text-orange-400 text-right' : 'text-cyan-400'}">${msg.sender === 'admin' ? '管理者' : 'バイヤー'}</span>
+              <div class="text-[11px] leading-relaxed text-white">${msg.text}</div>
+              ${extraInvoiceBtn}
+            </div>
+          `;
+        });
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function broadcastToVendors() {
+      if (!currentAdminChatId) return;
+
+      const checkedBoxes = document.querySelectorAll('.vendor-checkbox:checked');
+      if (checkedBoxes.length === 0) {
+        alert("送信先の業者を1社以上選択してください。");
+        return;
+      }
+
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+      if (order) {
+        order.status = "業者照会中";
+        saveOrders(orders);
+        alert(`選択された業者宛てに一斉打診通知を送信しました。`);
+        renderModalContent();
+      }
+    }
+
+    function selectAndSendToBuyer(index, calculatedBuyerPrice) {
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+
+      if (order && order.vendorResponses[index]) {
+        const selected = order.vendorResponses[index];
+        order.status = "見積もり回答済み";
+        order.price = calculatedBuyerPrice;
+        order.selectedPart = selected;
+        
+        order.hasNewPriceNotice = true;
+        order.readByBuyer = false;
+        
+        if (!order.messages) order.messages = [];
+        order.messages.push({
+          sender: 'admin',
+          text: `【見積もり提示】${selected.vendor}より取り寄せたパーツの実物写真を提示いたします。提示金額: ¥${order.price.toLocaleString()}`
+        });
+
+        saveOrders(orders);
+        alert(`【同期完了】バイヤー側画面にお見積り金額 (¥${order.price.toLocaleString()}) と添付写真が自動反映され、NEW通知が届きました！`);
+        renderModalContent();
+      }
+    }
+
+    function sendAdminChat() {
+      const input = document.getElementById('admin-chat-input');
+      if (!input.value || !currentAdminChatId) return;
+
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentAdminChatId);
+      if (order) {
+        if (!order.messages) order.messages = [];
+        order.messages.push({ sender: 'admin', text: input.value });
+        order.readByBuyer = false;
+        saveOrders(orders);
+        input.value = '';
+      }
+    }
+
+    function resetData() {
+      localStorage.setItem('portal_orders', JSON.stringify(defaultOrders));
+      localStorage.setItem('portal_vendors', JSON.stringify(defaultVendors));
+      localStorage.setItem('portal_margin_rate', '20');
+      localStorage.setItem('portal_margin_min', '2000');
+      localStorage.setItem('portal_shipping_fee_config', JSON.stringify({ vehicle: 15000, container: 30000 }));
+      updateMarginUI();
+      updateAdminEmailUI();
+      renderVendorTable();
+      renderAdminTable();
+      alert('初期データにリセットしました。');
+    }
+
+    window.addEventListener('storage', () => {
+      updateMarginUI();
+      updateAdminEmailUI();
+      renderVendorTable();
+      renderAdminTable();
+    });
+
+    updateMarginUI();
+    updateAdminEmailUI();
+    renderVendorTable();
+    renderAdminTable();
+  </script>
+</body>
+</html>

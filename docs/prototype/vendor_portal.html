@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>自動車パーツ調達システム - 提携解体業者ポータル</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    body { background-color: #0f172a; color: #e2e8f0; font-family: 'Segoe UI', sans-serif; }
+    .dark-card { background-color: #1e293b; border: 1px solid #334155; }
+    .input-dark { background-color: #090d16; border: 1px solid #1e293b; color: #ffffff; }
+    .input-dark:focus { border-color: #f97316; outline: none; }
+    .drag-active { border-color: #f97316 !important; background-color: #1c1917 !important; }
+  </style>
+</head>
+
+<body class="min-h-screen flex flex-col justify-center items-center p-4 md:p-6">
+
+  <!-- 🔒 1. 業者ログイン画面 -->
+  <div id="vendor-login-screen" class="w-full max-w-md dark-card rounded-2xl p-8 space-y-6 shadow-2xl border border-slate-700">
+    <div class="text-center space-y-2">
+      <div class="w-16 h-16 bg-orange-950 text-orange-400 border border-orange-700 rounded-2xl flex items-center justify-center text-2xl mx-auto shadow-inner">
+        <i class="fa-solid fa-warehouse"></i>
+      </div>
+      <h1 class="text-xl font-black text-white tracking-wide">解体パーツ事業者用ポータル</h1>
+      <p class="text-xs text-orange-400 font-bold tracking-wider">VENDOR LOGIN</p>
+    </div>
+
+    <form onsubmit="handleVendorLogin(event)" class="space-y-4 text-xs">
+      <div id="v-login-error" class="hidden bg-red-950/80 border border-red-500 text-red-200 p-2.5 rounded-lg text-center font-bold">
+        業者IDまたはパスワードが不正、あるいは取引中止されています
+      </div>
+
+      <div>
+        <label class="text-slate-300 font-bold block mb-1">登録業者ID (例: asd / qwe)</label>
+        <input type="text" id="v-id-input" placeholder="asd または qwe" class="w-full input-dark rounded-xl p-3 text-sm font-mono" required>
+      </div>
+
+      <div>
+        <label class="text-slate-300 font-bold block mb-1">パスワード</label>
+        <input type="password" id="v-pass-input" value="1234" class="w-full input-dark rounded-xl p-3 text-sm" required>
+      </div>
+
+      <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800 text-[10px] text-slate-400 space-y-1">
+        <span class="text-orange-400 font-bold block"><i class="fa-solid fa-key mr-1"></i>テスト用ログイン情報:</span>
+        <div>業者A: ID <span class="text-white font-mono font-bold">asd</span> / PASS <span class="text-white font-mono font-bold">1234</span> (関東オートパーツ)</div>
+        <div>業者B: ID <span class="text-white font-mono font-bold">qwe</span> / PASS <span class="text-white font-mono font-bold">1234</span> (関西解体キング)</div>
+      </div>
+
+      <button type="submit" class="w-full bg-orange-500 hover:bg-orange-400 text-black font-black py-3 rounded-xl text-sm transition shadow-lg flex items-center justify-center gap-2">
+        <i class="fa-solid fa-right-to-bracket"></i> サインインして依頼確認・回答
+      </button>
+    </form>
+  </div>
+
+  <!-- 🌟 2. 業者用メイン画面 -->
+  <div id="vendor-portal-content" class="hidden w-full max-w-6xl space-y-6">
+    
+    <!-- ヘッダー -->
+    <div class="dark-card rounded-2xl p-6 flex flex-wrap justify-between items-center gap-4">
+      <div>
+        <div class="flex items-center gap-2">
+          <h1 class="text-lg font-black text-white" id="v-logged-name">---</h1>
+          <span class="bg-orange-950 text-orange-400 border border-orange-800 text-[10px] font-black px-2.5 py-0.5 rounded">認証済み業者</span>
+        </div>
+        <p class="text-xs text-slate-400 mt-1">登録メール: <span id="v-logged-email" class="font-mono text-cyan-300">---</span></p>
+      </div>
+      <button onclick="handleVendorLogout()" class="bg-slate-800 hover:bg-red-950 hover:text-red-300 text-slate-300 border border-slate-700 hover:border-red-800 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1.5">
+        <i class="fa-solid fa-right-from-bracket"></i> ログアウト
+      </button>
+    </div>
+
+    <!-- 小窓分け一覧 -->
+    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+      <div class="dark-card rounded-2xl p-5 space-y-3 border-l-4 border-l-orange-500">
+        <h2 class="text-xs font-bold text-orange-400 flex items-center justify-between border-b border-slate-700/60 pb-2">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-hourglass-half"></i> ⌛ 未回答の見積もり依頼 (要対応)
+          </span>
+          <span id="v-pending-count" class="bg-orange-950 text-orange-300 font-mono text-[10px] px-2 py-0.5 rounded border border-orange-800">0件</span>
+        </h2>
+        <div id="v-pending-box" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+      </div>
+
+      <div class="dark-card rounded-2xl p-5 space-y-3 border-l-4 border-l-emerald-500">
+        <h2 class="text-xs font-bold text-emerald-400 flex items-center justify-between border-b border-slate-700/60 pb-2">
+          <span class="flex items-center gap-1.5">
+            <i class="fa-solid fa-circle-check"></i> ✅ 回答送信済みの依頼 / 発注確定案件
+          </span>
+          <span id="v-completed-count" class="bg-emerald-950 text-emerald-300 font-mono text-[10px] px-2 py-0.5 rounded border border-emerald-800">0件</span>
+        </h2>
+        <div id="v-completed-box" class="space-y-2.5 max-h-72 overflow-y-auto pr-1"></div>
+      </div>
+    </div>
+
+    <!-- 📝 選択案件の操作（見積もり回答 ＆ アドミン専用チャット） -->
+    <div id="v-form-container" class="hidden dark-card rounded-2xl p-6 space-y-6 border border-slate-700">
+      
+      <div class="flex flex-wrap justify-between items-center border-b border-slate-700/60 pb-3 gap-3">
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="text-xs font-black text-orange-400 font-mono bg-orange-950/80 px-2 py-0.5 rounded border border-orange-800/80" id="v-selected-req-id">#REQ-xxx</span>
+            <h2 class="text-base font-black text-white" id="v-selected-req-car">車種パーツ名</h2>
+          </div>
+          <div class="text-[11px] text-slate-400 font-mono mt-1 flex gap-3">
+            <span>OEM品番: <strong class="text-cyan-300" id="v-selected-req-partnum">未指定</strong></span>
+            <span>車台番号(VIN): <strong class="text-slate-200" id="v-selected-req-vin">未指定</strong></span>
+          </div>
+        </div>
+
+        <div class="flex gap-2">
+          <!-- 🌟 ワンタップ在庫なし回答ボタン -->
+          <button onclick="submitVendorNoStock()" class="bg-red-950 hover:bg-red-900 text-red-300 border border-red-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow">
+            <i class="fa-solid fa-ban"></i> 🚫 在庫なし (ワンタップ回答)
+          </button>
+          <button id="v-generate-invoice-btn" onclick="sendVendorInvoiceToAdmin()" class="hidden bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1 shadow">
+            <i class="fa-solid fa-file-invoice"></i> 🧾 アドミン宛て請求書(Invoice)を発行する
+          </button>
+          <a id="v-partsouq-btn" href="#" target="_blank" class="bg-cyan-950 hover:bg-cyan-900 text-cyan-300 border border-cyan-700 px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center gap-1">
+            <i class="fa-solid fa-up-right-from-square"></i> PartsOuqでVIN検索
+          </a>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        
+        <!-- 👈 左側: 見積入力フォーム -->
+        <div class="lg:col-span-7 space-y-4">
+          <form onsubmit="submitVendorResponse(event)" class="space-y-4 text-xs">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">卸仕入原価 (税抜・円) <span class="text-red-400">*</span></label>
+                <div class="flex items-center gap-2">
+                  <input type="number" id="v-price-input" placeholder="例: 45000" class="w-full input-dark rounded-xl p-3 text-emerald-400 font-bold font-mono text-base" required>
+                  <span class="text-white font-bold text-sm">円</span>
+                </div>
+              </div>
+              <div>
+                <label class="text-slate-300 font-bold block mb-1">パーツ状態ランク <span class="text-red-400">*</span></label>
+                <select id="v-quality-select" class="w-full input-dark rounded-xl p-3 text-white">
+                  <option value="Sランク (ほぼ新品・OEM互換)">Sランク (ほぼ新品・OEM互換)</option>
+                  <option value="Aランク (美品・ステー正常)">Aランク (美品・ステー正常)</option>
+                  <option value="Bランク (小傷あり・要補修)">Bランク (小傷あり・要補修)</option>
+                  <option value="Cランク (ジャンク・部品取り用)">Cランク (ジャンク・部品取り用)</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- 発送可能予定日 -->
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">発送可能予定日 (納期) <span class="text-red-400">*</span></label>
+              <select id="v-ship-date-select" class="w-full input-dark rounded-xl p-3 text-cyan-300 font-bold">
+                <option value="即日〜2日以内に発送可能">⚡ 即日〜2日以内に発送可能 (近日出荷)</option>
+                <option value="3日〜1週間以内に発送可能">📅 3日〜1週間以内に発送可能</option>
+                <option value="2週間以内に発送可能">📦 2週間以内に発送可能</option>
+                <option value="納期未定（要問い合わせ）">⚠️ 納期未定（管理者と要チャット調整）</option>
+              </select>
+            </div>
+
+            <!-- 写真添付エリア -->
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">パーツ実物写真 (ドラッグ / Ctrl+V / ファイル選択) <span class="text-red-400">*</span></label>
+              <div id="v-drop-zone" tabindex="0" class="bg-[#090d16] border-2 border-dashed border-slate-700 rounded-xl p-5 text-center space-y-2 hover:border-orange-500 focus:border-orange-500 focus:outline-none transition cursor-pointer">
+                <i class="fa-solid fa-cloud-arrow-up text-2xl text-orange-400"></i>
+                <div class="text-slate-200 font-bold text-xs">画像を選択、または <span class="text-orange-400 font-mono">Ctrl + V</span></div>
+                <input type="file" id="v-file-input" accept="image/*" class="hidden" onchange="handleFileSelect(event)">
+              </div>
+
+              <div id="v-img-preview-box" class="hidden mt-2 relative inline-block">
+                <img id="v-img-preview" src="" class="h-28 rounded-lg border border-slate-700 object-cover">
+                <button type="button" onclick="removeImgPreview()" class="absolute -top-2 -right-2 bg-red-600 text-white rounded-full w-5 h-5 text-xs flex items-center justify-center shadow"><i class="fa-solid fa-xmark"></i></button>
+              </div>
+            </div>
+
+            <div>
+              <label class="text-slate-300 font-bold block mb-1">状態の詳細メモ・備考</label>
+              <textarea id="v-comment-input" rows="2" placeholder="例: ステー折れなし。非常に綺麗な状態です。" class="w-full input-dark rounded-xl p-2.5 text-white" required></textarea>
+            </div>
+
+            <button type="submit" class="w-full bg-orange-500 hover:bg-orange-400 text-black font-black py-3 rounded-xl text-xs shadow-lg transition flex items-center justify-center gap-2">
+              <i class="fa-solid fa-paper-plane"></i> 写真と見積価格を管理者に回答送信
+            </button>
+          </form>
+        </div>
+
+        <!-- 👉 右側: 管理者(Admin)との専用チャット -->
+        <div class="lg:col-span-5 bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3 flex flex-col justify-between">
+          <h3 class="text-xs font-bold text-cyan-400 flex items-center justify-between border-b border-slate-800 pb-2">
+            <span class="flex items-center gap-1.5"><i class="fa-solid fa-comments"></i> 管理者 (Admin) との個別質問チャット</span>
+          </h3>
+
+          <div id="v-chat-box" class="h-72 overflow-y-auto space-y-2 text-xs p-1">
+          </div>
+
+          <div class="flex gap-2 pt-2 border-t border-slate-800">
+            <input type="text" id="v-chat-input" placeholder="質問・適合確認を送信..." class="w-full input-dark rounded-lg p-2 text-xs text-white focus:outline-none" onkeypress="if(event.key==='Enter') sendVendorChat()">
+            <button onclick="sendVendorChat()" class="bg-cyan-500 hover:bg-cyan-400 text-black font-black px-3 py-2 rounded-lg text-xs whitespace-nowrap transition">
+              送信
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const defaultVendors = [
+      { id: "asd", name: "中古パーツ業者A (関東オートパーツ)", email: "kanto-autoparts@example.com", pass: "1234", status: "active" },
+      { id: "qwe", name: "中古パーツ業者B (関西解体キング)", email: "info@kansai-king-parts.jp", pass: "1234", status: "active" },
+      { id: "V-003", name: "中古パーツ業者C (中部パーツリサイクル)", email: "estimate@chubu-recycle.co.jp", pass: "1234", status: "active" }
+    ];
+
+    let currentLoggedVendor = null;
+    let currentSelectedReqId = null;
+    let uploadedImageBase64 = null;
+
+    function getVendors() {
+      const data = localStorage.getItem('portal_vendors');
+      return data ? JSON.parse(data) : defaultVendors;
+    }
+
+    function getOrders() {
+      const data = localStorage.getItem('portal_orders');
+      return data ? JSON.parse(data) : [];
+    }
+
+    function handleVendorLogin(e) {
+      e.preventDefault();
+      const vId = document.getElementById('v-id-input').value.trim().toLowerCase();
+      const vPass = document.getElementById('v-pass-input').value.trim();
+      const errorDiv = document.getElementById('v-login-error');
+
+      const vendors = getVendors();
+      const vendor = vendors.find(v => v.id.toLowerCase() === vId && (v.pass || '1234') === vPass);
+
+      if (vendor && vendor.status !== 'suspended') {
+        currentLoggedVendor = vendor;
+        sessionStorage.setItem('logged_vendor', JSON.stringify(vendor));
+        errorDiv.classList.add('hidden');
+        showVendorPortal();
+      } else {
+        errorDiv.classList.remove('hidden');
+      }
+    }
+
+    function checkVendorAuth() {
+      const session = sessionStorage.getItem('logged_vendor');
+      if (session) {
+        currentLoggedVendor = JSON.parse(session);
+        showVendorPortal();
+      } else {
+        document.getElementById('vendor-login-screen').classList.remove('hidden');
+        document.getElementById('vendor-portal-content').classList.add('hidden');
+      }
+    }
+
+    function handleVendorLogout() {
+      sessionStorage.removeItem('logged_vendor');
+      currentLoggedVendor = null;
+      checkVendorAuth();
+    }
+
+    function showVendorPortal() {
+      document.getElementById('vendor-login-screen').classList.add('hidden');
+      document.getElementById('vendor-portal-content').classList.remove('hidden');
+
+      document.getElementById('v-logged-name').innerText = currentLoggedVendor.name;
+      document.getElementById('v-logged-email').innerText = currentLoggedVendor.email;
+
+      renderVendorOrderList();
+      setupDragAndDropAndPaste();
+    }
+
+    function isRespondedByCurrentVendor(order) {
+      if (!order.vendorResponses || !currentLoggedVendor) return false;
+      return order.vendorResponses.some(res => res.vendor === currentLoggedVendor.name || res.email === currentLoggedVendor.email);
+    }
+
+    function hasUnreadAdminChat(order) {
+      if (!order.vendorChats || order.vendorChats.length === 0 || !currentLoggedVendor) return false;
+      const lastMsg = order.vendorChats[order.vendorChats.length - 1];
+      const isFromAdmin = lastMsg.sender.includes('管理者');
+      const isForMe = lastMsg.target === currentLoggedVendor.name || lastMsg.text.includes(`[宛先: ${currentLoggedVendor.name}]`) || lastMsg.text.includes('[全業者宛て]');
+      return isFromAdmin && isForMe;
+    }
+
+    function renderVendorOrderList() {
+      const orders = getOrders();
+      const pendingBox = document.getElementById('v-pending-box');
+      const completedBox = document.getElementById('v-completed-box');
+      
+      pendingBox.innerHTML = '';
+      completedBox.innerHTML = '';
+
+      let pendingCount = 0;
+      let completedCount = 0;
+
+      if (orders.length === 0) {
+        pendingBox.innerHTML = `<div class="text-slate-500 py-4 text-center">現在、打診中の案件はありません</div>`;
+        completedBox.innerHTML = `<div class="text-slate-500 py-4 text-center">回答済みの案件はありません</div>`;
+        return;
+      }
+
+      orders.forEach(item => {
+        let isSelected = (item.id === currentSelectedReqId);
+        let responded = isRespondedByCurrentVendor(item);
+        let isConfirmedToUs = (item.confirmedVendorName === currentLoggedVendor.name);
+
+        let borderClass = isSelected ? "border-orange-500 bg-slate-900" : "border-slate-800 bg-slate-950 hover:border-slate-700";
+        
+        let statusBadge = responded ? 
+          `<span class="bg-emerald-950 text-emerald-400 border border-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded">✅ 回答送信済み</span>` :
+          `<span class="bg-orange-950 text-orange-400 border border-orange-800 text-[10px] font-bold px-2 py-0.5 rounded">未回答</span>`;
+
+        if (isConfirmedToUs) {
+          statusBadge = `<span class="bg-emerald-500 text-black font-black text-[10px] px-2 py-0.5 rounded animate-bounce shadow">🛒【受注確定】要発送</span>`;
+        }
+
+        let chatNoticeBadge = hasUnreadAdminChat(item) ? 
+          `<span class="ml-1 bg-amber-400 text-black font-black text-[9px] px-1.5 py-0.5 rounded-full animate-bounce shadow">💬 新着チャットあり</span>` : '';
+
+        let cardHtml = `
+          <div onclick="selectOrderForResponse('${item.id}')" class="p-3 rounded-xl border ${borderClass} cursor-pointer transition space-y-1.5">
+            <div class="flex justify-between items-center">
+              <span class="font-black text-orange-400 font-mono text-xs">${item.id} ${chatNoticeBadge}</span>
+              ${statusBadge}
+            </div>
+            <div class="font-bold text-white text-xs truncate">${item.car}</div>
+            <div class="flex justify-between items-center text-[10px] text-slate-400 font-mono pt-1">
+              <span>品番: ${item.partNum || '未指定'}</span>
+              <span class="text-cyan-400">年式: ${item.mfgDate || '未算定'}</span>
+            </div>
+          </div>
+        `;
+
+        if (responded) {
+          completedCount++;
+          completedBox.innerHTML += cardHtml;
+        } else {
+          pendingCount++;
+          pendingBox.innerHTML += cardHtml;
+        }
+      });
+
+      document.getElementById('v-pending-count').innerText = `${pendingCount}件`;
+      document.getElementById('v-completed-count').innerText = `${completedCount}件`;
+
+      if (pendingCount === 0) pendingBox.innerHTML = `<div class="text-slate-500 py-4 text-center">未回答の案件はありません🎉</div>`;
+      if (completedBox.innerHTML === '') completedBox.innerHTML = `<div class="text-slate-500 py-4 text-center">回答済みの案件はありません</div>`;
+
+      if (currentSelectedReqId) renderVendorChatBox();
+    }
+
+    function selectOrderForResponse(reqId) {
+      currentSelectedReqId = reqId;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === reqId);
+
+      if (order) {
+        document.getElementById('v-selected-req-id').innerText = order.id;
+        document.getElementById('v-selected-req-car').innerText = order.car || '車種未指定';
+        document.getElementById('v-selected-req-partnum').innerText = order.partNum || '未指定';
+        document.getElementById('v-selected-req-vin').innerText = order.vin || '未指定';
+
+        const btn = document.getElementById('v-partsouq-btn');
+        if (order.vin && order.vin !== '-') {
+          btn.href = `https://partsouq.com/en/search/all?q=${encodeURIComponent(order.vin)}`;
+        } else {
+          btn.href = `https://partsouq.com/`;
+        }
+
+        const invBtn = document.getElementById('v-generate-invoice-btn');
+        if (order.confirmedVendorName === currentLoggedVendor.name) {
+          invBtn.classList.remove('hidden');
+        } else {
+          invBtn.classList.add('hidden');
+        }
+      }
+
+      document.getElementById('v-form-container').classList.remove('hidden');
+      renderVendorOrderList();
+      renderVendorChatBox();
+    }
+
+    // 🌟 ワンタップ「在庫なし」回答処理
+    function submitVendorNoStock() {
+      if (!currentSelectedReqId || !currentLoggedVendor) return;
+      if (!confirm('このパーツの在庫が無い旨を管理者に回答送信しますか？')) return;
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentSelectedReqId);
+
+      if (order) {
+        if (!order.vendorResponses) order.vendorResponses = [];
+
+        order.vendorResponses.unshift({
+          vendor: currentLoggedVendor.name,
+          email: currentLoggedVendor.email,
+          price: 0,
+          quality: "在庫なし",
+          shipDate: "-",
+          img: "https://images.unsplash.com/photo-1578328819058-b69f3a3b0f6b?w=800",
+          comment: "【在庫なし】探しましたが該当パーツの在庫はありませんでした。"
+        });
+
+        order.status = "業者照会中";
+        order.hasNewVendorResponse = true;
+        order.readByAdmin = false;
+
+        localStorage.setItem('portal_orders', JSON.stringify(orders));
+        alert(`【送信完了】「在庫なし」の回答を送信いたしました。`);
+
+        document.getElementById('v-form-container').classList.add('hidden');
+        currentSelectedReqId = null;
+        renderVendorOrderList();
+      }
+    }
+
+    function renderVendorChatBox() {
+      if (!currentSelectedReqId || !currentLoggedVendor) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentSelectedReqId);
+      const box = document.getElementById('v-chat-box');
+      box.innerHTML = '';
+
+      if (order && order.vendorChats && order.vendorChats.length > 0) {
+        const myChats = order.vendorChats.filter(c => {
+          const isSender = (c.sender === currentLoggedVendor.name || c.sender.includes(currentLoggedVendor.name));
+          const isTarget = (c.target === currentLoggedVendor.name || c.target === 'ALL');
+          const isTextMatch = c.text.includes(`[宛先: ${currentLoggedVendor.name}]`) || c.text.includes('[全業者宛て]');
+          return isSender || isTarget || isTextMatch;
+        });
+
+        if (myChats.length > 0) {
+          myChats.forEach(c => {
+            let isMe = (c.sender === currentLoggedVendor.name || c.sender.includes(currentLoggedVendor.name));
+            box.innerHTML += `
+              <div class="${isMe ? 'bg-slate-900 border-slate-800' : 'bg-cyan-950/80 border-cyan-800'} border p-2 rounded-lg space-y-0.5">
+                <span class="text-[9px] font-bold block ${isMe ? 'text-orange-400' : 'text-cyan-300 text-right'}">${isMe ? '自社 (あなた)' : '管理者 (Admin)'}</span>
+                <div class="text-[11px] text-white leading-relaxed">${c.text}</div>
+              </div>
+            `;
+          });
+        } else {
+          box.innerHTML = `<div class="text-slate-500 text-[10px] text-center py-8">管理者への質問・相談履歴はありません</div>`;
+        }
+      } else {
+        box.innerHTML = `<div class="text-slate-500 text-[10px] text-center py-8">管理者への質問・相談履歴はありません</div>`;
+      }
+      box.scrollTop = box.scrollHeight;
+    }
+
+    function sendVendorChat() {
+      const input = document.getElementById('v-chat-input');
+      if (!input.value || !currentSelectedReqId) return;
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentSelectedReqId);
+
+      if (order) {
+        if (!order.vendorChats) order.vendorChats = [];
+        order.vendorChats.push({
+          sender: currentLoggedVendor.name,
+          target: "管理者 (Admin)",
+          text: input.value,
+          date: new Date().toLocaleString('ja-JP')
+        });
+
+        order.hasNewVendorChat = true;
+        order.readByAdmin = false;
+
+        localStorage.setItem('portal_orders', JSON.stringify(orders));
+        alert(`【質問送信完了】管理者宛てにメッセージを送信いたしました！`);
+        input.value = '';
+        renderVendorChatBox();
+      }
+    }
+
+    function sendVendorInvoiceToAdmin() {
+      if (!currentSelectedReqId) return;
+      const orders = getOrders();
+      const order = orders.find(o => o.id === currentSelectedReqId);
+
+      if (order) {
+        const myResponse = order.vendorResponses ? order.vendorResponses.find(r => r.vendor === currentLoggedVendor.name) : null;
+        const wholesalePrice = myResponse ? myResponse.price : 45000;
+
+        if (!order.messages) order.messages = [];
+        order.messages.push({
+          sender: 'admin',
+          text: `【業者請求書受領】${currentLoggedVendor.name} より卸パーツ代金のご請求書を受領いたしました。\n・ご請求金額: ¥${wholesalePrice.toLocaleString()} (税抜)\n・パーツ品名: ${order.car}`
+        });
+
+        localStorage.setItem('portal_orders', JSON.stringify(orders));
+        alert(`【発行・送信完了】管理者（アドミン）宛てに卸パーツ代金（¥${wholesalePrice.toLocaleString()}）の正当な請求書を送付いたしました！`);
+      }
+    }
+
+    function setupDragAndDropAndPaste() {
+      const dropZone = document.getElementById('v-drop-zone');
+      if (!dropZone) return;
+
+      dropZone.addEventListener('click', () => {
+        document.getElementById('v-file-input').click();
+      });
+
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          dropZone.classList.add('drag-active');
+        }, false);
+      });
+
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropZone.addEventListener(eventName, (e) => {
+          e.preventDefault(); e.stopPropagation();
+          dropZone.classList.remove('drag-active');
+        }, false);
+      });
+
+      dropZone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        if (dt.files && dt.files.length > 0) processFile(dt.files[0]);
+      }, false);
+
+      document.addEventListener('paste', (e) => {
+        const items = (e.clipboardData || e.originalEvent.clipboardData).items;
+        for (let i = 0; i < items.length; i++) {
+          if (items[i].type.indexOf('image') !== -1) {
+            const blob = items[i].getAsFile();
+            processFile(blob);
+            break;
+          }
+        }
+      });
+    }
+
+    function handleFileSelect(e) {
+      const files = e.target.files;
+      if (files && files.length > 0) processFile(files[0]);
+    }
+
+    function processFile(file) {
+      if (!file.type.startsWith('image/')) {
+        alert("画像ファイル（JPG, PNG, WEBPなど）を選択してください。");
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onload = function(evt) {
+        uploadedImageBase64 = evt.target.result;
+        document.getElementById('v-img-preview').src = uploadedImageBase64;
+        document.getElementById('v-img-preview-box').classList.remove('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    function removeImgPreview() {
+      uploadedImageBase64 = null;
+      document.getElementById('v-file-input').value = '';
+      document.getElementById('v-img-preview-box').classList.add('hidden');
+    }
+
+    function submitVendorResponse(e) {
+      e.preventDefault();
+
+      if (!uploadedImageBase64) {
+        alert("パーツの実物写真を添付（Ctrl+Vスクショ貼付、ドラッグまたはファイル選択）してください。");
+        return;
+      }
+
+      const price = parseInt(document.getElementById('v-price-input').value, 10);
+      const quality = document.getElementById('v-quality-select').value;
+      const shipDate = document.getElementById('v-ship-date-select').value;
+      const comment = document.getElementById('v-comment-input').value;
+
+      let orders = getOrders();
+      let order = orders.find(o => o.id === currentSelectedReqId);
+
+      if (order) {
+        if (!order.vendorResponses) order.vendorResponses = [];
+
+        order.vendorResponses.unshift({
+          vendor: currentLoggedVendor.name,
+          email: currentLoggedVendor.email,
+          price: price,
+          quality: quality,
+          shipDate: shipDate,
+          img: uploadedImageBase64,
+          comment: comment
+        });
+
+        order.status = "業者照会中";
+        order.hasNewVendorResponse = true;
+        order.readByAdmin = false;
+
+        localStorage.setItem('portal_orders', JSON.stringify(orders));
+        alert(`【回答送信完了】写真添付・発送予定日（${shipDate}）の見積もり回答を管理者に送信しました！`);
+
+        removeImgPreview();
+        document.getElementById('v-comment-input').value = '';
+        document.getElementById('v-price-input').value = '';
+        document.getElementById('v-form-container').classList.add('hidden');
+        currentSelectedReqId = null;
+        renderVendorOrderList();
+      }
+    }
+
+    window.addEventListener('storage', renderVendorOrderList);
+    checkVendorAuth();
+  </script>
+</body>
+</html>
