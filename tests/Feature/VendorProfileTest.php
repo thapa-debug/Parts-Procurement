@@ -32,6 +32,16 @@ it('lets only the admin list the vendor master', function () {
         ->and($vendor->can('viewAny', VendorProfile::class))->toBeFalse();
 });
 
+it('lets only the admin create a vendor profile', function () {
+    $admin = User::factory()->admin()->create();
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    expect($admin->can('create', VendorProfile::class))->toBeTrue()
+        ->and($buyer->can('create', VendorProfile::class))->toBeFalse()
+        ->and($vendor->can('create', VendorProfile::class))->toBeFalse();
+});
+
 it('lets the admin view any vendor profile and a vendor view only their own', function () {
     $admin = User::factory()->admin()->create();
     $buyer = User::factory()->buyer()->create();
