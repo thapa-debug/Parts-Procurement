@@ -197,7 +197,12 @@ All money stored as integers (yen, no decimals).
 ## 14. Phased build order
 
 - **Phase 0 — Foundation**: project skeleton, `README.md` + `CONVENTIONS.md`, config (S3/SES/Redis/queue/Reverb), auth + roles (Spatie), base Blade/Tailwind layout, GitHub Actions CI pipeline. Then the **`settings` + `PricingService` slice with its full Pest suite** — our reference implementation that sets the quality bar.
-- **Phase 1 — Accounts & masters**: buyer + vendor registration (self-register + admin-created; vendors require admin approval before active), vendor master CRUD + suspend/resume, settings admin UI (margin, shipping fees, sender email).
+- **Phase 1 — Accounts & masters**: buyer + vendor registration, vendor master CRUD + suspend/resume, settings admin UI (margin, shipping fees, sender email). Two account-creation paths, one shared onboarding invariant:
+  - **Self-registration** (buyer only): user picks their own password. Account can log in immediately.
+  - **Admin-created** (buyer or vendor — vendors additionally require admin approval before active): admin creates the account; the system generates a temporary password, shown once to the admin and never emailed (the buyer/vendor may not be reachable yet — relaying it is on the admin's own time, the account simply waits). Stored hashed like any password.
+  - First login on a temporary password forces a password change before anything else — enforced by a middleware applied to the global `web` stack, not opt-in per route, so no route can accidentally skip it.
+  - **Universal invariant**: email verification gates the ability to *act* (buyer creating a request, vendor responding to an inquiry) — not the ability to log in. An unverified user can log in and browse but cannot act until verified. Self-registered buyers go straight to this gate (no forced password change); admin-created accounts pass through the forced-change gate first, then this one.
+  - Email delivery: log driver in Phase 1, SES from Phase 3.
 - **Phase 2 — Core lifecycle**: buyer request form → admin board with status tabs → broadcast to vendors → vendor response with S3 photo upload → admin presents priced quote (pricing snapshot).
 - **Phase 3 — Messaging**: two chat channels (buyer/vendor, single-target + broadcast), read/unread badges, SES notifications via events/listeners.
 - **Phase 4 — Payments & ordering**: buyer checkout (shipping selection) → Stripe PaymentIntents → payment gate → `ordered_to_vendor` + `procurement_failed` path → buyer invoice + vendor invoice.
