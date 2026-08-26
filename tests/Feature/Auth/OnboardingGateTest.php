@@ -50,39 +50,48 @@ it('does not force a password change for a self-registered buyer', function () {
     expect($buyer->must_change_password)->toBeFalse();
 });
 
-// --- must-change middleware is un-bypassable --------------------------------
+// --- must-change middleware is un-bypassable, proven through a real login --
 
-it('redirects any route to the password-change page while must_change_password is true', function () {
+it('redirects to the password-change page after a real login on a temporary password', function () {
+    $result = app(CreateAdminManagedUserAction::class)->execute('Jane Vendor', 'jane@example.com', UserRole::Vendor);
+
+    $this->post('/login', ['email' => 'jane@example.com', 'password' => $result['temporary_password']])
+        ->assertRedirect('/');
+
+    $this->get('/')->assertRedirect(route('password.change'));
+});
+
+it('reaches an arbitrary route normally once logged in with a password that needs no change', function () {
     Route::get('/__test/arbitrary', fn () => 'reached')->middleware('web');
 
-    $user = User::factory()->create(['must_change_password' => true]);
+    $buyer = User::factory()->buyer()->create();
 
-    $this->actingAs($user)
-        ->get('/__test/arbitrary')
-        ->assertRedirect(route('password.change'));
+    $this->post('/login', ['email' => $buyer->email, 'password' => 'password'])
+        ->assertRedirect('/');
+
+    $this->get('/__test/arbitrary')->assertOk()->assertSee('reached');
 });
 
-it('does not redirect once must_change_password is false', function () {
+it('does not redirect loop on the password-change page itself after a real login', function () {
+    $result = app(CreateAdminManagedUserAction::class)->execute('Jane Vendor', 'jane@example.com', UserRole::Vendor);
+
+    $this->post('/login', ['email' => 'jane@example.com', 'password' => $result['temporary_password']])
+        ->assertRedirect('/');
+
+    $this->get(route('password.change'))->assertOk();
+});
+
+it('rejects login with the wrong password and leaves the user a guest', function () {
+    $user = User::factory()->create();
+
+    $this->post('/login', ['email' => $user->email, 'password' => 'not-the-right-password'])
+        ->assertSessionHasErrors('email');
+
+    $this->assertGuest();
+});
+
+it('leaves guests alone on routes that do not require auth', function () {
     Route::get('/__test/arbitrary-2', fn () => 'reached')->middleware('web');
 
-    $user = User::factory()->create(['must_change_password' => false]);
-
-    $this->actingAs($user)
-        ->get('/__test/arbitrary-2')
-        ->assertOk()
-        ->assertSee('reached');
-});
-
-it('does not redirect loop on the password-change page itself', function () {
-    $user = User::factory()->create(['must_change_password' => true]);
-
-    $this->actingAs($user)
-        ->get(route('password.change'))
-        ->assertOk();
-});
-
-it('leaves guests alone', function () {
-    Route::get('/__test/arbitrary-3', fn () => 'reached')->middleware('web');
-
-    $this->get('/__test/arbitrary-3')->assertOk()->assertSee('reached');
+    $this->get('/__test/arbitrary-2')->assertOk()->assertSee('reached');
 });
