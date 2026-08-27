@@ -9,5 +9,6 @@ return [
     'nav' => [
         'vendors' => 'Vendors',
         'buyers' => 'Buyers',
+        'settings' => 'Settings',
     ],
 ];

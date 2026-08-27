@@ -95,4 +95,27 @@ return [
         'dismiss_button' => 'Done',
     ],
 
+    'settings' => [
+        'title' => 'Settings',
+        'heading' => 'Pricing & shipping settings',
+        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, and the address the system sends mail from.',
+
+        'margin_section' => 'Margin',
+        'margin_rate_label' => 'Margin rate (%)',
+        'margin_min_fee_label' => 'Minimum margin fee (¥)',
+        'margin_help' => 'Applied margin is whichever is larger: the percentage of cost price, or the minimum fee floor.',
+
+        'shipping_section' => 'Shipping fees',
+        'shipping_fee_vehicle_label' => 'Vehicle (¥)',
+        'shipping_fee_container_label' => 'Container (¥)',
+        'shipping_help' => 'Provisional fixed fees, pending client confirmation. DHL is not configured here -- it varies per request and is entered by the admin at quote time.',
+
+        'sender_section' => 'Notifications',
+        'admin_sender_email_label' => 'Admin sender email',
+        'admin_sender_email_help' => 'The "from" address used when the system emails buyers and vendors.',
+
+        'save_button' => 'Save settings',
+        'saved' => 'Saved.',
+    ],
+
 ];

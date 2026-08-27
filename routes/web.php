@@ -4,6 +4,7 @@ use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Livewire\Admin\BuyerMaster;
+use App\Livewire\Admin\Settings;
 use App\Livewire\Admin\VendorMaster;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\PasswordChange;
@@ -41,4 +42,5 @@ Route::post('/email/verification-notification', [EmailVerificationNotificationCo
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
     Route::get('/vendors', VendorMaster::class)->name('vendors.index');
     Route::get('/buyers', BuyerMaster::class)->name('buyers.index');
+    Route::get('/settings', Settings::class)->name('settings');
 });
