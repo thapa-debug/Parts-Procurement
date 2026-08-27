@@ -5,8 +5,10 @@ use App\Enums\VendorStatus;
 use App\Livewire\Admin\VendorMaster;
 use App\Models\User;
 use App\Models\VendorProfile;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -58,6 +60,28 @@ it('lists vendors and filters them by search', function () {
         ->and($other->company_name)->toBe('Zenith Auto Parts');
 });
 
+it('shows an explicit Edit link to the detail page for every row, not just the clickable company name', function () {
+    $admin = User::factory()->admin()->create();
+    $profile = VendorProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->assertSeeHtml('href="'.route('admin.vendors.show', $profile).'"')
+        ->assertSee(__('admin.profile_edit.edit_link'));
+});
+
+it('consolidates every row\'s actions into one dropdown trigger, one per row', function () {
+    $admin = User::factory()->admin()->create();
+    VendorProfile::factory()->count(3)->create();
+
+    $html = Livewire::actingAs($admin)->test(VendorMaster::class)->html();
+
+    // aria-haspopup is unique to the dropdown trigger -- the table header
+    // also happens to render the literal word "Actions" via a different
+    // lang key, which would otherwise inflate a plain text count.
+    expect(substr_count($html, 'aria-haspopup="true"'))->toBe(3);
+});
+
 // --- create vendor + reveal ceremony ------------------------------------
 
 it('creates a vendor and reveals the temporary password', function () {
@@ -77,7 +101,8 @@ it('creates a vendor and reveals the temporary password', function () {
         ->assertSet('revealedContext', 'created')
         ->assertSet('revealedForCompany', 'Acme Dismantlers')
         ->assertSee('Acme Dismantlers')
-        ->assertSee(__('admin.vendor_master.reveal.created_heading'));
+        ->assertSee(__('admin.vendor_master.reveal.created_heading'))
+        ->assertDontSee(__('admin.buyer_master.reveal.created_heading'));
 
     $user = User::where('email', 'jane@example.com')->firstOrFail();
 
@@ -164,4 +189,64 @@ it('dismisses the reveal and clears its state', function () {
         ->assertSet('revealedPassword', null)
         ->assertSet('revealedForCompany', null)
         ->assertSet('revealedContext', null);
+});
+
+// --- email verification badge + resend ------------------------------------
+//
+// The `act` gate (CLAUDE.md 14) is role-agnostic -- a vendor must verify
+// their email before responding to an inquiry, exactly like a buyer must
+// before creating a request -- so this list needs the same badge/action a
+// buyer list needs, not something vendor-specific.
+
+it('shows a Verified badge for a verified vendor and Unverified for one who has not verified', function () {
+    $admin = User::factory()->admin()->create();
+    $verified = VendorProfile::factory()->create(['company_name' => 'Verified Motors']);
+    $unverifiedUser = User::factory()->vendor()->unverified()->create();
+    $unverified = VendorProfile::factory()->for($unverifiedUser)->create(['company_name' => 'Unverified Motors']);
+
+    $response = Livewire::actingAs($admin)->test(VendorMaster::class);
+
+    $response->assertSeeInOrder([$verified->company_name, __('admin.verification.verified_badge')])
+        ->assertSeeInOrder([$unverified->company_name, __('admin.verification.unverified_badge')]);
+});
+
+it('only shows the resend-verification button for an unverified vendor', function () {
+    $admin = User::factory()->admin()->create();
+    $verified = VendorProfile::factory()->create();
+    $unverifiedUser = User::factory()->vendor()->unverified()->create();
+    $unverified = VendorProfile::factory()->for($unverifiedUser)->create();
+
+    $html = Livewire::actingAs($admin)->test(VendorMaster::class)->html();
+
+    expect(substr_count($html, __('admin.verification.resend_button')))->toBe(1);
+
+    expect($verified->user->hasVerifiedEmail())->toBeTrue()
+        ->and($unverified->user->hasVerifiedEmail())->toBeFalse();
+});
+
+it('resends the verification email for an unverified vendor', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $unverifiedUser = User::factory()->vendor()->unverified()->create();
+    $profile = VendorProfile::factory()->for($unverifiedUser)->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->call('resendVerification', $profile->id);
+
+    Notification::assertSentTo($unverifiedUser, VerifyEmail::class);
+});
+
+it('does not resend for an already-verified vendor', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $profile = VendorProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->call('resendVerification', $profile->id);
+
+    Notification::assertNothingSent();
 });

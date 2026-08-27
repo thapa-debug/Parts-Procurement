@@ -120,6 +120,22 @@ class BuyerMaster extends Component
     }
 
     /**
+     * See VendorMaster::resendVerification() for why this doesn't reuse the
+     * verification.send route.
+     */
+    public function resendVerification(BuyerProfile $buyerProfile): void
+    {
+        $this->authorize('update', $buyerProfile);
+
+        /** @var User $user */
+        $user = $buyerProfile->user;
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
+    }
+
+    /**
      * @return LengthAwarePaginator<int, BuyerProfile>
      */
     protected function buyers(): LengthAwarePaginator
