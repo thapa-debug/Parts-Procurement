@@ -1,0 +1,122 @@
+<?php
+
+use App\Actions\CreateBuyerAction;
+use App\Enums\UserRole;
+use App\Http\Requests\CreateBuyerRequest;
+use App\Models\BuyerProfile;
+use App\Models\User;
+use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Validator;
+
+uses(RefreshDatabase::class);
+
+function buyerPayload(array $overrides = []): array
+{
+    return array_merge([
+        'name' => 'Jane Buyer',
+        'email' => 'jane@example.com',
+        'company_name' => 'Acme Imports',
+        'default_destination_country' => 'Australia',
+        'default_yard' => 'Oceania Yard',
+        'phone' => '090-0000-0000',
+    ], $overrides);
+}
+
+// --- CreateBuyerAction: happy path -------------------------------------
+
+it('creates a user and buyer profile together, atomically', function () {
+    $payload = buyerPayload();
+
+    $result = app(CreateBuyerAction::class)->execute(
+        $payload['name'],
+        $payload['email'],
+        $payload['company_name'],
+        $payload['default_destination_country'],
+        $payload['default_yard'],
+        $payload['phone'],
+    );
+
+    expect($result['user']->role)->toBe(UserRole::Buyer)
+        ->and($result['user']->must_change_password)->toBeTrue()
+        ->and($result['user']->hasVerifiedEmail())->toBeFalse()
+        ->and($result['buyer_profile']->user_id)->toBe($result['user']->id)
+        ->and($result['buyer_profile']->company_name)->toBe('Acme Imports')
+        ->and($result['buyer_profile']->member_code)->toBe(BuyerProfile::generateMemberCode($result['user']))
+        ->and(Hash::check($result['temporary_password'], $result['user']->password))->toBeTrue();
+
+    expect(User::count())->toBe(1)
+        ->and(BuyerProfile::count())->toBe(1);
+});
+
+// --- CreateBuyerAction: transaction rollback ----------------------------
+
+it('rolls back the entire transaction and creates zero users if the buyer profile write fails', function () {
+    BuyerProfile::creating(function () {
+        throw new RuntimeException('forced failure for test');
+    });
+
+    $payload = buyerPayload();
+
+    $attempt = fn () => app(CreateBuyerAction::class)->execute(
+        $payload['name'],
+        $payload['email'],
+        $payload['company_name'],
+        $payload['default_destination_country'],
+        $payload['default_yard'],
+        $payload['phone'],
+    );
+
+    expect($attempt)->toThrow(RuntimeException::class);
+
+    expect(User::count())->toBe(0)
+        ->and(BuyerProfile::count())->toBe(0);
+});
+
+// --- CreateBuyerRequest: validation --------------------------------------
+
+it('requires every admin-created buyer field', function () {
+    $validator = Validator::make([], (new CreateBuyerRequest)->rules());
+
+    expect($validator->fails())->toBeTrue();
+
+    foreach (['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone'] as $field) {
+        expect($validator->errors()->has($field))->toBeTrue();
+    }
+});
+
+it('does not accept member_code as an input field', function () {
+    expect((new CreateBuyerRequest)->rules())->not->toHaveKey('member_code');
+});
+
+it('rejects a duplicate email', function () {
+    User::factory()->create(['email' => 'taken@example.com']);
+
+    $validator = Validator::make(
+        buyerPayload(['email' => 'taken@example.com']),
+        (new CreateBuyerRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('email'))->toBeTrue();
+});
+
+it('passes with a complete, unique payload', function () {
+    $validator = Validator::make(buyerPayload(), (new CreateBuyerRequest)->rules());
+
+    expect($validator->fails())->toBeFalse();
+});
+
+// --- CreateBuyerRequest: authorization ------------------------------------
+
+it('authorizes admin-created buyer creation for an admin only', function () {
+    $admin = User::factory()->admin()->create();
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    foreach ([[$admin, true], [$buyer, false], [$vendor, false]] as [$user, $expected]) {
+        $request = new CreateBuyerRequest;
+        $request->setUserResolver(fn () => $user);
+
+        expect($request->authorize())->toBe($expected);
+    }
+});

@@ -31,6 +31,8 @@ return [
         'password_label' => 'Password',
         'remember_label' => 'Remember me',
         'submit' => 'Log In',
+        'no_account' => "Don't have an account?",
+        'register_link' => 'Sign up',
     ],
 
     /*
@@ -48,6 +50,43 @@ return [
         'confirm_password_label' => 'Confirm new password',
         'submit' => 'Update password',
         'success' => 'Your password has been updated.',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | UI copy — buyer self-registration screen
+    |--------------------------------------------------------------------------
+    */
+
+    'register' => [
+        'title' => 'Create Account',
+        'heading' => 'Create your buyer account',
+        'subheading' => 'Register to start requesting parts.',
+        'name_label' => 'Your name',
+        'email_label' => 'Email',
+        'password_label' => 'Password',
+        'confirm_password_label' => 'Confirm password',
+        'company_name_label' => 'Company name',
+        'phone_label' => 'Phone',
+        'default_destination_country_label' => 'Default destination country',
+        'default_yard_label' => 'Default yard',
+        'submit' => 'Create account',
+        'already_have_account' => 'Already have an account?',
+        'login_link' => 'Log in',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | UI copy — email verification banner
+    |--------------------------------------------------------------------------
+    */
+
+    'verification' => [
+        'banner' => 'Please verify your email address before you can create or respond to requests.',
+        'resend_button' => 'Resend verification email',
+        'sent' => 'A new verification link has been sent to your email address.',
+        'verified' => 'Your email address has been verified.',
+        'already_verified' => 'Your email address is already verified.',
     ],
 
 ];

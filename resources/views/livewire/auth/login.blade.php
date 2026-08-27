@@ -56,6 +56,13 @@
             >
                 {{ __('auth.login.submit') }}
             </button>
+
+            <p class="text-center text-sm text-ink-muted">
+                {{ __('auth.login.no_account') }}
+                <a href="{{ route('register') }}" class="font-medium text-brand-700 hover:text-brand-800">
+                    {{ __('auth.login.register_link') }}
+                </a>
+            </p>
         </form>
     </div>
 </div>
