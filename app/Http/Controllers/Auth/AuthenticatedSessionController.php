@@ -10,14 +10,6 @@ use Illuminate\Support\Facades\Auth;
 
 class AuthenticatedSessionController extends Controller
 {
-    /**
-     * Placeholder until the real Livewire login form is built.
-     */
-    public function create(): string
-    {
-        return 'Login form placeholder.';
-    }
-
     public function store(LoginRequest $request): RedirectResponse
     {
         $request->authenticate();
