@@ -31,32 +31,71 @@
                     <th class="px-4 py-3">{{ __('admin.buyer_master.table.member_code') }}</th>
                     <th class="px-4 py-3">{{ __('admin.buyer_master.table.contact') }}</th>
                     <th class="px-4 py-3">{{ __('admin.buyer_master.table.email') }}</th>
+                    <th class="px-4 py-3">{{ __('admin.verification.column') }}</th>
                     <th class="px-4 py-3 text-right">{{ __('admin.buyer_master.table.actions') }}</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-line">
                 @forelse ($buyers as $buyer)
                     <tr wire:key="buyer-{{ $buyer->id }}">
-                        <td class="px-4 py-3 font-medium text-ink">{{ $buyer->company_name }}</td>
+                        <td class="px-4 py-3 font-medium text-ink">
+                            <a href="{{ route('admin.buyers.show', $buyer) }}" class="hover:text-brand-700 hover:underline">
+                                {{ $buyer->company_name }}
+                            </a>
+                        </td>
                         <td class="px-4 py-3 font-mono text-xs text-ink-muted">{{ $buyer->member_code }}</td>
                         <td class="px-4 py-3 text-ink-muted">{{ $buyer->user->name }}</td>
                         <td class="px-4 py-3 text-ink-muted">{{ $buyer->user->email }}</td>
                         <td class="px-4 py-3">
-                            <div class="flex items-center justify-end gap-3 text-sm">
+                            @if ($buyer->user->hasVerifiedEmail())
+                                <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                                    {{ __('admin.verification.verified_badge') }}
+                                </span>
+                            @else
+                                <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    {{ __('admin.verification.unverified_badge') }}
+                                </span>
+                            @endif
+                        </td>
+                        <td class="px-4 py-3 text-right">
+                            <x-admin.row-actions-menu>
+                                <a
+                                    href="{{ route('admin.buyers.show', $buyer) }}"
+                                    role="menuitem"
+                                    class="block px-4 py-2 text-left text-sm text-ink-muted hover:bg-surface-muted hover:text-ink"
+                                >
+                                    {{ __('admin.profile_edit.edit_link') }}
+                                </a>
+
                                 <button
                                     type="button"
                                     wire:click="resetPassword({{ $buyer->id }})"
                                     wire:confirm="{{ __('admin.buyer_master.reset_password_confirm', ['company' => $buyer->company_name]) }}"
-                                    class="text-ink-muted underline hover:text-ink"
+                                    role="menuitem"
+                                    class="block w-full px-4 py-2 text-left text-sm text-ink-muted hover:bg-surface-muted hover:text-ink"
                                 >
                                     {{ __('admin.buyer_master.reset_password_button') }}
                                 </button>
-                            </div>
+
+                                @unless ($buyer->user->hasVerifiedEmail())
+                                    <span x-data="{ sent: false }" class="block">
+                                        <button
+                                            type="button"
+                                            @click="$wire.resendVerification({{ $buyer->id }}).then(() => { sent = true; setTimeout(() => (sent = false), 2000) })"
+                                            role="menuitem"
+                                            class="block w-full px-4 py-2 text-left text-sm text-ink-muted hover:bg-surface-muted hover:text-ink"
+                                        >
+                                            <span x-show="!sent">{{ __('admin.verification.resend_button') }}</span>
+                                            <span x-show="sent" style="display: none">{{ __('admin.verification.resent') }}</span>
+                                        </button>
+                                    </span>
+                                @endunless
+                            </x-admin.row-actions-menu>
                         </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="5" class="px-4 py-8 text-center text-ink-muted">
+                        <td colspan="6" class="px-4 py-8 text-center text-ink-muted">
                             {{ __('admin.buyer_master.empty') }}
                         </td>
                     </tr>

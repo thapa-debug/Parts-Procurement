@@ -45,6 +45,8 @@ return [
             'reset_heading' => 'Password reset',
             'warning' => 'Save this now -- it will not be shown again. Relay it to the vendor yourself; the system never emails it.',
         ],
+
+        'back_link' => 'Back to vendors',
     ],
 
     'buyer_master' => [
@@ -82,6 +84,8 @@ return [
             'reset_heading' => 'Password reset',
             'warning' => 'Save this now -- it will not be shown again. Relay it to the buyer yourself; the system never emails it.',
         ],
+
+        'back_link' => 'Back to buyers',
     ],
 
     // Shared across every admin-created-account reveal ceremony (vendor,
@@ -93,6 +97,37 @@ return [
         'copied' => 'Copied',
         'acknowledge_label' => "I've saved this password",
         'dismiss_button' => 'Done',
+    ],
+
+    // Shared by the vendor/buyer detail-edit view (<x-admin.profile-edit-form>):
+    // the account block's labels are domain-agnostic (name/email mean the
+    // same thing for a vendor or a buyer), unlike the editable fields below
+    // it, which each caller supplies its own labels/fields for.
+    'profile_edit' => [
+        'edit_link' => 'Edit',
+        'account_section' => 'Account',
+        'name_label' => 'Name',
+        'email_label' => 'Login email',
+        'save_button' => 'Save changes',
+        'saved' => 'Saved.',
+    ],
+
+    // Shared by the vendor/buyer master lists: the "act" gate (CLAUDE.md 14)
+    // is role-agnostic, so both a vendor and a buyer can be unverified and
+    // need the exact same badge/action -- neither the badge nor the resend
+    // button is vendor- or buyer-specific copy.
+    'verification' => [
+        'column' => 'Verification',
+        'verified_badge' => 'Verified',
+        'unverified_badge' => 'Unverified',
+        'resend_button' => 'Resend verification email',
+        'resent' => 'Sent.',
+    ],
+
+    // <x-admin.row-actions-menu>'s trigger button text -- shared, since the
+    // menu itself is domain-agnostic (see CONVENTIONS.md).
+    'row_actions' => [
+        'trigger' => 'Actions',
     ],
 
     'settings' => [

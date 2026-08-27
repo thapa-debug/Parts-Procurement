@@ -132,6 +132,24 @@ class VendorMaster extends Component
     }
 
     /**
+     * Deliberately does not reuse the verification.send route -- that
+     * controller always resends for $request->user() (self-service only),
+     * so pointed at from an admin session it would resend the ADMIN's own
+     * email, not this vendor's. Same underlying mechanism, correct actor.
+     */
+    public function resendVerification(VendorProfile $vendorProfile): void
+    {
+        $this->authorize('update', $vendorProfile);
+
+        /** @var User $user */
+        $user = $vendorProfile->user;
+
+        if (! $user->hasVerifiedEmail()) {
+            $user->sendEmailVerificationNotification();
+        }
+    }
+
+    /**
      * @return LengthAwarePaginator<int, VendorProfile>
      */
     protected function vendors(): LengthAwarePaginator

@@ -4,8 +4,10 @@ use App\Enums\UserRole;
 use App\Livewire\Admin\BuyerMaster;
 use App\Models\BuyerProfile;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -53,6 +55,28 @@ it('lists buyers and filters them by search', function () {
 
     expect($match->company_name)->toBe('Acme Imports')
         ->and($other->company_name)->toBe('Zenith Trading Co');
+});
+
+it('shows an explicit Edit link to the detail page for every row, not just the clickable company name', function () {
+    $admin = User::factory()->admin()->create();
+    $profile = BuyerProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->assertSeeHtml('href="'.route('admin.buyers.show', $profile).'"')
+        ->assertSee(__('admin.profile_edit.edit_link'));
+});
+
+it('consolidates every row\'s actions into one dropdown trigger, one per row', function () {
+    $admin = User::factory()->admin()->create();
+    BuyerProfile::factory()->count(3)->create();
+
+    $html = Livewire::actingAs($admin)->test(BuyerMaster::class)->html();
+
+    // aria-haspopup is unique to the dropdown trigger -- the table header
+    // also happens to render the literal word "Actions" via a different
+    // lang key, which would otherwise inflate a plain text count.
+    expect(substr_count($html, 'aria-haspopup="true"'))->toBe(3);
 });
 
 it('finds a buyer by member code', function () {
@@ -160,4 +184,59 @@ it('dismisses the reveal and clears its state', function () {
         ->assertSet('revealedPassword', null)
         ->assertSet('revealedForCompany', null)
         ->assertSet('revealedContext', null);
+});
+
+// --- email verification badge + resend ------------------------------------
+
+it('shows a Verified badge for a verified buyer and Unverified for one who has not verified', function () {
+    $admin = User::factory()->admin()->create();
+    $verified = BuyerProfile::factory()->create(['company_name' => 'Verified Imports']);
+    $unverifiedUser = User::factory()->buyer()->unverified()->create();
+    $unverified = BuyerProfile::factory()->for($unverifiedUser)->create(['company_name' => 'Unverified Imports']);
+
+    $response = Livewire::actingAs($admin)->test(BuyerMaster::class);
+
+    $response->assertSeeInOrder([$verified->company_name, __('admin.verification.verified_badge')])
+        ->assertSeeInOrder([$unverified->company_name, __('admin.verification.unverified_badge')]);
+});
+
+it('only shows the resend-verification button for an unverified buyer', function () {
+    $admin = User::factory()->admin()->create();
+    $verified = BuyerProfile::factory()->create();
+    $unverifiedUser = User::factory()->buyer()->unverified()->create();
+    $unverified = BuyerProfile::factory()->for($unverifiedUser)->create();
+
+    $html = Livewire::actingAs($admin)->test(BuyerMaster::class)->html();
+
+    expect(substr_count($html, __('admin.verification.resend_button')))->toBe(1);
+
+    expect($verified->user->hasVerifiedEmail())->toBeTrue()
+        ->and($unverified->user->hasVerifiedEmail())->toBeFalse();
+});
+
+it('resends the verification email for an unverified buyer', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $unverifiedUser = User::factory()->buyer()->unverified()->create();
+    $profile = BuyerProfile::factory()->for($unverifiedUser)->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('resendVerification', $profile->id);
+
+    Notification::assertSentTo($unverifiedUser, VerifyEmail::class);
+});
+
+it('does not resend for an already-verified buyer', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $profile = BuyerProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('resendVerification', $profile->id);
+
+    Notification::assertNothingSent();
 });
