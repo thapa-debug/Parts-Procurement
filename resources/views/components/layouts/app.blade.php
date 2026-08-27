@@ -20,6 +20,11 @@
                     @auth
                         <nav class="flex items-center gap-6 text-sm text-ink-muted">
                             {{-- Role-specific nav links (admin/buyer/vendor portals) are added here as each is built. --}}
+                            @if (auth()->user()->isAdmin())
+                                <a href="{{ route('admin.vendors.index') }}" class="hover:text-ink">
+                                    {{ __('app.nav.vendors') }}
+                                </a>
+                            @endif
                         </nav>
                     @endauth
                 </div>
