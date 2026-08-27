@@ -41,3 +41,9 @@ GitHub Actions (`.github/workflows/ci.yml`) runs on every push/PR to `main`: Pin
 ## Conventions
 
 See [`CONVENTIONS.md`](./CONVENTIONS.md) for patterns introduced as the codebase grows.
+
+## Demo data
+
+`php artisan migrate:fresh --seed` seeds a realistic demo cast (admin,
+vendors, buyers). See [`DEMO.md`](./DEMO.md) for login credentials and a
+suggested click-path walkthrough.
