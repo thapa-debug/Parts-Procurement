@@ -95,3 +95,18 @@ it('leaves guests alone on routes that do not require auth', function () {
 
     $this->get('/__test/arbitrary-2')->assertOk()->assertSee('reached');
 });
+
+it('does not redirect away Livewire\'s own shared update endpoint, or the password-change form would never be able to submit', function () {
+    $result = app(CreateAdminManagedUserAction::class)->execute('Jane Vendor', 'jane@example.com', UserRole::Vendor);
+
+    $this->post('/login', ['email' => 'jane@example.com', 'password' => $result['temporary_password']])
+        ->assertRedirect('/');
+
+    // Matches the real route Livewire registers for all component AJAX
+    // traffic (see Livewire\Mechanisms\HandleRequests\HandleRequests::boot).
+    Route::post('/__test/livewire-update', fn () => 'reached')
+        ->middleware('web')
+        ->name('default.livewire.update');
+
+    $this->post('/__test/livewire-update')->assertOk()->assertSee('reached');
+});
