@@ -27,6 +27,9 @@
                                 <a href="{{ route('admin.buyers.index') }}" class="hover:text-ink">
                                     {{ __('app.nav.buyers') }}
                                 </a>
+                                <a href="{{ route('admin.settings') }}" class="hover:text-ink">
+                                    {{ __('app.nav.settings') }}
+                                </a>
                             @endif
                         </nav>
                     @endauth
