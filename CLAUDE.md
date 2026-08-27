@@ -57,6 +57,14 @@ Single `users` table + `role` enum (`admin` | `buyer` | `vendor`), guarded by Po
 
 A leak here exposes the client's margin and supplier relationships. Treat authorization as a first-class feature, not middleware you add later.
 
+**Admin-role granularity — confirmed upcoming requirement:** the client's company has two admin tiers, not one undifferentiated `admin` role:
+- **Owner/manager**: full access — margin, settings, and creating/managing staff accounts + permissions.
+- **Staff**: operational work only — requests, quotes, messaging — but **not** margin, settings, account editing, or creating staff.
+
+Unlimited staff accounts; only owner/managers create or manage staff. To be built in **Phase 2**, using spatie/laravel-permission's fine-grained permissions (the package is already installed — §2 — this is what it's for; not yet wired to any real roles/permissions as of Phase 1). Whether finer-than-two-tier control is needed is still open, pending client confirmation — don't build past two tiers until that's settled.
+
+This lands on top of the Policy-based defense-in-depth discipline already established for Phase 1's admin screens (route middleware + component-level Policy check on every action, e.g. `VendorMasterTest`'s buyer/vendor-forbidden cases): **design every Phase 2 admin screen so an owner-vs-staff permission check slots into that same per-action Policy shape without rework** — the check belongs inside each Policy method (`create`, `update`, ...) alongside the existing `isAdmin()` check, not bolted on separately. This doesn't require touching Phase 1's already-shipped policies (`VendorProfilePolicy`, `BuyerProfilePolicy`, `SettingPolicy`) now — whether those need an owner-only permission added later (e.g. `SettingPolicy::update` restricted to owner/manager, matching "not... settings" above) is itself a Phase 2 decision, once permissions actually exist to check against.
+
 ---
 
 ## 5. Request lifecycle (state machine)
@@ -118,7 +126,7 @@ No refund flow, no Stripe refund calls, no refund UI in this build. Refunds are 
 - **invoices** (admin→buyer): part_request_id(fk), invoice_no(unique), buyer_id(fk), parts_price, shipping_fee, tax(nullable), total, status(enum issued|paid), issued_at
 - **vendor_invoices** (vendor→admin): part_request_id(fk), vendor_id(fk), amount, issued_at
 - **payments**: part_request_id(fk), invoice_id(fk nullable), gateway(enum), gateway_payment_id, amount, currency(char3), status(enum pending|confirmed|failed), paid_at(nullable), raw_response(json), timestamps
-- **settings**: key, value, type  (holds margin_rate, margin_min_fee, shipping_fee_vehicle, shipping_fee_container, shipping_fee_dhl, admin_sender_email)
+- **settings**: key, value, type  (holds margin_rate, margin_min_fee, shipping_fee_vehicle, shipping_fee_container, admin_sender_email — vehicle/container are provisional fixed fees pending client confirmation; DHL is deliberately **not** a settings key, see §14 Phase 4)
 - Plus Laravel's `notifications`, `jobs`, `failed_jobs`, and spatie's `activity_log` + permission tables.
 
 All money stored as integers (yen, no decimals).
@@ -203,9 +211,9 @@ All money stored as integers (yen, no decimals).
   - First login on a temporary password forces a password change before anything else — enforced by a middleware applied to the global `web` stack, not opt-in per route, so no route can accidentally skip it.
   - **Universal invariant**: email verification gates the ability to *act* (buyer creating a request, vendor responding to an inquiry) — not the ability to log in. An unverified user can log in and browse but cannot act until verified. Self-registered buyers go straight to this gate (no forced password change); admin-created accounts pass through the forced-change gate first, then this one.
   - Email delivery: log driver in Phase 1, SES from Phase 3.
-- **Phase 2 — Core lifecycle**: buyer request form → admin board with status tabs → broadcast to vendors → vendor response with S3 photo upload → admin presents priced quote (pricing snapshot).
+- **Phase 2 — Core lifecycle**: buyer request form → admin board with status tabs → broadcast to vendors → vendor response with S3 photo upload → admin presents priced quote (pricing snapshot). **Also where owner/manager-vs-staff admin permissions get built** (§4) — every admin screen in this phase needs its Policy shaped for that from the start, not retrofitted after.
 - **Phase 3 — Messaging**: two chat channels (buyer/vendor, single-target + broadcast), read/unread badges, SES notifications via events/listeners.
-- **Phase 4 — Payments & ordering**: buyer checkout (shipping selection) → Stripe PaymentIntents → payment gate → `ordered_to_vendor` + `procurement_failed` path → buyer invoice + vendor invoice.
+- **Phase 4 — Payments & ordering**: buyer checkout (shipping selection) → Stripe PaymentIntents → payment gate → `ordered_to_vendor` + `procurement_failed` path → buyer invoice + vendor invoice. **This is also where the shipping model gets finalized, not before**: `shipping_fee_vehicle`/`shipping_fee_container` (§7 `settings`) are provisional fixed fees pending client confirmation. DHL is realistically per-request — the admin enters the actual fee at quote time (`part_requests.shipping_fee`, already nullable for this) — not a global fixed number. A DHL Express (MyDHL) Rating-API auto-calculation is a plausible later enhancement, but it requires the *client's own* DHL Express business account; whether they have one is an open question to confirm with the client before scoping any DHL API work.
 - **Phase 5 — Fulfilment & ops**: shipped/received, KPI dashboard, real-time via Reverb/Horizon, audit log wired in.
 - **Phase 6 — Hardening**: coverage pass, Larastan level-up, isolation security review, deployment to the client's environment.
 
