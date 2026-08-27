@@ -39,6 +39,23 @@
             </div>
         </header>
 
+        @auth
+            @unless (auth()->user()->hasVerifiedEmail())
+                <div class="border-b border-amber-200 bg-amber-50">
+                    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-3 text-sm text-amber-800">
+                        <span>{{ __('auth.verification.banner') }}</span>
+
+                        <form method="POST" action="{{ route('verification.send') }}">
+                            @csrf
+                            <button type="submit" class="font-medium underline hover:text-amber-900">
+                                {{ __('auth.verification.resend_button') }}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            @endunless
+        @endauth
+
         <main class="mx-auto max-w-6xl px-6 py-10">
             @if (session('status'))
                 <div class="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
