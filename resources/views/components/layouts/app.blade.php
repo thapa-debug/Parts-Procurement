@@ -24,6 +24,9 @@
                                 <a href="{{ route('admin.vendors.index') }}" class="hover:text-ink">
                                     {{ __('app.nav.vendors') }}
                                 </a>
+                                <a href="{{ route('admin.buyers.index') }}" class="hover:text-ink">
+                                    {{ __('app.nav.buyers') }}
+                                </a>
                             @endif
                         </nav>
                     @endauth

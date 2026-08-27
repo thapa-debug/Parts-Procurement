@@ -47,6 +47,43 @@ return [
         ],
     ],
 
+    'buyer_master' => [
+        'title' => 'Buyers',
+        'subheading' => 'Manage buyer accounts: create and reset temporary passwords.',
+        'search_placeholder' => 'Search by company, member code, name, or email...',
+        'create_button' => 'New buyer',
+        'empty' => 'No buyers found.',
+
+        'table' => [
+            'company' => 'Company',
+            'member_code' => 'Member code',
+            'contact' => 'Contact',
+            'email' => 'Login email',
+            'actions' => 'Actions',
+        ],
+
+        'reset_password_button' => 'Reset password',
+        'reset_password_confirm' => "Reset :company's temporary password? Their current password stops working immediately.",
+
+        'create_form' => [
+            'title' => 'New buyer',
+            'name_label' => 'Contact name',
+            'email_label' => 'Login email',
+            'company_name_label' => 'Company name',
+            'phone_label' => 'Phone',
+            'default_destination_country_label' => 'Default destination country',
+            'default_yard_label' => 'Default yard',
+            'submit' => 'Create buyer',
+            'cancel' => 'Cancel',
+        ],
+
+        'reveal' => [
+            'created_heading' => 'Buyer created',
+            'reset_heading' => 'Password reset',
+            'warning' => 'Save this now -- it will not be shown again. Relay it to the buyer yourself; the system never emails it.',
+        ],
+    ],
+
     // Shared across every admin-created-account reveal ceremony (vendor,
     // buyer, ...): heading/warning are context-specific and come from the
     // caller instead, since "Vendor created" would be wrong copy for a buyer.
