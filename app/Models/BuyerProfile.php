@@ -7,16 +7,33 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Spatie\Activitylog\Models\Concerns\LogsActivity;
+use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['user_id', 'company_name', 'member_code', 'default_destination_country', 'default_yard', 'phone'])]
+#[Fillable([
+    'user_id', 'company_name', 'member_code', 'default_destination_country',
+    'default_yard', 'phone', 'approved_at', 'approved_by',
+])]
 class BuyerProfile extends Model
 {
     /** @use HasFactory<BuyerProfileFactory> */
-    use HasFactory;
+    use HasFactory, LogsActivity;
+
+    /**
+     * @var array<string, string>
+     */
+    protected $casts = [
+        'approved_at' => 'datetime',
+    ];
 
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function approvedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
     }
 
     /**
@@ -27,5 +44,21 @@ class BuyerProfile extends Model
     public static function generateMemberCode(User $user): string
     {
         return 'BYR-'.str_pad((string) $user->id, 6, '0', STR_PAD_LEFT);
+    }
+
+    /**
+     * CLAUDE.md §14: a new gate on top of email verification -- a
+     * self-registered buyer can't create requests until an admin approves
+     * them. Admin-created buyers are approved at creation (see
+     * CreateBuyerAction); only self-registration leaves this null.
+     */
+    public function isApproved(): bool
+    {
+        return $this->approved_at !== null;
+    }
+
+    public function getActivitylogOptions(): LogOptions
+    {
+        return LogOptions::defaults()->logOnly(['approved_at']);
     }
 }

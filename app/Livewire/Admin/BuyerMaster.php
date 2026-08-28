@@ -36,6 +36,12 @@ class BuyerMaster extends Component
 
     public string $phone = '';
 
+    /**
+     * Defaults to checked -- "activate now" is the common case for a buyer
+     * the admin is deliberately creating (CLAUDE.md §14).
+     */
+    public bool $approve_immediately = true;
+
     public ?string $revealedPassword = null;
 
     public ?string $revealedForCompany = null;
@@ -44,6 +50,13 @@ class BuyerMaster extends Component
      * @var 'created'|'reset'|null
      */
     public ?string $revealedContext = null;
+
+    /**
+     * Set only alongside a fresh creation, so the reveal modal can tell the
+     * admin a verification email already went out. Null on a password
+     * reset -- that doesn't touch verification state.
+     */
+    public ?string $revealedVerificationEmail = null;
 
     public function mount(): void
     {
@@ -68,6 +81,7 @@ class BuyerMaster extends Component
         $this->authorize('create', BuyerProfile::class);
 
         $this->reset(['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone']);
+        $this->approve_immediately = true;
         $this->resetErrorBag();
         $this->showCreateForm = true;
     }
@@ -83,6 +97,9 @@ class BuyerMaster extends Component
 
         $validated = $this->validate();
 
+        /** @var User $admin */
+        $admin = auth()->user();
+
         $result = $action->execute(
             $validated['name'],
             $validated['email'],
@@ -90,12 +107,15 @@ class BuyerMaster extends Component
             $validated['default_destination_country'],
             $validated['default_yard'],
             $validated['phone'],
+            $admin,
+            $validated['approve_immediately'],
         );
 
         $this->showCreateForm = false;
         $this->revealedPassword = $result['temporary_password'];
         $this->revealedForCompany = $result['buyer_profile']->company_name;
         $this->revealedContext = 'created';
+        $this->revealedVerificationEmail = $result['user']->email;
     }
 
     public function resetPassword(BuyerProfile $buyerProfile, ResetTemporaryPasswordAction $action): void
@@ -110,6 +130,7 @@ class BuyerMaster extends Component
         $this->revealedPassword = $result['temporary_password'];
         $this->revealedForCompany = $buyerProfile->company_name;
         $this->revealedContext = 'reset';
+        $this->revealedVerificationEmail = null;
     }
 
     public function dismissReveal(): void
@@ -117,6 +138,7 @@ class BuyerMaster extends Component
         $this->revealedPassword = null;
         $this->revealedForCompany = null;
         $this->revealedContext = null;
+        $this->revealedVerificationEmail = null;
     }
 
     /**

@@ -40,6 +40,11 @@ class DemoSeeder extends Seeder
         // Deliberately unverified -- the one account that shows the
         // Unverified badge + resend action on the buyer master list.
         $this->buyer('Southern Cross Auto Imports', "Liam O'Connor", 'buyer3@demo.test', '+61-7-000-1003', 'Australia', 'Brisbane Yard', unverified: true);
+
+        // Deliberately verified but not yet approved -- CLAUDE.md §14's
+        // buyer-approval gate: gives the (upcoming) approval-queue screen
+        // something real to show.
+        $this->buyer('Andes Auto Traders', 'Sofia Herrera', 'buyer4@demo.test', '+56-32-000-1004', 'Chile', 'Valparaiso Yard', pending: true);
     }
 
     private function vendor(string $companyName, string $contactPerson, string $email, string $phone): void
@@ -68,6 +73,7 @@ class DemoSeeder extends Seeder
         string $destinationCountry,
         string $yard,
         bool $unverified = false,
+        bool $pending = false,
     ): void {
         $factory = User::factory()->buyer();
 
@@ -81,7 +87,13 @@ class DemoSeeder extends Seeder
             'password' => 'password',
         ]);
 
-        BuyerProfile::factory()->create([
+        $profileFactory = BuyerProfile::factory();
+
+        if ($pending) {
+            $profileFactory = $profileFactory->pending();
+        }
+
+        $profileFactory->create([
             'user_id' => $user->id,
             'company_name' => $companyName,
             'member_code' => BuyerProfile::generateMemberCode($user),

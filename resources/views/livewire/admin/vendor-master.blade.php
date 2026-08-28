@@ -267,6 +267,7 @@
             :for-company="$revealedForCompany"
             :heading="$revealedContext === 'reset' ? __('admin.vendor_master.reveal.reset_heading') : __('admin.vendor_master.reveal.created_heading')"
             :warning="__('admin.vendor_master.reveal.warning')"
+            :verification-email="$revealedVerificationEmail"
         />
     @endif
 </div>

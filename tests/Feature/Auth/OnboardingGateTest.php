@@ -19,7 +19,10 @@ it('blocks an unverified user from acting', function () {
 });
 
 it('allows a verified user to act', function () {
-    $user = User::factory()->create();
+    // Vendor, not the factory default (buyer) -- a buyer now carries an
+    // extra approval condition (see BuyerApprovalGateTest), so this
+    // role-agnostic "verified is enough" case needs a role that isn't one.
+    $user = User::factory()->vendor()->create();
 
     expect($user->hasVerifiedEmail())->toBeTrue()
         ->and(Gate::forUser($user)->allows('act'))->toBeTrue();

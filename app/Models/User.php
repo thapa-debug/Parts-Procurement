@@ -49,11 +49,17 @@ class User extends Authenticatable implements MustVerifyEmail
         return $this->role === UserRole::Vendor;
     }
 
+    /**
+     * @return HasOne<VendorProfile, $this>
+     */
     public function vendorProfile(): HasOne
     {
         return $this->hasOne(VendorProfile::class);
     }
 
+    /**
+     * @return HasOne<BuyerProfile, $this>
+     */
     public function buyerProfile(): HasOne
     {
         return $this->hasOne(BuyerProfile::class);
