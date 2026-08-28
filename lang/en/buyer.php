@@ -31,9 +31,12 @@ return [
         'car_model_label' => 'Car model',
         'car_model_placeholder' => 'Examples: Crown / Land Cruiser',
 
+        'identifier_note' => 'Provide at least one of VIN, OEM part number, or a reference URL below, so vendors have something concrete to identify the exact part from.',
+        'identifier_required_error' => 'Please provide at least one of: VIN, OEM part number, or a reference URL.',
+
         'vin_label' => 'VIN / chassis number',
         'vin_placeholder' => 'Example: GRS184-0002255',
-        'vin_help' => 'Optional, but helps vendors confirm an exact fit.',
+        'vin_help' => 'Helps vendors confirm an exact fit.',
 
         'mfg_date_label' => 'Manufacture date',
         'mfg_date_placeholder' => 'e.g. 2005/10',

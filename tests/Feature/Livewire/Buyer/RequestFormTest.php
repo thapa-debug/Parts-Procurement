@@ -112,6 +112,7 @@ it('resets the form and shows an inline confirmation after submitting', function
         ->set('part_type', PartType::Both->value)
         ->set('maker', 'Nissan')
         ->set('car_model', 'Skyline')
+        ->set('oem_part_number', '81110-60M00')
         ->set('part_name', 'Rear bumper')
         ->call('submit')
         ->assertSet('part_type', '')
@@ -134,6 +135,7 @@ it('clears the confirmation as soon as the buyer starts a new request', function
         ->set('part_type', PartType::Used->value)
         ->set('maker', 'Toyota')
         ->set('car_model', 'Crown')
+        ->set('vin', 'GRS184-0002255')
         ->set('part_name', 'Headlight')
         ->call('submit')
         ->assertSet('submittedCode', fn ($code) => $code !== null)
@@ -147,9 +149,41 @@ it('rejects an incomplete submission', function () {
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
         ->call('submit')
-        ->assertHasErrors(['part_type', 'maker', 'car_model', 'part_name']);
+        ->assertHasErrors(['part_type', 'maker', 'car_model', 'part_name', 'identifier']);
 
     expect(PartRequest::count())->toBe(0);
+});
+
+it('rejects submission when vin, oem_part_number, and reference_url are all left blank', function () {
+    $buyer = actingBuyer();
+
+    Livewire::actingAs($buyer)
+        ->test(RequestForm::class)
+        ->set('part_type', PartType::Used->value)
+        ->set('maker', 'Toyota')
+        ->set('car_model', 'Crown')
+        ->set('part_name', 'Headlight')
+        ->call('submit')
+        ->assertHasErrors(['identifier'])
+        ->assertSee(__('buyer.request_form.identifier_required_error'));
+
+    expect(PartRequest::count())->toBe(0);
+});
+
+it('accepts submission with only a reference_url as the identifier', function () {
+    $buyer = actingBuyer();
+
+    Livewire::actingAs($buyer)
+        ->test(RequestForm::class)
+        ->set('part_type', PartType::Used->value)
+        ->set('maker', 'Toyota')
+        ->set('car_model', 'Crown')
+        ->set('part_name', 'Headlight')
+        ->set('reference_url', 'https://example.com/listing')
+        ->call('submit')
+        ->assertHasNoErrors();
+
+    expect(PartRequest::count())->toBe(1);
 });
 
 it('blocks submission for an unapproved buyer even if the form were somehow reached', function () {
