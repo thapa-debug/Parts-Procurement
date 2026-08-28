@@ -130,6 +130,16 @@ A best-effort side effect (like sending that verification email) belongs *after*
 
 **Open client question, not yet answered**: does the client have their own DHL Express business account? Nothing DHL-API-shaped should be scoped or built until that's confirmed. `SettingsTest` has a standing regression case asserting `save()` never writes a `shipping_fee_dhl` key -- if that ever needs to change, it means this decision has changed too, and CLAUDE.md §7/§14 need updating alongside it, not just the test.
 
+## Every form: required asterisks, example placeholders, brief help text
+
+Every form field in the app follows the same three-part standard, applied consistently rather than left to per-form judgment:
+
+- **Required fields get a red asterisk** right after the label text, via the shared `<x-required-mark />` component (`resources/views/components/required-mark.blade.php` -- a bare `<span class="text-red-600">*</span>`). Which fields get the mark comes straight from that field's actual validation rules (the FormRequest's or Livewire component's `rules()`) -- not from copying a reference mockup's asterisks, which may not match our schema's own nullability (e.g. the client's prototype marks VIN as required; our `part_requests.vin` column is nullable, so our form doesn't mark it).
+- **Placeholders show an example value in the expected format**, wherever the format isn't self-evident from the label alone (a VIN, an OEM part number, a URL). Skip them where they'd add nothing (a plain name field) or where they'd be actively confusing (never on a password field).
+- **A short line of help text under the field**, only where the field's purpose or optionality genuinely isn't obvious on its own (e.g. "Optional, but helps vendors confirm an exact fit." under an optional VIN field). Don't add one to every field just for symmetry -- CLAUDE.md's "don't add features beyond what's needed" applies to hint text too.
+
+All three go through `lang/en/*.php` like every other UI string -- see `App\Livewire\Buyer\RequestForm` and `lang/en/buyer.php`'s `request_form` section for the reference implementation.
+
 ## Testing
 
 - Unit tests for pure business logic live under `tests/Unit`, grouped by the class under test (e.g. `tests/Unit/Services/PricingServiceTest.php`).

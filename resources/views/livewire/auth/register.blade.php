@@ -8,7 +8,7 @@
         <form wire:submit="register" class="mt-8 space-y-5">
             <div>
                 <label for="name" class="block text-sm font-medium text-ink">
-                    {{ __('auth.register.name_label') }}
+                    {{ __('auth.register.name_label') }} <x-required-mark />
                 </label>
                 <input
                     id="name"
@@ -17,6 +17,7 @@
                     required
                     autofocus
                     autocomplete="name"
+                    placeholder="{{ __('auth.register.name_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('name')
@@ -26,7 +27,7 @@
 
             <div>
                 <label for="email" class="block text-sm font-medium text-ink">
-                    {{ __('auth.register.email_label') }}
+                    {{ __('auth.register.email_label') }} <x-required-mark />
                 </label>
                 <input
                     id="email"
@@ -34,6 +35,7 @@
                     wire:model="email"
                     required
                     autocomplete="username"
+                    placeholder="{{ __('auth.register.email_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('email')
@@ -44,7 +46,7 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label for="password" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.password_label') }}
+                        {{ __('auth.register.password_label') }} <x-required-mark />
                     </label>
                     <input
                         id="password"
@@ -61,7 +63,7 @@
 
                 <div>
                     <label for="password_confirmation" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.confirm_password_label') }}
+                        {{ __('auth.register.confirm_password_label') }} <x-required-mark />
                     </label>
                     <input
                         id="password_confirmation"
@@ -76,13 +78,14 @@
 
             <div>
                 <label for="company_name" class="block text-sm font-medium text-ink">
-                    {{ __('auth.register.company_name_label') }}
+                    {{ __('auth.register.company_name_label') }} <x-required-mark />
                 </label>
                 <input
                     id="company_name"
                     type="text"
                     wire:model="company_name"
                     required
+                    placeholder="{{ __('auth.register.company_name_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('company_name')
@@ -92,7 +95,7 @@
 
             <div>
                 <label for="phone" class="block text-sm font-medium text-ink">
-                    {{ __('auth.register.phone_label') }}
+                    {{ __('auth.register.phone_label') }} <x-required-mark />
                 </label>
                 <input
                     id="phone"
@@ -100,6 +103,7 @@
                     wire:model="phone"
                     required
                     autocomplete="tel"
+                    placeholder="{{ __('auth.register.phone_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('phone')
@@ -110,15 +114,17 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label for="default_destination_country" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.default_destination_country_label') }}
+                        {{ __('auth.register.default_destination_country_label') }} <x-required-mark />
                     </label>
                     <input
                         id="default_destination_country"
                         type="text"
                         wire:model="default_destination_country"
                         required
+                        placeholder="{{ __('auth.register.default_destination_country_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('auth.register.default_destination_country_help') }}</p>
                     @error('default_destination_country')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -126,15 +132,17 @@
 
                 <div>
                     <label for="default_yard" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.default_yard_label') }}
+                        {{ __('auth.register.default_yard_label') }} <x-required-mark />
                     </label>
                     <input
                         id="default_yard"
                         type="text"
                         wire:model="default_yard"
                         required
+                        placeholder="{{ __('auth.register.default_yard_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('auth.register.default_yard_help') }}</p>
                     @error('default_yard')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror

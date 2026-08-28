@@ -69,10 +69,10 @@ class BuyerDetail extends Component
 
         return view('livewire.admin.buyer-detail', [
             'fields' => [
-                ['name' => 'company_name', 'label' => __('admin.buyer_master.create_form.company_name_label')],
-                ['name' => 'phone', 'label' => __('admin.buyer_master.create_form.phone_label')],
-                ['name' => 'default_destination_country', 'label' => __('admin.buyer_master.create_form.default_destination_country_label')],
-                ['name' => 'default_yard', 'label' => __('admin.buyer_master.create_form.default_yard_label')],
+                ['name' => 'company_name', 'label' => __('admin.buyer_master.create_form.company_name_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.company_name_placeholder')],
+                ['name' => 'phone', 'label' => __('admin.buyer_master.create_form.phone_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.phone_placeholder')],
+                ['name' => 'default_destination_country', 'label' => __('admin.buyer_master.create_form.default_destination_country_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.default_destination_country_placeholder')],
+                ['name' => 'default_yard', 'label' => __('admin.buyer_master.create_form.default_yard_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.default_yard_placeholder')],
             ],
             'accountFields' => [
                 ['label' => __('admin.profile_edit.name_label'), 'value' => $user->name],

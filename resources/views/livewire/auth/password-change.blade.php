@@ -8,7 +8,7 @@
         <form wire:submit="update" class="mt-8 space-y-5">
             <div>
                 <label for="current_password" class="block text-sm font-medium text-ink">
-                    {{ __('auth.password_change.current_password_label') }}
+                    {{ __('auth.password_change.current_password_label') }} <x-required-mark />
                 </label>
                 <input
                     id="current_password"
@@ -26,7 +26,7 @@
 
             <div>
                 <label for="password" class="block text-sm font-medium text-ink">
-                    {{ __('auth.password_change.new_password_label') }}
+                    {{ __('auth.password_change.new_password_label') }} <x-required-mark />
                 </label>
                 <input
                     id="password"
@@ -43,7 +43,7 @@
 
             <div>
                 <label for="password_confirmation" class="block text-sm font-medium text-ink">
-                    {{ __('auth.password_change.confirm_password_label') }}
+                    {{ __('auth.password_change.confirm_password_label') }} <x-required-mark />
                 </label>
                 <input
                     id="password_confirmation"

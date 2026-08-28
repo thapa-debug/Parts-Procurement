@@ -23,7 +23,7 @@
         <form wire:submit="submit" class="mt-6 max-w-2xl space-y-5">
             <div>
                 <label class="block text-sm font-medium text-ink">
-                    {{ __('buyer.request_form.part_type_label') }}
+                    {{ __('buyer.request_form.part_type_label') }} <x-required-mark />
                 </label>
                 <div class="mt-1.5 flex flex-wrap gap-3">
                     @foreach (\App\Enums\PartType::cases() as $option)
@@ -41,12 +41,13 @@
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label for="maker" class="block text-sm font-medium text-ink">
-                        {{ __('buyer.request_form.maker_label') }}
+                        {{ __('buyer.request_form.maker_label') }} <x-required-mark />
                     </label>
                     <input
                         id="maker"
                         type="text"
                         wire:model="maker"
+                        placeholder="{{ __('buyer.request_form.maker_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('maker')
@@ -56,12 +57,13 @@
 
                 <div>
                     <label for="car_model" class="block text-sm font-medium text-ink">
-                        {{ __('buyer.request_form.car_model_label') }}
+                        {{ __('buyer.request_form.car_model_label') }} <x-required-mark />
                     </label>
                     <input
                         id="car_model"
                         type="text"
                         wire:model="car_model"
+                        placeholder="{{ __('buyer.request_form.car_model_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('car_model')
@@ -79,6 +81,7 @@
                         id="vin"
                         type="text"
                         wire:model="vin"
+                        placeholder="{{ __('buyer.request_form.vin_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     <p class="mt-1 text-xs text-ink-muted">{{ __('buyer.request_form.vin_help') }}</p>
@@ -97,6 +100,7 @@
                         wire:model="mfg_date"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('buyer.request_form.mfg_date_help') }}</p>
                     @error('mfg_date')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror
@@ -111,6 +115,7 @@
                     id="oem_part_number"
                     type="text"
                     wire:model="oem_part_number"
+                    placeholder="{{ __('buyer.request_form.oem_part_number_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('oem_part_number')
@@ -120,12 +125,13 @@
 
             <div>
                 <label for="part_name" class="block text-sm font-medium text-ink">
-                    {{ __('buyer.request_form.part_name_label') }}
+                    {{ __('buyer.request_form.part_name_label') }} <x-required-mark />
                 </label>
                 <input
                     id="part_name"
                     type="text"
                     wire:model="part_name"
+                    placeholder="{{ __('buyer.request_form.part_name_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('part_name')
@@ -141,7 +147,7 @@
                     id="reference_url"
                     type="url"
                     wire:model="reference_url"
-                    placeholder="https://..."
+                    placeholder="{{ __('buyer.request_form.reference_url_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 <p class="mt-1 text-xs text-ink-muted">{{ __('buyer.request_form.reference_url_help') }}</p>
@@ -158,6 +164,7 @@
                     id="memo"
                     rows="3"
                     wire:model="memo"
+                    placeholder="{{ __('buyer.request_form.memo_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 ></textarea>
                 @error('memo')
