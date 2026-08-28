@@ -20,6 +20,17 @@ class PartRequestPolicy
     }
 
     /**
+     * The admin request board specifically -- distinct from viewAny, which
+     * also permits a buyer to see their own future "my requests" list. The
+     * board itself is admin-only, full stop (today just `isAdmin()`, the
+     * same owner/staff permission slot as everywhere else in `/admin`).
+     */
+    public function viewBoard(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * The admin sees any request; a buyer sees only their own. A vendor
      * never sees a part_request directly through this policy -- CLAUDE.md
      * §4 isolation, and the (held-back) vendor-inquiry workflow will expose

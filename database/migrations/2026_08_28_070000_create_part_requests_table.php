@@ -11,7 +11,16 @@ return new class extends Migration
         Schema::create('part_requests', function (Blueprint $table) {
             $table->id();
             $table->foreignId('buyer_id')->constrained('buyer_profiles')->restrictOnDelete();
-            $table->string('request_code')->unique();
+
+            // Nullable despite always being set in practice (generated from
+            // the row's own id post-insert, see PartRequest::
+            // generateRequestCode) -- a NOT NULL unique column would need a
+            // placeholder value between insert and that follow-up update,
+            // and a shared placeholder (e.g. '') collides under concurrent
+            // submissions since MySQL treats it as any other unique value.
+            // Multiple NULLs don't collide against a unique index, so this
+            // sidesteps the race instead of needing a lock.
+            $table->string('request_code')->nullable()->unique();
             $table->enum('part_type', ['used', 'new', 'both']);
             $table->string('maker');
             $table->string('car_model');

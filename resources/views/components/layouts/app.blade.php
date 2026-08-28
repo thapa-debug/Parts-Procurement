@@ -21,6 +21,9 @@
                         <nav class="flex items-center gap-6 text-sm text-ink-muted">
                             {{-- Role-specific nav links (admin/buyer/vendor portals) are added here as each is built. --}}
                             @if (auth()->user()->isAdmin())
+                                <a href="{{ route('admin.requests.index') }}" class="hover:text-ink">
+                                    {{ __('app.nav.requests') }}
+                                </a>
                                 <a href="{{ route('admin.vendors.index') }}" class="hover:text-ink">
                                     {{ __('app.nav.vendors') }}
                                 </a>
@@ -29,6 +32,10 @@
                                 </a>
                                 <a href="{{ route('admin.settings') }}" class="hover:text-ink">
                                     {{ __('app.nav.settings') }}
+                                </a>
+                            @elseif (auth()->user()->isBuyer())
+                                <a href="{{ route('buyer.requests.create') }}" class="hover:text-ink">
+                                    {{ __('app.nav.new_request') }}
                                 </a>
                             @endif
                         </nav>

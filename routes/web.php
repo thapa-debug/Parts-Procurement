@@ -5,12 +5,14 @@ use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Livewire\Admin\BuyerDetail;
 use App\Livewire\Admin\BuyerMaster;
+use App\Livewire\Admin\RequestBoard;
 use App\Livewire\Admin\Settings;
 use App\Livewire\Admin\VendorDetail;
 use App\Livewire\Admin\VendorMaster;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\PasswordChange;
 use App\Livewire\Auth\Register;
+use App\Livewire\Buyer\RequestForm;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -47,4 +49,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/buyers', BuyerMaster::class)->name('buyers.index');
     Route::get('/buyers/{buyerProfile}', BuyerDetail::class)->name('buyers.show');
     Route::get('/settings', Settings::class)->name('settings');
+    Route::get('/requests', RequestBoard::class)->name('requests.index');
+});
+
+Route::prefix('buyer')->name('buyer.')->middleware(['auth', 'buyer'])->group(function () {
+    Route::get('/requests/new', RequestForm::class)->name('requests.create');
 });
