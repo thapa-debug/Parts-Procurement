@@ -1,0 +1,10 @@
+# .claudeignore
+.env
+.env.*
+!.env.example
+.env.backup
+.env.production
+*.pem
+*.key
+certs/
+secrets/
