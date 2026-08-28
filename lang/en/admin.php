@@ -156,4 +156,46 @@ return [
         'saved' => 'Saved.',
     ],
 
+    'request_board' => [
+        'title' => 'Requests',
+        'subheading' => 'Every part request submitted by a buyer, across every stage of the pipeline.',
+        'search_placeholder' => 'Search by request code, buyer, car model, or part...',
+        'empty' => 'No requests here yet.',
+        'empty_all' => 'No requests yet. Once a buyer submits one, it will appear here.',
+
+        'tabs' => [
+            'new' => 'New',
+            'in_progress' => 'In progress',
+            'purchased' => 'Purchased',
+            'completed' => 'Completed',
+            'all' => 'All',
+        ],
+
+        'table' => [
+            'code' => 'Request',
+            'buyer' => 'Buyer',
+            'part_type' => 'Type',
+            'details' => 'Car / Part',
+            'requested_at' => 'Requested',
+            'status' => 'Status',
+        ],
+
+        'part_type' => [
+            'used' => 'Used',
+            'new' => 'New',
+            'both' => 'Either',
+        ],
+
+        'status' => [
+            'new' => 'New',
+            'vendor_inquiry' => 'Vendor inquiry',
+            'quoted' => 'Quoted',
+            'paid' => 'Paid',
+            'ordered_to_vendor' => 'Ordered to vendor',
+            'procurement_failed' => 'Procurement failed',
+            'shipped' => 'Shipped',
+            'received' => 'Received',
+        ],
+    ],
+
 ];
