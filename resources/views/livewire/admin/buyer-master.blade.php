@@ -116,12 +116,13 @@
                 <form wire:submit="createBuyer" class="mt-5 space-y-4">
                     <div>
                         <label for="name" class="block text-sm font-medium text-ink">
-                            {{ __('admin.buyer_master.create_form.name_label') }}
+                            {{ __('admin.buyer_master.create_form.name_label') }} <x-required-mark />
                         </label>
                         <input
                             id="name"
                             type="text"
                             wire:model="name"
+                            placeholder="{{ __('admin.buyer_master.create_form.name_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                         @error('name')
@@ -131,12 +132,13 @@
 
                     <div>
                         <label for="email" class="block text-sm font-medium text-ink">
-                            {{ __('admin.buyer_master.create_form.email_label') }}
+                            {{ __('admin.buyer_master.create_form.email_label') }} <x-required-mark />
                         </label>
                         <input
                             id="email"
                             type="email"
                             wire:model="email"
+                            placeholder="{{ __('admin.buyer_master.create_form.email_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                         @error('email')
@@ -146,12 +148,13 @@
 
                     <div>
                         <label for="company_name" class="block text-sm font-medium text-ink">
-                            {{ __('admin.buyer_master.create_form.company_name_label') }}
+                            {{ __('admin.buyer_master.create_form.company_name_label') }} <x-required-mark />
                         </label>
                         <input
                             id="company_name"
                             type="text"
                             wire:model="company_name"
+                            placeholder="{{ __('admin.buyer_master.create_form.company_name_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                         @error('company_name')
@@ -161,12 +164,13 @@
 
                     <div>
                         <label for="phone" class="block text-sm font-medium text-ink">
-                            {{ __('admin.buyer_master.create_form.phone_label') }}
+                            {{ __('admin.buyer_master.create_form.phone_label') }} <x-required-mark />
                         </label>
                         <input
                             id="phone"
                             type="text"
                             wire:model="phone"
+                            placeholder="{{ __('admin.buyer_master.create_form.phone_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                         @error('phone')
@@ -177,12 +181,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="default_destination_country" class="block text-sm font-medium text-ink">
-                                {{ __('admin.buyer_master.create_form.default_destination_country_label') }}
+                                {{ __('admin.buyer_master.create_form.default_destination_country_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="default_destination_country"
                                 type="text"
                                 wire:model="default_destination_country"
+                                placeholder="{{ __('admin.buyer_master.create_form.default_destination_country_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
                             @error('default_destination_country')
@@ -192,12 +197,13 @@
 
                         <div>
                             <label for="default_yard" class="block text-sm font-medium text-ink">
-                                {{ __('admin.buyer_master.create_form.default_yard_label') }}
+                                {{ __('admin.buyer_master.create_form.default_yard_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="default_yard"
                                 type="text"
                                 wire:model="default_yard"
+                                placeholder="{{ __('admin.buyer_master.create_form.default_yard_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
                             @error('default_yard')

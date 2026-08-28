@@ -24,13 +24,22 @@
                 <div>
                     <label for="{{ $field['name'] }}" class="block text-sm font-medium text-ink">
                         {{ $field['label'] }}
+                        @if ($field['required'] ?? false)
+                            <x-required-mark />
+                        @endif
                     </label>
                     <input
                         id="{{ $field['name'] }}"
                         type="{{ $field['type'] ?? 'text' }}"
                         wire:model="{{ $field['name'] }}"
+                        @if (isset($field['placeholder']))
+                            placeholder="{{ $field['placeholder'] }}"
+                        @endif
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
+                    @if (isset($field['help']))
+                        <p class="mt-1 text-xs text-ink-muted">{{ $field['help'] }}</p>
+                    @endif
                     @error($field['name'])
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror

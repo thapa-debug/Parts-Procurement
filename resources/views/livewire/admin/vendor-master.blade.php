@@ -147,14 +147,16 @@
                 <form wire:submit="createVendor" class="mt-5 space-y-4">
                     <div>
                         <label for="name" class="block text-sm font-medium text-ink">
-                            {{ __('admin.vendor_master.create_form.name_label') }}
+                            {{ __('admin.vendor_master.create_form.name_label') }} <x-required-mark />
                         </label>
                         <input
                             id="name"
                             type="text"
                             wire:model="name"
+                            placeholder="{{ __('admin.vendor_master.create_form.name_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.vendor_master.create_form.name_help') }}</p>
                         @error('name')
                             <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                         @enderror
@@ -162,12 +164,13 @@
 
                     <div>
                         <label for="email" class="block text-sm font-medium text-ink">
-                            {{ __('admin.vendor_master.create_form.email_label') }}
+                            {{ __('admin.vendor_master.create_form.email_label') }} <x-required-mark />
                         </label>
                         <input
                             id="email"
                             type="email"
                             wire:model="email"
+                            placeholder="{{ __('admin.vendor_master.create_form.email_placeholder') }}"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                         @error('email')
@@ -178,12 +181,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="company_name" class="block text-sm font-medium text-ink">
-                                {{ __('admin.vendor_master.create_form.company_name_label') }}
+                                {{ __('admin.vendor_master.create_form.company_name_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="company_name"
                                 type="text"
                                 wire:model="company_name"
+                                placeholder="{{ __('admin.vendor_master.create_form.company_name_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
                             @error('company_name')
@@ -193,14 +197,16 @@
 
                         <div>
                             <label for="contact_person" class="block text-sm font-medium text-ink">
-                                {{ __('admin.vendor_master.create_form.contact_person_label') }}
+                                {{ __('admin.vendor_master.create_form.contact_person_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="contact_person"
                                 type="text"
                                 wire:model="contact_person"
+                                placeholder="{{ __('admin.vendor_master.create_form.contact_person_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
+                            <p class="mt-1 text-xs text-ink-muted">{{ __('admin.vendor_master.create_form.contact_person_help') }}</p>
                             @error('contact_person')
                                 <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                             @enderror
@@ -210,12 +216,13 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label for="phone" class="block text-sm font-medium text-ink">
-                                {{ __('admin.vendor_master.create_form.phone_label') }}
+                                {{ __('admin.vendor_master.create_form.phone_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="phone"
                                 type="text"
                                 wire:model="phone"
+                                placeholder="{{ __('admin.vendor_master.create_form.phone_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
                             @error('phone')
@@ -225,14 +232,16 @@
 
                         <div>
                             <label for="notify_email" class="block text-sm font-medium text-ink">
-                                {{ __('admin.vendor_master.create_form.notify_email_label') }}
+                                {{ __('admin.vendor_master.create_form.notify_email_label') }} <x-required-mark />
                             </label>
                             <input
                                 id="notify_email"
                                 type="email"
                                 wire:model="notify_email"
+                                placeholder="{{ __('admin.vendor_master.create_form.notify_email_placeholder') }}"
                                 class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                             >
+                            <p class="mt-1 text-xs text-ink-muted">{{ __('admin.vendor_master.create_form.notify_email_help') }}</p>
                             @error('notify_email')
                                 <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                             @enderror

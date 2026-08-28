@@ -22,15 +22,30 @@ return [
         ],
 
         'maker_label' => 'Maker',
+        'maker_placeholder' => 'e.g. Toyota, Nissan, Honda',
+
         'car_model_label' => 'Car model',
+        'car_model_placeholder' => 'Examples: Crown / Land Cruiser',
+
         'vin_label' => 'VIN / chassis number',
+        'vin_placeholder' => 'Example: GRS184-0002255',
         'vin_help' => 'Optional, but helps vendors confirm an exact fit.',
+
         'mfg_date_label' => 'Manufacture date',
+        'mfg_date_help' => "Optional -- leave blank if you don't know it.",
+
         'oem_part_number_label' => 'OEM part number',
+        'oem_part_number_placeholder' => 'Example: 81110-60M00',
+
         'part_name_label' => 'Part name & details',
+        'part_name_placeholder' => 'Example: Right LED headlight',
+
         'reference_url_label' => 'Reference URL',
+        'reference_url_placeholder' => 'https://page.auctions.yahoo.co.jp/...',
         'reference_url_help' => 'A listing or reference page for the part, if you have one.',
+
         'memo_label' => 'Notes',
+        'memo_placeholder' => 'e.g. specifications or your desired delivery date',
 
         'submit' => 'Submit request',
 

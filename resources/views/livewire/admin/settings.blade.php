@@ -9,13 +9,14 @@
             <div class="mt-4 grid grid-cols-2 gap-4">
                 <div>
                     <label for="margin_rate" class="block text-sm font-medium text-ink">
-                        {{ __('admin.settings.margin_rate_label') }}
+                        {{ __('admin.settings.margin_rate_label') }} <x-required-mark />
                     </label>
                     <input
                         id="margin_rate"
                         type="number"
                         min="0"
                         wire:model="margin_rate"
+                        placeholder="{{ __('admin.settings.margin_rate_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('margin_rate')
@@ -25,13 +26,14 @@
 
                 <div>
                     <label for="margin_min_fee" class="block text-sm font-medium text-ink">
-                        {{ __('admin.settings.margin_min_fee_label') }}
+                        {{ __('admin.settings.margin_min_fee_label') }} <x-required-mark />
                     </label>
                     <input
                         id="margin_min_fee"
                         type="number"
                         min="0"
                         wire:model="margin_min_fee"
+                        placeholder="{{ __('admin.settings.margin_min_fee_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('margin_min_fee')
@@ -49,13 +51,14 @@
             <div class="mt-4 grid grid-cols-2 gap-4">
                 <div>
                     <label for="shipping_fee_vehicle" class="block text-sm font-medium text-ink">
-                        {{ __('admin.settings.shipping_fee_vehicle_label') }}
+                        {{ __('admin.settings.shipping_fee_vehicle_label') }} <x-required-mark />
                     </label>
                     <input
                         id="shipping_fee_vehicle"
                         type="number"
                         min="0"
                         wire:model="shipping_fee_vehicle"
+                        placeholder="{{ __('admin.settings.shipping_fee_vehicle_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('shipping_fee_vehicle')
@@ -65,13 +68,14 @@
 
                 <div>
                     <label for="shipping_fee_container" class="block text-sm font-medium text-ink">
-                        {{ __('admin.settings.shipping_fee_container_label') }}
+                        {{ __('admin.settings.shipping_fee_container_label') }} <x-required-mark />
                     </label>
                     <input
                         id="shipping_fee_container"
                         type="number"
                         min="0"
                         wire:model="shipping_fee_container"
+                        placeholder="{{ __('admin.settings.shipping_fee_container_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                     @error('shipping_fee_container')
@@ -88,12 +92,13 @@
 
             <div class="mt-4">
                 <label for="admin_sender_email" class="block text-sm font-medium text-ink">
-                    {{ __('admin.settings.admin_sender_email_label') }}
+                    {{ __('admin.settings.admin_sender_email_label') }} <x-required-mark />
                 </label>
                 <input
                     id="admin_sender_email"
                     type="email"
                     wire:model="admin_sender_email"
+                    placeholder="{{ __('admin.settings.admin_sender_email_placeholder') }}"
                     class="mt-1.5 block w-full max-w-sm rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('admin_sender_email')

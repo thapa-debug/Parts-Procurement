@@ -10,7 +10,7 @@
 
             <div>
                 <label for="email" class="block text-sm font-medium text-ink">
-                    {{ __('auth.login.email_label') }}
+                    {{ __('auth.login.email_label') }} <x-required-mark />
                 </label>
                 <input
                     id="email"
@@ -20,6 +20,7 @@
                     required
                     autofocus
                     autocomplete="username"
+                    placeholder="{{ __('auth.login.email_placeholder') }}"
                     class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                 >
                 @error('email')
@@ -29,7 +30,7 @@
 
             <div>
                 <label for="password" class="block text-sm font-medium text-ink">
-                    {{ __('auth.login.password_label') }}
+                    {{ __('auth.login.password_label') }} <x-required-mark />
                 </label>
                 <input
                     id="password"

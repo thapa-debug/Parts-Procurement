@@ -72,10 +72,10 @@ class VendorDetail extends Component
 
         return view('livewire.admin.vendor-detail', [
             'fields' => [
-                ['name' => 'company_name', 'label' => __('admin.vendor_master.create_form.company_name_label')],
-                ['name' => 'contact_person', 'label' => __('admin.vendor_master.create_form.contact_person_label')],
-                ['name' => 'phone', 'label' => __('admin.vendor_master.create_form.phone_label')],
-                ['name' => 'notify_email', 'label' => __('admin.vendor_master.create_form.notify_email_label'), 'type' => 'email'],
+                ['name' => 'company_name', 'label' => __('admin.vendor_master.create_form.company_name_label'), 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.company_name_placeholder')],
+                ['name' => 'contact_person', 'label' => __('admin.vendor_master.create_form.contact_person_label'), 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.contact_person_placeholder'), 'help' => __('admin.vendor_master.create_form.contact_person_help')],
+                ['name' => 'phone', 'label' => __('admin.vendor_master.create_form.phone_label'), 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.phone_placeholder')],
+                ['name' => 'notify_email', 'label' => __('admin.vendor_master.create_form.notify_email_label'), 'type' => 'email', 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.notify_email_placeholder'), 'help' => __('admin.vendor_master.create_form.notify_email_help')],
             ],
             'accountFields' => [
                 ['label' => __('admin.profile_edit.name_label'), 'value' => $user->name],
