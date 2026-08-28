@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Actions\ApproveBuyerAction;
 use App\Actions\CreateBuyerAction;
 use App\Actions\ResetTemporaryPasswordAction;
 use App\Http\Requests\CreateBuyerRequest;
@@ -21,6 +22,12 @@ class BuyerMaster extends Component
     use WithPagination;
 
     public string $search = '';
+
+    /**
+     * Quick filter so the admin can spot who's waiting at a glance,
+     * instead of hunting through every row's Approval badge.
+     */
+    public bool $pendingOnly = false;
 
     public bool $showCreateForm = false;
 
@@ -72,6 +79,11 @@ class BuyerMaster extends Component
     }
 
     public function updatedSearch(): void
+    {
+        $this->resetPage();
+    }
+
+    public function updatedPendingOnly(): void
     {
         $this->resetPage();
     }
@@ -158,12 +170,29 @@ class BuyerMaster extends Component
     }
 
     /**
+     * Approves a self-registered buyer still sitting in the pending queue
+     * (CLAUDE.md §14). Admin-created buyers are usually already approved
+     * at creation (CreateBuyerAction) unless the admin unchecked "Approve
+     * immediately", so this covers both origins of a pending row.
+     */
+    public function approveBuyer(BuyerProfile $buyerProfile, ApproveBuyerAction $action): void
+    {
+        $this->authorize('approve', $buyerProfile);
+
+        /** @var User $admin */
+        $admin = auth()->user();
+
+        $action->execute($buyerProfile, $admin);
+    }
+
+    /**
      * @return LengthAwarePaginator<int, BuyerProfile>
      */
     protected function buyers(): LengthAwarePaginator
     {
         return BuyerProfile::query()
             ->with('user')
+            ->when($this->pendingOnly, fn ($query) => $query->whereNull('approved_at'))
             ->when($this->search, function ($query) {
                 $query->where(function ($query) {
                     $query->where('company_name', 'like', "%{$this->search}%")

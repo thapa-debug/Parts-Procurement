@@ -73,6 +73,17 @@ return [
             'actions' => 'Actions',
         ],
 
+        // Buyer-only (CLAUDE.md §14) -- vendors have no approval concept,
+        // so this stays scoped here rather than in the shared admin.verification
+        // namespace the way the Verification badge is.
+        'approval' => [
+            'column' => 'Approval',
+            'approved_badge' => 'Approved',
+            'pending_badge' => 'Pending',
+            'approve_button' => 'Approve',
+            'pending_only_label' => 'Pending approval only',
+        ],
+
         'reset_password_button' => 'Reset password',
         'reset_password_confirm' => "Reset :company's temporary password? Their current password stops working immediately.",
 

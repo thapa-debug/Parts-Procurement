@@ -300,3 +300,66 @@ it('does not resend for an already-verified buyer', function () {
 
     Notification::assertNothingSent();
 });
+
+// --- approval badge + Approve action ----------------------------------------
+//
+// The authorization side of this is already covered at the policy level by
+// BuyerApprovalGateTest's "lets only an admin approve a buyer profile" --
+// a buyer/vendor can't reach approveBuyer() through this component at all,
+// since mount() already 403s them before any action method is reachable
+// (see the "does not let a buyer/vendor mount" cases above), the same
+// shape already established for resetPassword/resendVerification.
+
+it('shows an Approved badge for an approved buyer and Pending for one who is not', function () {
+    $admin = User::factory()->admin()->create();
+    $approved = BuyerProfile::factory()->create(['company_name' => 'Approved Imports']);
+    $pending = BuyerProfile::factory()->pending()->create(['company_name' => 'Pending Imports']);
+
+    $response = Livewire::actingAs($admin)->test(BuyerMaster::class);
+
+    $response->assertSeeInOrder([$approved->company_name, __('admin.buyer_master.approval.approved_badge')])
+        ->assertSeeInOrder([$pending->company_name, __('admin.buyer_master.approval.pending_badge')]);
+});
+
+it('only shows the Approve action for a pending buyer', function () {
+    $admin = User::factory()->admin()->create();
+    BuyerProfile::factory()->create(); // approved by factory default
+    BuyerProfile::factory()->pending()->create();
+
+    $html = Livewire::actingAs($admin)->test(BuyerMaster::class)->html();
+
+    // Matching the wire:click call itself, not the visible label -- "Approve"
+    // is a substring of the "Approved" badge text, so counting the label
+    // would over-count.
+    expect(substr_count($html, 'wire:click="approveBuyer('))->toBe(1);
+});
+
+it('approves a pending buyer via the Approve action', function () {
+    $admin = User::factory()->admin()->create();
+    $profile = BuyerProfile::factory()->pending()->create();
+
+    expect($profile->isApproved())->toBeFalse();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('approveBuyer', $profile->id);
+
+    $profile->refresh();
+
+    expect($profile->isApproved())->toBeTrue()
+        ->and($profile->approved_by)->toBe($admin->id);
+});
+
+it('filters to pending-only buyers when the checkbox is checked', function () {
+    $admin = User::factory()->admin()->create();
+    $approved = BuyerProfile::factory()->create(['company_name' => 'Approved Imports']);
+    $pending = BuyerProfile::factory()->pending()->create(['company_name' => 'Pending Imports']);
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->assertSee($approved->company_name)
+        ->assertSee($pending->company_name)
+        ->set('pendingOnly', true)
+        ->assertDontSee($approved->company_name)
+        ->assertSee($pending->company_name);
+});
