@@ -5,7 +5,7 @@
     </div>
 
     <div class="mt-6 flex flex-wrap gap-2 border-b border-line pb-3 text-sm font-medium">
-        @foreach (['all', 'new', 'in_progress', 'purchased', 'completed'] as $key)
+        @foreach (['all', 'new', 'inquiring', 'quoted', 'order_confirmed', 'shipped', 'completed'] as $key)
             <button
                 type="button"
                 wire:click="$set('tab', '{{ $key }}')"

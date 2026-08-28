@@ -86,6 +86,14 @@ class RequestForm extends Component
         return (new SubmitPartRequestRequest)->rules();
     }
 
+    /**
+     * @return array<string, string>
+     */
+    protected function messages(): array
+    {
+        return (new SubmitPartRequestRequest)->messages();
+    }
+
     public function submit(SubmitPartRequestAction $action): void
     {
         // Belt-and-suspenders (CONVENTIONS.md): the form is already hidden

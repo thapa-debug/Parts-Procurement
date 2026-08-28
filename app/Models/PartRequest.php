@@ -29,7 +29,6 @@ class PartRequest extends Model
         'part_type' => PartType::class,
         'status' => RequestStatus::class,
         'shipping_method' => ShippingMethod::class,
-        'mfg_date' => 'date',
     ];
 
     public function buyer(): BelongsTo

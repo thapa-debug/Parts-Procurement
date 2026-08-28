@@ -22,7 +22,11 @@ return [
         ],
 
         'maker_label' => 'Maker',
-        'maker_placeholder' => 'e.g. Toyota, Nissan, Honda',
+        'maker_placeholder_option' => '-- Select a maker --',
+        'maker_options' => [
+            'Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru',
+            'Mitsubishi', 'Suzuki', 'Daihatsu', 'Imported / Other',
+        ],
 
         'car_model_label' => 'Car model',
         'car_model_placeholder' => 'Examples: Crown / Land Cruiser',
@@ -32,7 +36,9 @@ return [
         'vin_help' => 'Optional, but helps vendors confirm an exact fit.',
 
         'mfg_date_label' => 'Manufacture date',
-        'mfg_date_help' => "Optional -- leave blank if you don't know it.",
+        'mfg_date_placeholder' => 'e.g. 2005/10',
+        'mfg_date_help' => "Year and month only (format: YYYY/MM) -- leave blank if you don't know it.",
+        'mfg_date_format_error' => 'Enter the manufacture date as year and month only, e.g. 2005/10.',
 
         'oem_part_number_label' => 'OEM part number',
         'oem_part_number_placeholder' => 'Example: 81110-60M00',

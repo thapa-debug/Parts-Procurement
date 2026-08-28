@@ -184,9 +184,11 @@ return [
         'empty_all' => 'No requests yet. Once a buyer submits one, it will appear here.',
 
         'tabs' => [
-            'new' => 'New',
-            'in_progress' => 'In progress',
-            'purchased' => 'Purchased',
+            'new' => 'New request',
+            'inquiring' => 'Inquiring suppliers',
+            'quoted' => 'Quote provided',
+            'order_confirmed' => 'Order confirmed / inspection',
+            'shipped' => 'Shipped',
             'completed' => 'Completed',
             'all' => 'All',
         ],

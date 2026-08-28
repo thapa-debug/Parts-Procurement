@@ -25,7 +25,13 @@ return new class extends Migration
             $table->string('maker');
             $table->string('car_model');
             $table->string('vin')->nullable();
-            $table->date('mfg_date')->nullable();
+
+            // Year and month only, as a plain string (e.g. "2005/10") --
+            // never a real date column. Nobody submitting this form knows
+            // the exact day a car was manufactured, and a DATE column would
+            // force fabricating one (misleading precision we don't have).
+            $table->string('mfg_date', 7)->nullable();
+
             $table->string('oem_part_number')->nullable();
             $table->string('part_name');
             $table->string('reference_url', 2048)->nullable();
