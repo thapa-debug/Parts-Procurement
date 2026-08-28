@@ -85,6 +85,8 @@ it('consolidates every row\'s actions into one dropdown trigger, one per row', f
 // --- create vendor + reveal ceremony ------------------------------------
 
 it('creates a vendor and reveals the temporary password', function () {
+    Notification::fake();
+
     $admin = User::factory()->admin()->create();
 
     Livewire::actingAs($admin)
@@ -100,14 +102,30 @@ it('creates a vendor and reveals the temporary password', function () {
         ->assertSet('showCreateForm', false)
         ->assertSet('revealedContext', 'created')
         ->assertSet('revealedForCompany', 'Acme Dismantlers')
+        ->assertSet('revealedVerificationEmail', 'jane@example.com')
         ->assertSee('Acme Dismantlers')
         ->assertSee(__('admin.vendor_master.reveal.created_heading'))
-        ->assertDontSee(__('admin.buyer_master.reveal.created_heading'));
+        ->assertDontSee(__('admin.buyer_master.reveal.created_heading'))
+        ->assertSee(__('admin.reveal.verification_sent', ['email' => 'jane@example.com']));
 
     $user = User::where('email', 'jane@example.com')->firstOrFail();
 
     expect($user->must_change_password)->toBeTrue()
         ->and(VendorProfile::where('user_id', $user->id)->exists())->toBeTrue();
+
+    Notification::assertSentTo($user, VerifyEmail::class);
+});
+
+it('clears the verification-sent notice on a password reset -- it does not apply there', function () {
+    $admin = User::factory()->admin()->create();
+    $profile = VendorProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->call('resetPassword', $profile->id)
+        ->assertSet('revealedContext', 'reset')
+        ->assertSet('revealedVerificationEmail', null)
+        ->assertDontSee(__('admin.reveal.verification_sent', ['email' => $profile->user->email]));
 });
 
 it('rejects an incomplete vendor creation form', function () {

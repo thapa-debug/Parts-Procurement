@@ -1,4 +1,4 @@
-@props(['password', 'forCompany', 'heading', 'warning'])
+@props(['password', 'forCompany', 'heading', 'warning', 'verificationEmail' => null])
 
 <div
     x-data="{ acknowledged: false, copied: false }"
@@ -23,6 +23,12 @@
         </div>
 
         <p class="mt-3 text-sm text-amber-700">{{ $warning }}</p>
+
+        @if ($verificationEmail)
+            <p class="mt-3 text-sm text-ink-muted">
+                {{ __('admin.reveal.verification_sent', ['email' => $verificationEmail]) }}
+            </p>
+        @endif
 
         <label class="mt-4 flex items-start gap-2 text-sm text-ink">
             <input

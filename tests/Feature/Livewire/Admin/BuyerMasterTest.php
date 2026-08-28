@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\ApproveBuyerAction;
 use App\Enums\UserRole;
 use App\Livewire\Admin\BuyerMaster;
 use App\Models\BuyerProfile;
@@ -92,6 +93,8 @@ it('finds a buyer by member code', function () {
 // --- create buyer + reveal ceremony --------------------------------------
 
 it('creates a buyer and reveals the temporary password', function () {
+    Notification::fake();
+
     $admin = User::factory()->admin()->create();
 
     Livewire::actingAs($admin)
@@ -107,14 +110,71 @@ it('creates a buyer and reveals the temporary password', function () {
         ->assertSet('showCreateForm', false)
         ->assertSet('revealedContext', 'created')
         ->assertSet('revealedForCompany', 'Acme Imports')
+        ->assertSet('revealedVerificationEmail', 'jane@example.com')
         ->assertSee('Acme Imports')
         ->assertSee(__('admin.buyer_master.reveal.created_heading'))
-        ->assertDontSee(__('admin.vendor_master.reveal.created_heading'));
+        ->assertDontSee(__('admin.vendor_master.reveal.created_heading'))
+        ->assertSee(__('admin.reveal.verification_sent', ['email' => 'jane@example.com']));
 
     $user = User::where('email', 'jane@example.com')->firstOrFail();
 
     expect($user->must_change_password)->toBeTrue()
-        ->and(BuyerProfile::where('user_id', $user->id)->exists())->toBeTrue();
+        ->and(BuyerProfile::where('user_id', $user->id)->exists())->toBeTrue()
+        ->and(BuyerProfile::where('user_id', $user->id)->first()->isApproved())->toBeTrue();
+
+    Notification::assertSentTo($user, VerifyEmail::class);
+});
+
+it('clears the verification-sent notice on a password reset -- it does not apply there', function () {
+    $admin = User::factory()->admin()->create();
+    $profile = BuyerProfile::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('resetPassword', $profile->id)
+        ->assertSet('revealedContext', 'reset')
+        ->assertSet('revealedVerificationEmail', null)
+        ->assertDontSee(__('admin.reveal.verification_sent', ['email' => $profile->user->email]));
+});
+
+it('defaults the approve-immediately checkbox to checked', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('openCreateForm')
+        ->assertSet('approve_immediately', true);
+});
+
+it('creates a buyer pending approval when approve-immediately is unchecked, and blocks them from acting until approved', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('openCreateForm')
+        ->set('name', 'Jane Buyer')
+        ->set('email', 'jane@example.com')
+        ->set('company_name', 'Acme Imports')
+        ->set('phone', '090-0000-0000')
+        ->set('default_destination_country', 'Australia')
+        ->set('default_yard', 'Oceania Yard')
+        ->set('approve_immediately', false)
+        ->call('createBuyer');
+
+    $user = User::where('email', 'jane@example.com')->firstOrFail();
+    $profile = BuyerProfile::where('user_id', $user->id)->firstOrFail();
+
+    expect($profile->isApproved())->toBeFalse();
+
+    // Verify the account (bypassing the temp-password/must-change flow,
+    // irrelevant to this check) and confirm approval is still the blocker.
+    $user->markEmailAsVerified();
+
+    expect($user->fresh()->can('act'))->toBeFalse();
+
+    app(ApproveBuyerAction::class)->execute($profile, $admin);
+
+    expect($user->fresh()->can('act'))->toBeTrue();
 });
 
 it('rejects an incomplete buyer creation form', function () {

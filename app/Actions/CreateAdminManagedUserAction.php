@@ -9,8 +9,11 @@ use Illuminate\Support\Str;
 /**
  * Shared onboarding mechanism for admin-created buyer/vendor accounts
  * (CLAUDE.md 14): a temporary password the admin relays out-of-band, forcing
- * a change on first login. Never emailed -- the account simply waits until
- * the admin can reach the buyer/vendor.
+ * a change on first login. The password itself is never emailed -- the
+ * account simply waits until the admin can reach the buyer/vendor. The
+ * account's email-verification notification is a separate concern, sent by
+ * the caller (CreateBuyerAction/CreateVendorAction) once its own profile
+ * row has committed, not by this shared piece.
  */
 class CreateAdminManagedUserAction
 {

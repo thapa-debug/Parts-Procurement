@@ -5,8 +5,10 @@ use App\Enums\UserRole;
 use App\Http\Requests\CreateBuyerRequest;
 use App\Models\BuyerProfile;
 use App\Models\User;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 
 uses(RefreshDatabase::class);
@@ -20,12 +22,16 @@ function buyerPayload(array $overrides = []): array
         'default_destination_country' => 'Australia',
         'default_yard' => 'Oceania Yard',
         'phone' => '090-0000-0000',
+        'approve_immediately' => true,
     ], $overrides);
 }
 
 // --- CreateBuyerAction: happy path -------------------------------------
 
-it('creates a user and buyer profile together, atomically', function () {
+it('creates a user and buyer profile together, atomically, approved immediately when the flag is true', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
     $payload = buyerPayload();
 
     $result = app(CreateBuyerAction::class)->execute(
@@ -35,6 +41,8 @@ it('creates a user and buyer profile together, atomically', function () {
         $payload['default_destination_country'],
         $payload['default_yard'],
         $payload['phone'],
+        $admin,
+        $payload['approve_immediately'],
     );
 
     expect($result['user']->role)->toBe(UserRole::Buyer)
@@ -45,13 +53,50 @@ it('creates a user and buyer profile together, atomically', function () {
         ->and($result['buyer_profile']->member_code)->toBe(BuyerProfile::generateMemberCode($result['user']))
         ->and(Hash::check($result['temporary_password'], $result['user']->password))->toBeTrue();
 
-    expect(User::count())->toBe(1)
+    expect(User::count())->toBe(2) // the admin + the new buyer
         ->and(BuyerProfile::count())->toBe(1);
+
+    expect($result['buyer_profile']->isApproved())->toBeTrue()
+        ->and($result['buyer_profile']->approved_by)->toBe($admin->id);
+
+    // Auto-sent on creation regardless of approve_immediately (CLAUDE.md
+    // §14) -- verification and approval are fully independent conditions.
+    Notification::assertSentTo($result['user'], VerifyEmail::class);
+    Notification::assertCount(1);
+});
+
+it('creates a buyer profile pending approval when the flag is false', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $payload = buyerPayload(['approve_immediately' => false]);
+
+    $result = app(CreateBuyerAction::class)->execute(
+        $payload['name'],
+        $payload['email'],
+        $payload['company_name'],
+        $payload['default_destination_country'],
+        $payload['default_yard'],
+        $payload['phone'],
+        $admin,
+        $payload['approve_immediately'],
+    );
+
+    expect($result['buyer_profile']->isApproved())->toBeFalse()
+        ->and($result['buyer_profile']->approved_at)->toBeNull()
+        ->and($result['buyer_profile']->approved_by)->toBeNull();
+
+    // Verification still auto-sends regardless of the approval flag.
+    Notification::assertSentTo($result['user'], VerifyEmail::class);
 });
 
 // --- CreateBuyerAction: transaction rollback ----------------------------
 
 it('rolls back the entire transaction and creates zero users if the buyer profile write fails', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+
     BuyerProfile::creating(function () {
         throw new RuntimeException('forced failure for test');
     });
@@ -65,12 +110,18 @@ it('rolls back the entire transaction and creates zero users if the buyer profil
         $payload['default_destination_country'],
         $payload['default_yard'],
         $payload['phone'],
+        $admin,
+        $payload['approve_immediately'],
     );
 
     expect($attempt)->toThrow(RuntimeException::class);
 
-    expect(User::count())->toBe(0)
+    expect(User::count())->toBe(1) // just the admin -- the attempted buyer rolled back
         ->and(BuyerProfile::count())->toBe(0);
+
+    // The verification send happens after the transaction commits -- a
+    // rolled-back creation must never have emailed anyone.
+    Notification::assertNothingSent();
 });
 
 // --- CreateBuyerRequest: validation --------------------------------------
@@ -80,7 +131,7 @@ it('requires every admin-created buyer field', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone'] as $field) {
+    foreach (['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone', 'approve_immediately'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
 });

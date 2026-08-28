@@ -32,6 +32,11 @@ class CreateBuyerRequest extends FormRequest
             'default_destination_country' => ['required', 'string', 'max:255'],
             'default_yard' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
+            // CLAUDE.md §14's buyer-approval gate: whether this admin-created
+            // buyer is approved immediately or lands in the pending queue.
+            // Defaults to true (checked) in the form -- "activate now" is the
+            // common case for a buyer the admin is deliberately creating.
+            'approve_immediately' => ['required', 'boolean'],
         ];
     }
 }

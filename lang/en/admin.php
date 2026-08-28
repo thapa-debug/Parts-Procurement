@@ -75,6 +75,8 @@ return [
             'phone_label' => 'Phone',
             'default_destination_country_label' => 'Default destination country',
             'default_yard_label' => 'Default yard',
+            'approve_immediately_label' => 'Approve immediately',
+            'approve_immediately_help' => 'Checked: this buyer can act as soon as they verify their email. Unchecked: they land in the pending-approval queue instead.',
             'submit' => 'Create buyer',
             'cancel' => 'Cancel',
         ],
@@ -97,6 +99,7 @@ return [
         'copied' => 'Copied',
         'acknowledge_label' => "I've saved this password",
         'dismiss_button' => 'Done',
+        'verification_sent' => 'A verification email has been sent to :email. They\'ll need to verify before they can act.',
     ],
 
     // Shared by the vendor/buyer detail-edit view (<x-admin.profile-edit-form>):

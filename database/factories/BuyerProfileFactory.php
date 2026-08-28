@@ -25,6 +25,19 @@ class BuyerProfileFactory extends Factory
             'default_destination_country' => fake()->country(),
             'default_yard' => fake()->city().' Yard',
             'phone' => fake()->phoneNumber(),
+            // Approved by default -- most tests using this factory exercise
+            // something unrelated to the approval gate and shouldn't have to
+            // think about it. Use ->pending() for the deliberately-unapproved
+            // case (CLAUDE.md §14).
+            'approved_at' => now(),
         ];
+    }
+
+    public function pending(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'approved_at' => null,
+            'approved_by' => null,
+        ]);
     }
 }

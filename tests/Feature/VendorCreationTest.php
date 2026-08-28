@@ -6,8 +6,10 @@ use App\Enums\UserRole;
 use App\Http\Requests\CreateVendorRequest;
 use App\Models\User;
 use App\Models\VendorProfile;
+use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Validator;
 
 uses(RefreshDatabase::class);
@@ -27,6 +29,8 @@ function vendorPayload(array $overrides = []): array
 // --- CreateVendorAction: happy path -----------------------------------------
 
 it('creates a user and vendor profile together, atomically', function () {
+    Notification::fake();
+
     $payload = vendorPayload();
 
     $result = app(CreateVendorAction::class)->execute(
@@ -47,11 +51,19 @@ it('creates a user and vendor profile together, atomically', function () {
 
     expect(User::count())->toBe(1)
         ->and(VendorProfile::count())->toBe(1);
+
+    // Auto-sent on creation (CLAUDE.md §14) -- the account still starts
+    // unverified (asserted above); this only removes the admin's manual
+    // "Resend verification" click as the default path.
+    Notification::assertSentTo($result['user'], VerifyEmail::class);
+    Notification::assertCount(1);
 });
 
 // --- CreateVendorAction: transaction rollback -------------------------------
 
 it('rolls back the entire transaction and creates zero users if the vendor profile write fails', function () {
+    Notification::fake();
+
     VendorProfile::creating(function () {
         throw new RuntimeException('forced failure for test');
     });
@@ -71,6 +83,10 @@ it('rolls back the entire transaction and creates zero users if the vendor profi
 
     expect(User::count())->toBe(0)
         ->and(VendorProfile::count())->toBe(0);
+
+    // The verification send happens after the transaction commits -- a
+    // rolled-back creation must never have emailed anyone.
+    Notification::assertNothingSent();
 });
 
 // --- CreateVendorRequest: validation -----------------------------------------

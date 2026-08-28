@@ -43,6 +43,13 @@ class VendorMaster extends Component
      */
     public ?string $revealedContext = null;
 
+    /**
+     * Set only alongside a fresh creation, so the reveal modal can tell the
+     * admin a verification email already went out. Null on a password
+     * reset -- that doesn't touch verification state.
+     */
+    public ?string $revealedVerificationEmail = null;
+
     public function mount(): void
     {
         $this->authorize('viewAny', VendorProfile::class);
@@ -94,6 +101,7 @@ class VendorMaster extends Component
         $this->revealedPassword = $result['temporary_password'];
         $this->revealedForCompany = $result['vendor_profile']->company_name;
         $this->revealedContext = 'created';
+        $this->revealedVerificationEmail = $result['user']->email;
     }
 
     public function suspend(VendorProfile $vendorProfile, SuspendVendorAction $action): void
@@ -122,6 +130,7 @@ class VendorMaster extends Component
         $this->revealedPassword = $result['temporary_password'];
         $this->revealedForCompany = $vendorProfile->company_name;
         $this->revealedContext = 'reset';
+        $this->revealedVerificationEmail = null;
     }
 
     public function dismissReveal(): void
@@ -129,6 +138,7 @@ class VendorMaster extends Component
         $this->revealedPassword = null;
         $this->revealedForCompany = null;
         $this->revealedContext = null;
+        $this->revealedVerificationEmail = null;
     }
 
     /**

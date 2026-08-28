@@ -42,6 +42,16 @@ class BuyerProfilePolicy
         return $user->isAdmin();
     }
 
+    /**
+     * Approving a pending self-registered buyer (CLAUDE.md §14) is
+     * operational admin work -- today just `isAdmin()`, the same slot
+     * CLAUDE.md §4's owner/staff permission split layers into later.
+     */
+    public function approve(User $user, BuyerProfile $buyerProfile): bool
+    {
+        return $user->isAdmin();
+    }
+
     public function delete(User $user, BuyerProfile $buyerProfile): bool
     {
         return false;

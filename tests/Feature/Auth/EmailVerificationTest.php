@@ -119,7 +119,10 @@ it('shows the verification banner for an unverified user and hides it once verif
 // --- the whole loop: the `act` gate before and after verification -----------
 
 it('blocks the act gate before verification and allows it after the real signed link is clicked', function () {
-    $user = User::factory()->unverified()->create();
+    // Vendor, not the factory default (buyer) -- this test is about the
+    // verification loop specifically, and a buyer now carries an extra
+    // approval condition on top of it (see BuyerApprovalGateTest).
+    $user = User::factory()->vendor()->unverified()->create();
 
     expect($user->can('act'))->toBeFalse();
 

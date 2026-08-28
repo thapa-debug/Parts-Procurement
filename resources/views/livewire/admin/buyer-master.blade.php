@@ -206,6 +206,20 @@
                         </div>
                     </div>
 
+                    <label class="flex items-start gap-2 text-sm text-ink">
+                        <input
+                            type="checkbox"
+                            wire:model="approve_immediately"
+                            class="mt-0.5 rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                        >
+                        <span>
+                            {{ __('admin.buyer_master.create_form.approve_immediately_label') }}
+                            <span class="block text-xs text-ink-muted">
+                                {{ __('admin.buyer_master.create_form.approve_immediately_help') }}
+                            </span>
+                        </span>
+                    </label>
+
                     <div class="flex items-center justify-end gap-3 pt-2">
                         <button
                             type="button"
@@ -234,6 +248,7 @@
             :for-company="$revealedForCompany"
             :heading="$revealedContext === 'reset' ? __('admin.buyer_master.reveal.reset_heading') : __('admin.buyer_master.reveal.created_heading')"
             :warning="__('admin.buyer_master.reveal.warning')"
+            :verification-email="$revealedVerificationEmail"
         />
     @endif
 </div>
