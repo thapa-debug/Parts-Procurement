@@ -32,6 +32,17 @@ class RequestForm extends Component
     public string $memo = '';
 
     /**
+     * Not a real field -- never bound to an input, never reset. Purely an
+     * anchor Livewire's own $this->validate() can validate the "at least
+     * one of vin/oem_part_number/reference_url" rule against (see rules()):
+     * Livewire requires every rules() key to be a real component property,
+     * and Laravel's validator skips a rule entirely for an attribute
+     * that's completely absent, so this has to both exist and stay
+     * permanently non-empty.
+     */
+    public string $identifier = 'n/a';
+
+    /**
      * Why the form is hidden in favour of a "what's next" message, instead
      * of a bare 403 -- CLAUDE.md's UX guidance: blocked states must explain
      * why and what to do, not just deny. Computed once in mount(); a

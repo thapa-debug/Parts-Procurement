@@ -14,6 +14,14 @@ function submitRequestPayload(array $overrides = []): array
         'maker' => 'Toyota',
         'car_model' => 'Crown',
         'part_name' => 'Right LED headlight',
+        // A default identifier so most tests represent a complete, valid
+        // submission -- the "at least one of vin/oem/reference_url" tests
+        // below override all three explicitly to exercise that rule.
+        'vin' => 'GRS184-0002255',
+        // Normally injected by SubmitPartRequestRequest::prepareForValidation()
+        // -- these tests build a Validator directly, bypassing that hook, so
+        // it's replicated here (see that method for why it must be present).
+        'identifier' => true,
     ], $overrides);
 }
 
@@ -27,10 +35,48 @@ it('requires the mandatory fields', function () {
     }
 });
 
-it('leaves the optional fields optional', function () {
+it('leaves mfg_date and memo optional given at least one identifier', function () {
     $validator = Validator::make(submitRequestPayload(), (new SubmitPartRequestRequest)->rules());
 
     expect($validator->fails())->toBeFalse();
+});
+
+// --- "at least one of vin / oem_part_number / reference_url" ---------------
+
+it('rejects the submission when vin, oem_part_number, and reference_url are all empty', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['vin' => null, 'oem_part_number' => null, 'reference_url' => null]),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('identifier'))->toBeTrue();
+});
+
+it('accepts the submission when only vin is present', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['vin' => 'GRS184-0002255', 'oem_part_number' => null, 'reference_url' => null]),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('identifier'))->toBeFalse();
+});
+
+it('accepts the submission when only oem_part_number is present', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['vin' => null, 'oem_part_number' => '81110-60M00', 'reference_url' => null]),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('identifier'))->toBeFalse();
+});
+
+it('accepts the submission when only reference_url is present', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['vin' => null, 'oem_part_number' => null, 'reference_url' => 'https://example.com/listing']),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('identifier'))->toBeFalse();
 });
 
 it('accepts a maker from the fixed list', function () {

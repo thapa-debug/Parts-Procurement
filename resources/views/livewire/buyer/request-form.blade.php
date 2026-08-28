@@ -75,6 +75,13 @@
                 </div>
             </div>
 
+            <div>
+                <p class="text-sm text-ink-muted">{{ __('buyer.request_form.identifier_note') }}</p>
+                @error('identifier')
+                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label for="vin" class="block text-sm font-medium text-ink">
