@@ -14,13 +14,22 @@
         </button>
     </div>
 
-    <div class="mt-6">
+    <div class="mt-6 flex flex-wrap items-center gap-4">
         <input
             type="search"
             wire:model.live.debounce.300ms="search"
             placeholder="{{ __('admin.buyer_master.search_placeholder') }}"
             class="w-full max-w-sm rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
         >
+
+        <label class="flex items-center gap-2 text-sm text-ink-muted">
+            <input
+                type="checkbox"
+                wire:model.live="pendingOnly"
+                class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+            >
+            {{ __('admin.buyer_master.approval.pending_only_label') }}
+        </label>
     </div>
 
     <div class="mt-4 overflow-x-auto rounded-lg border border-line bg-surface shadow-sm">
@@ -32,6 +41,7 @@
                     <th class="px-4 py-3">{{ __('admin.buyer_master.table.contact') }}</th>
                     <th class="px-4 py-3">{{ __('admin.buyer_master.table.email') }}</th>
                     <th class="px-4 py-3">{{ __('admin.verification.column') }}</th>
+                    <th class="px-4 py-3">{{ __('admin.buyer_master.approval.column') }}</th>
                     <th class="px-4 py-3 text-right">{{ __('admin.buyer_master.table.actions') }}</th>
                 </tr>
             </thead>
@@ -57,6 +67,17 @@
                                 </span>
                             @endif
                         </td>
+                        <td class="px-4 py-3">
+                            @if ($buyer->isApproved())
+                                <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
+                                    {{ __('admin.buyer_master.approval.approved_badge') }}
+                                </span>
+                            @else
+                                <span class="inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                    {{ __('admin.buyer_master.approval.pending_badge') }}
+                                </span>
+                            @endif
+                        </td>
                         <td class="px-4 py-3 text-right">
                             <x-admin.row-actions-menu>
                                 <a
@@ -77,6 +98,17 @@
                                     {{ __('admin.buyer_master.reset_password_button') }}
                                 </button>
 
+                                @unless ($buyer->isApproved())
+                                    <button
+                                        type="button"
+                                        wire:click="approveBuyer({{ $buyer->id }})"
+                                        role="menuitem"
+                                        class="block w-full px-4 py-2 text-left text-sm text-brand-700 hover:bg-surface-muted hover:text-brand-800"
+                                    >
+                                        {{ __('admin.buyer_master.approval.approve_button') }}
+                                    </button>
+                                @endunless
+
                                 @unless ($buyer->user->hasVerifiedEmail())
                                     <span x-data="{ sent: false }" class="block">
                                         <button
@@ -95,7 +127,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-ink-muted">
+                        <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
                             {{ __('admin.buyer_master.empty') }}
                         </td>
                     </tr>
