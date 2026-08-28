@@ -33,6 +33,24 @@ it('leaves the optional fields optional', function () {
     expect($validator->fails())->toBeFalse();
 });
 
+it('accepts a maker from the fixed list', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['maker' => 'Imported / Other']),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->fails())->toBeFalse();
+});
+
+it('rejects a maker outside the fixed list -- never trust the <select> alone', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['maker' => 'Ferrari']),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('maker'))->toBeTrue();
+});
+
 it('rejects a part_type outside the enum', function () {
     $validator = Validator::make(
         submitRequestPayload(['part_type' => 'refurbished']),
@@ -50,6 +68,30 @@ it('rejects a non-URL reference_url', function () {
 
     expect($validator->errors()->has('reference_url'))->toBeTrue();
 });
+
+it('accepts mfg_date in YYYY/MM format only', function () {
+    $validator = Validator::make(
+        submitRequestPayload(['mfg_date' => '2005/10']),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->fails())->toBeFalse();
+});
+
+it('rejects mfg_date in any other format', function (string $invalid) {
+    $validator = Validator::make(
+        submitRequestPayload(['mfg_date' => $invalid]),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('mfg_date'))->toBeTrue();
+})->with([
+    'hyphenated' => '2005-10',
+    'day included' => '2005/10/01',
+    'month first' => '10/2005',
+    'month out of range' => '2005/13',
+    'two-digit year' => '05/10',
+]);
 
 it('authorizes a buyer only, not an admin or vendor', function () {
     $admin = User::factory()->admin()->create();

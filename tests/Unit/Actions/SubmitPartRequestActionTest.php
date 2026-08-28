@@ -18,7 +18,7 @@ it('creates a request with a request_code derived from its own id', function () 
         'Toyota',
         'Crown',
         'GRS184-0002255',
-        null,
+        '2005/10',
         '81110-60M00',
         'Right LED headlight',
         'https://example.com/listing',
@@ -30,7 +30,10 @@ it('creates a request with a request_code derived from its own id', function () 
         ->and($request->status)->toBe(RequestStatus::New)
         ->and($request->oem_part_number)->toBe('81110-60M00')
         ->and($request->reference_url)->toBe('https://example.com/listing')
-        ->and($request->memo)->toBe('Please prioritize speed');
+        ->and($request->memo)->toBe('Please prioritize speed')
+        // Stored exactly as given -- a plain string, year and month only,
+        // never cast to/from a real date (see the part_requests migration).
+        ->and($request->mfg_date)->toBe('2005/10');
 });
 
 it('allows null optional fields', function () {

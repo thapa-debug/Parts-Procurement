@@ -16,16 +16,22 @@ class RequestBoard extends Component
     public string $search = '';
 
     /**
-     * @var 'new'|'in_progress'|'purchased'|'completed'|'all'
+     * @var 'new'|'inquiring'|'quoted'|'order_confirmed'|'shipped'|'completed'|'all'
      */
     public string $tab = 'all';
 
     /**
-     * Groups the full status enum into the same broad stages the client's
-     * prototype board uses. Only `new` is reachable yet -- the vendor
+     * Mirrors CLAUDE.md §5's full lifecycle one stage per tab, not a
+     * collapsed grouping -- only `new` is reachable yet (the vendor
      * broadcast/quote/payment workflow that populates the rest is the
-     * held-back next slice -- but the board is built against the full
+     * held-back next slice), but the board is built against the full
      * lifecycle from the start rather than re-worked later.
+     *
+     * `order_confirmed` bundles `paid` + `ordered_to_vendor` +
+     * `procurement_failed`: all three are "we've been paid, now arranging
+     * fulfillment" from an admin's-eye view, and `procurement_failed` has
+     * no JP label of its own in CLAUDE.md §5 (routes back to re-quoting
+     * rather than being a distinct client-facing stage).
      *
      * @return array<string, list<RequestStatus>>
      */
@@ -33,9 +39,11 @@ class RequestBoard extends Component
     {
         return [
             'new' => [RequestStatus::New],
-            'in_progress' => [RequestStatus::VendorInquiry, RequestStatus::Quoted, RequestStatus::ProcurementFailed],
-            'purchased' => [RequestStatus::Paid, RequestStatus::OrderedToVendor],
-            'completed' => [RequestStatus::Shipped, RequestStatus::Received],
+            'inquiring' => [RequestStatus::VendorInquiry],
+            'quoted' => [RequestStatus::Quoted],
+            'order_confirmed' => [RequestStatus::Paid, RequestStatus::OrderedToVendor, RequestStatus::ProcurementFailed],
+            'shipped' => [RequestStatus::Shipped],
+            'completed' => [RequestStatus::Received],
         ];
     }
 

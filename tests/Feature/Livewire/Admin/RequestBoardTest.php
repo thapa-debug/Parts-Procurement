@@ -84,38 +84,68 @@ it('filters requests into the correct tab by status, with accurate counts', func
     $admin = User::factory()->admin()->create();
 
     $new = PartRequest::factory()->create(['status' => RequestStatus::New, 'car_model' => 'New Model']);
-    $inProgress = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry, 'car_model' => 'Progress Model']);
-    $purchased = PartRequest::factory()->create(['status' => RequestStatus::Paid, 'car_model' => 'Purchased Model']);
-    $completed = PartRequest::factory()->create(['status' => RequestStatus::Received, 'car_model' => 'Completed Model']);
+    $inquiring = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry, 'car_model' => 'Inquiring Model']);
+    $quoted = PartRequest::factory()->create(['status' => RequestStatus::Quoted, 'car_model' => 'Quoted Model']);
+    $paid = PartRequest::factory()->create(['status' => RequestStatus::Paid, 'car_model' => 'Paid Model']);
+    $orderedToVendor = PartRequest::factory()->create(['status' => RequestStatus::OrderedToVendor, 'car_model' => 'Ordered Model']);
+    $procurementFailed = PartRequest::factory()->create(['status' => RequestStatus::ProcurementFailed, 'car_model' => 'Failed Model']);
+    $shipped = PartRequest::factory()->create(['status' => RequestStatus::Shipped, 'car_model' => 'Shipped Model']);
+    $received = PartRequest::factory()->create(['status' => RequestStatus::Received, 'car_model' => 'Received Model']);
 
     $component = Livewire::actingAs($admin)->test(RequestBoard::class);
 
     $component->set('tab', 'new')
         ->assertSee('New Model')
-        ->assertDontSee('Progress Model')
-        ->assertDontSee('Purchased Model')
-        ->assertDontSee('Completed Model');
+        ->assertDontSee('Inquiring Model')
+        ->assertDontSee('Quoted Model')
+        ->assertDontSee('Paid Model')
+        ->assertDontSee('Shipped Model')
+        ->assertDontSee('Received Model');
 
-    $component->set('tab', 'in_progress')
-        ->assertSee('Progress Model')
-        ->assertDontSee('New Model');
+    $component->set('tab', 'inquiring')
+        ->assertSee('Inquiring Model')
+        ->assertDontSee('New Model')
+        ->assertDontSee('Quoted Model');
 
-    $component->set('tab', 'purchased')
-        ->assertSee('Purchased Model')
-        ->assertDontSee('Progress Model');
+    $component->set('tab', 'quoted')
+        ->assertSee('Quoted Model')
+        ->assertDontSee('Inquiring Model')
+        ->assertDontSee('Paid Model');
+
+    // order_confirmed bundles paid + ordered_to_vendor + procurement_failed
+    // (see RequestBoard::tabStatuses()).
+    $component->set('tab', 'order_confirmed')
+        ->assertSee('Paid Model')
+        ->assertSee('Ordered Model')
+        ->assertSee('Failed Model')
+        ->assertDontSee('Quoted Model')
+        ->assertDontSee('Shipped Model');
+
+    $component->set('tab', 'shipped')
+        ->assertSee('Shipped Model')
+        ->assertDontSee('Paid Model')
+        ->assertDontSee('Received Model');
 
     $component->set('tab', 'completed')
-        ->assertSee('Completed Model')
-        ->assertDontSee('Purchased Model');
+        ->assertSee('Received Model')
+        ->assertDontSee('Shipped Model');
 
     $component->set('tab', 'all')
         ->assertSee('New Model')
-        ->assertSee('Progress Model')
-        ->assertSee('Purchased Model')
-        ->assertSee('Completed Model');
+        ->assertSee('Inquiring Model')
+        ->assertSee('Quoted Model')
+        ->assertSee('Paid Model')
+        ->assertSee('Ordered Model')
+        ->assertSee('Failed Model')
+        ->assertSee('Shipped Model')
+        ->assertSee('Received Model');
 
     expect($new->status)->toBe(RequestStatus::New)
-        ->and($inProgress->status)->toBe(RequestStatus::VendorInquiry)
-        ->and($purchased->status)->toBe(RequestStatus::Paid)
-        ->and($completed->status)->toBe(RequestStatus::Received);
+        ->and($inquiring->status)->toBe(RequestStatus::VendorInquiry)
+        ->and($quoted->status)->toBe(RequestStatus::Quoted)
+        ->and($paid->status)->toBe(RequestStatus::Paid)
+        ->and($orderedToVendor->status)->toBe(RequestStatus::OrderedToVendor)
+        ->and($procurementFailed->status)->toBe(RequestStatus::ProcurementFailed)
+        ->and($shipped->status)->toBe(RequestStatus::Shipped)
+        ->and($received->status)->toBe(RequestStatus::Received);
 });
