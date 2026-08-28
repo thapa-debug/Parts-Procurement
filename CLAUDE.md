@@ -4,6 +4,16 @@ This file is the source of truth for how this project is built. Read it fully be
 
 ---
 
+# Security Rules
+
+- Never read, print, expose, or disclose secret values from `.env`.
+- Never include credentials, API keys, passwords, tokens, or private keys in source code.
+- Never add real secrets to `.env.example`, documentation, tests, logs, or Git.
+- Environment variable names may be referenced and configured, but secret values must not be displayed.
+- Do not run commands that dump `.env`, environment variables, credentials, SSH keys, or other secrets.
+- When configuring services such as AWS S3, use the environment variable names without accessing their values.
+
+
 ## 1. Mission & quality bar
 
 We are building a production web system for a real client's daily business — a brokerage that connects overseas parts **buyers** with Japanese dismantler **vendors**, with an **admin** brokering every interaction.
