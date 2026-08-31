@@ -75,17 +75,10 @@
                 </div>
             </div>
 
-            <div>
-                <p class="text-sm text-ink-muted">{{ __('buyer.request_form.identifier_note') }}</p>
-                @error('identifier')
-                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label for="vin" class="block text-sm font-medium text-ink">
-                        {{ __('buyer.request_form.vin_label') }}
+                        {{ __('buyer.request_form.vin_label') }} <x-required-mark />
                     </label>
                     <input
                         id="vin"
@@ -101,37 +94,20 @@
                 </div>
 
                 <div>
-                    <label for="mfg_date" class="block text-sm font-medium text-ink">
-                        {{ __('buyer.request_form.mfg_date_label') }}
+                    <label for="oem_part_number" class="block text-sm font-medium text-ink">
+                        {{ __('buyer.request_form.oem_part_number_label') }}
                     </label>
                     <input
-                        id="mfg_date"
+                        id="oem_part_number"
                         type="text"
-                        wire:model="mfg_date"
-                        placeholder="{{ __('buyer.request_form.mfg_date_placeholder') }}"
+                        wire:model="oem_part_number"
+                        placeholder="{{ __('buyer.request_form.oem_part_number_placeholder') }}"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
-                    <p class="mt-1 text-xs text-ink-muted">{{ __('buyer.request_form.mfg_date_help') }}</p>
-                    @error('mfg_date')
+                    @error('oem_part_number')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>
-            </div>
-
-            <div>
-                <label for="oem_part_number" class="block text-sm font-medium text-ink">
-                    {{ __('buyer.request_form.oem_part_number_label') }}
-                </label>
-                <input
-                    id="oem_part_number"
-                    type="text"
-                    wire:model="oem_part_number"
-                    placeholder="{{ __('buyer.request_form.oem_part_number_placeholder') }}"
-                    class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                >
-                @error('oem_part_number')
-                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                @enderror
             </div>
 
             <div>

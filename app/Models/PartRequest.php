@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'buyer_id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
-    'mfg_date', 'oem_part_number', 'part_name', 'reference_url', 'memo',
+    'oem_part_number', 'part_name', 'reference_url', 'memo',
     'status', 'applied_rate', 'applied_min_fee', 'buyer_price',
     'shipping_method', 'shipping_fee',
 ])]

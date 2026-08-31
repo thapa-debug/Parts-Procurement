@@ -26,6 +26,7 @@ class PartRequestFactory extends Factory
             'part_type' => fake()->randomElement(PartType::cases()),
             'maker' => fake()->randomElement(['Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru']),
             'car_model' => fake()->bothify('Model-###'),
+            'vin' => strtoupper(fake()->bothify('???####-#######')),
             'part_name' => fake()->randomElement(['Front bumper', 'Alternator', 'Headlight assembly', 'ECU', 'Side mirror']),
             'status' => RequestStatus::New,
         ];

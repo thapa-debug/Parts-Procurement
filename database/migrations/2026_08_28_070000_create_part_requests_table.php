@@ -24,13 +24,9 @@ return new class extends Migration
             $table->enum('part_type', ['used', 'new', 'both']);
             $table->string('maker');
             $table->string('car_model');
-            $table->string('vin')->nullable();
-
-            // Year and month only, as a plain string (e.g. "2005/10") --
-            // never a real date column. Nobody submitting this form knows
-            // the exact day a car was manufactured, and a DATE column would
-            // force fabricating one (misleading precision we don't have).
-            $table->string('mfg_date', 7)->nullable();
+            // Always required, no exceptions (confirmed with the client) --
+            // not nullable, matching every other mandatory column here.
+            $table->string('vin');
 
             $table->string('oem_part_number')->nullable();
             $table->string('part_name');
