@@ -59,6 +59,18 @@ class PartRequestPolicy
     }
 
     /**
+     * Broadcasting a request to vendors (打診) is operational admin work --
+     * today just `isAdmin()`, the same owner/staff permission slot as
+     * viewBoard/create. The request's own eligibility (must still be
+     * `new`) is a business rule BroadcastRequestAction enforces itself,
+     * not a role check, so it doesn't belong here.
+     */
+    public function broadcast(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies

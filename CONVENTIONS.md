@@ -26,11 +26,11 @@ Livewire 3 ships its own internal build of Alpine.js and boots it automatically 
 
 On the installed 5.x line, a logged model's attribute diff is on the `attribute_changes` column (`['attributes' => [...], 'old' => [...]]`), not on `properties` (which comes back empty for a plain `LogsActivity` model) and not via a `changes()` method — both exist in older docs/versions but not this one. See `VendorProfile`/`VendorProfileTest` for the working pattern.
 
-## Vendor status is a flag only — not enforced anywhere yet
+## Vendor status: enforced at broadcast, still not at the `act`/login gates
 
-`vendor_profiles.status` (`active`/`suspended`) is pure data right now. Nothing reads it. Two places will need to start respecting it and don't yet:
-- **Phase 2 broadcast logic**: selecting which vendors a request goes out to must exclude suspended vendors.
-- **The `act`/login gates** (`app/Providers/AppServiceProvider.php`'s `act` gate, and login itself): currently only check email verification, not vendor status. Whether a suspended vendor should be blocked from logging in at all, or only from acting, is an open decision for whoever builds that enforcement — don't assume either way without deciding it explicitly first.
+`vendor_profiles.status` (`active`/`suspended`) is now genuinely enforced in one place: `BroadcastRequestAction` re-checks every submitted vendor id against `VendorProfile::where('status', Active)` itself, rather than trusting whatever list the admin's UI happened to offer -- a vendor suspended in the moment between page load and submit still can't end up invited. See `BroadcastRequestActionTest`'s "excludes a suspended vendor... even if its id was submitted" case.
+
+Still open: **the `act`/login gates** (`app/Providers/AppServiceProvider.php`'s `act` gate, and login itself) currently only check email verification, not vendor status. Whether a suspended vendor should be blocked from logging in at all, or only from acting, is an open decision for whoever builds that enforcement — don't assume either way without deciding it explicitly first.
 
 ## The `act` gate is real enforcement, already proven — Phase 2 must actually call it
 
