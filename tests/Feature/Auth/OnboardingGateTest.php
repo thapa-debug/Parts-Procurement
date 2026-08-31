@@ -4,9 +4,12 @@ use App\Actions\CreateAdminManagedUserAction;
 use App\Enums\UserRole;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Route;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\URL;
 
 uses(RefreshDatabase::class);
 
@@ -112,4 +115,35 @@ it('does not redirect away Livewire\'s own shared update endpoint, or the passwo
         ->name('default.livewire.update');
 
     $this->post('/__test/livewire-update')->assertOk()->assertSee('reached');
+});
+
+it('does not redirect Livewire\'s file-upload endpoint, or an upload 500s trying to json_decode the redirect body', function () {
+    // Regression test: a redirected livewire/upload-file response isn't
+    // valid JSON, so Livewire's own client-side error handler crashes on
+    // `json_decode($body, true)['errors']` (WithFileUploads.php) the next
+    // time it talks to the server -- a real 500, not just a blocked upload.
+    // See CONVENTIONS.md.
+    $result = app(CreateAdminManagedUserAction::class)->execute('Jane Vendor', 'jane@example.com', UserRole::Vendor);
+
+    $this->post('/login', ['email' => 'jane@example.com', 'password' => $result['temporary_password']])
+        ->assertRedirect('/');
+
+    // Livewire resolves its temporary-upload disk to 'tmp-for-tests' under
+    // app()->runningUnitTests(), but only registers that fake disk as a
+    // side effect of FileUploadConfiguration::storage() -- a method
+    // FileUploadController never actually calls. A component-driven
+    // upload triggers that registration earlier by other means; hitting
+    // the raw endpoint directly (below) does not, so it must be faked here.
+    Storage::fake('tmp-for-tests');
+
+    // The real route Livewire registers for temporary file uploads (see
+    // Livewire\Features\SupportFileUploads\SupportFileUploads::boot), hit
+    // with a genuine signature the same way Livewire's own JS generates one
+    // (GenerateSignedUploadUrl::forLocal), not a stand-in route -- this is
+    // exactly the request a real browser's file picker sends.
+    $signedPath = URL::temporarySignedRoute('livewire.upload-file', now()->addMinutes(5), [], false);
+
+    $this->post($signedPath, [
+        'files' => [UploadedFile::fake()->image('bumper.jpg')],
+    ])->assertOk()->assertJsonStructure(['paths']);
 });
