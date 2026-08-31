@@ -57,11 +57,20 @@ class SubmitVendorResponseAction
                 'is_no_stock' => $data['is_no_stock'] ?? false,
             ]);
 
+            // The default filesystem disk (CLAUDE.md §2: S3 in production,
+            // per config/filesystems.php -- local dev can point
+            // FILESYSTEM_DISK at 'public' instead, same local-only-override
+            // shape as CONVENTIONS.md's Redis/mail sections). Read once and
+            // reused for both the store() call and the persisted `disk`
+            // column so a photo is never saved to one disk while its row
+            // claims another.
+            $disk = config('filesystems.default');
+
             foreach ($photos as $photo) {
-                $path = $photo->store('response-photos', 's3');
+                $path = $photo->store('response-photos', $disk);
 
                 $response->photos()->create([
-                    'disk' => 's3',
+                    'disk' => $disk,
                     'path' => $path,
                     'original_name' => $photo->getClientOriginalName(),
                     'size' => $photo->getSize(),
