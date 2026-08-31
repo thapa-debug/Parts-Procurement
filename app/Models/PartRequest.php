@@ -41,11 +41,12 @@ class PartRequest extends Model
      * Vendors this request has been broadcast to (打診, CLAUDE.md §7's
      * request_vendor pivot) -- who, and when they were invited.
      *
-     * @return BelongsToMany<VendorProfile, $this>
+     * @return BelongsToMany<VendorProfile, $this, RequestVendorPivot>
      */
     public function vendors(): BelongsToMany
     {
         return $this->belongsToMany(VendorProfile::class, 'request_vendor', 'part_request_id', 'vendor_id')
+            ->using(RequestVendorPivot::class)
             ->withPivot('invited_at');
     }
 

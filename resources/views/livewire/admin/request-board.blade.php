@@ -40,12 +40,17 @@
                     <th class="px-4 py-3">{{ __('admin.request_board.table.details') }}</th>
                     <th class="px-4 py-3">{{ __('admin.request_board.table.requested_at') }}</th>
                     <th class="px-4 py-3">{{ __('admin.request_board.table.status') }}</th>
+                    <th class="px-4 py-3 text-right">{{ __('admin.request_board.table.actions') }}</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-line">
                 @forelse ($requests as $request)
                     <tr wire:key="request-{{ $request->id }}">
-                        <td class="px-4 py-3 font-mono text-xs font-medium text-ink">{{ $request->request_code }}</td>
+                        <td class="px-4 py-3 font-mono text-xs font-medium text-ink">
+                            <a href="{{ route('admin.requests.show', $request) }}" class="hover:text-brand-700 hover:underline">
+                                {{ $request->request_code }}
+                            </a>
+                        </td>
                         <td class="px-4 py-3 text-ink-muted">{{ $request->buyer->company_name }}</td>
                         <td class="px-4 py-3">
                             <span class="inline-flex rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-muted">
@@ -59,10 +64,15 @@
                                 {{ __('admin.request_board.status.'.$request->status->value) }}
                             </span>
                         </td>
+                        <td class="px-4 py-3 text-right">
+                            <a href="{{ route('admin.requests.show', $request) }}" class="text-sm text-ink-muted underline hover:text-ink">
+                                {{ __('admin.request_board.view_link') }}
+                            </a>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-ink-muted">
+                        <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
                             {{ $tab === 'all' ? __('admin.request_board.empty_all') : __('admin.request_board.empty') }}
                         </td>
                     </tr>

@@ -211,6 +211,7 @@ return [
             'details' => 'Car / Part',
             'requested_at' => 'Requested',
             'status' => 'Status',
+            'actions' => 'Actions',
         ],
 
         'part_type' => [
@@ -229,6 +230,40 @@ return [
             'shipped' => 'Shipped',
             'received' => 'Received',
         ],
+
+        'view_link' => 'View',
+    ],
+
+    'request_detail' => [
+        'back_link' => 'Back to requests',
+
+        'details_section' => 'Request details',
+        'buyer_label' => 'Buyer',
+        'part_type_label' => 'Part type',
+        'maker_label' => 'Maker',
+        'car_model_label' => 'Car model',
+        'vin_label' => 'VIN / chassis number',
+        'oem_part_number_label' => 'OEM part number',
+        'part_name_label' => 'Part name & details',
+        'reference_url_label' => 'Reference URL',
+        'memo_label' => 'Notes',
+        'requested_at_label' => 'Requested',
+        'not_provided' => '—',
+
+        'broadcast_section' => 'Send to vendors (打診)',
+        'broadcast_help' => 'Select which active vendors should receive this inquiry. Suspended vendors are never shown here and can\'t be selected.',
+        'select_all_button' => 'Select all',
+        'no_active_vendors' => 'There are no active vendors to send this to yet. Activate or add a vendor first.',
+        'vendor_column' => 'Vendor',
+        'contact_column' => 'Contact',
+        'send_button' => 'Send inquiry',
+        'select_at_least_one' => 'Select at least one vendor before sending.',
+        'sent_confirmation' => 'Inquiry sent to :count vendor(s).',
+        'broadcast_error' => 'Something went wrong sending this inquiry. Please refresh the page and try again.',
+
+        'sent_section' => 'Sent to vendors',
+        'sent_help' => 'This request has already been broadcast -- no response deadline, so vendors can quote whenever they\'re ready. Quote comparison lands in a later slice.',
+        'invited_at_column' => 'Invited',
     ],
 
 ];

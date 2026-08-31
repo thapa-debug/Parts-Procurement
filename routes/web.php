@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Livewire\Admin\BuyerDetail;
 use App\Livewire\Admin\BuyerMaster;
 use App\Livewire\Admin\RequestBoard;
+use App\Livewire\Admin\RequestDetail;
 use App\Livewire\Admin\Settings;
 use App\Livewire\Admin\VendorDetail;
 use App\Livewire\Admin\VendorMaster;
@@ -50,6 +51,7 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
     Route::get('/buyers/{buyerProfile}', BuyerDetail::class)->name('buyers.show');
     Route::get('/settings', Settings::class)->name('settings');
     Route::get('/requests', RequestBoard::class)->name('requests.index');
+    Route::get('/requests/{partRequest}', RequestDetail::class)->name('requests.show');
 });
 
 Route::prefix('buyer')->name('buyer.')->middleware(['auth', 'buyer'])->group(function () {
