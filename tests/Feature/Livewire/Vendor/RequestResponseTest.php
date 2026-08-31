@@ -59,6 +59,9 @@ it('blocks an unverified vendor from seeing the response form', function () {
 // --- submitting a quote -----------------------------------------------------
 
 it('submits a quote with a photo and shows a confirmation', function () {
+    // Pin the disk regardless of the developer's own local FILESYSTEM_DISK
+    // override (CONVENTIONS.md "Local dev without S3").
+    config(['filesystems.default' => 's3']);
     Storage::fake('s3');
 
     $vendorUser = User::factory()->vendor()->create();
@@ -72,7 +75,7 @@ it('submits a quote with a photo and shows a confirmation', function () {
         ->set('quality_rank', QualityRank::A->value)
         ->set('lead_time', LeadTime::Within1Week->value)
         ->set('comment', 'Clean, no damage.')
-        ->set('photos', [UploadedFile::fake()->image('bumper.jpg')])
+        ->set('photo', UploadedFile::fake()->image('bumper.jpg'))
         ->call('sendResponse')
         ->assertSet('submitted', true)
         ->assertHasNoErrors();
@@ -94,7 +97,7 @@ it('rejects a quote missing required fields', function () {
     Livewire::actingAs($vendorUser)
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->call('sendResponse')
-        ->assertHasErrors(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
+        ->assertHasErrors(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photo']);
 
     expect(VendorResponse::count())->toBe(0);
 });

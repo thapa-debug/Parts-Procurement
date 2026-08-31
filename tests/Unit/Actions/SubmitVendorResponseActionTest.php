@@ -14,6 +14,10 @@ use Illuminate\Support\Facades\Storage;
 uses(RefreshDatabase::class);
 
 it('records a priced quote with its photos for a vendor actually invited to the request', function () {
+    // Pin the disk regardless of the developer's own local FILESYSTEM_DISK
+    // override (CONVENTIONS.md "Local dev without S3") -- this test proves
+    // the real production disk works, not whatever's ambient locally.
+    config(['filesystems.default' => 's3']);
     Storage::fake('s3');
     $request = PartRequest::factory()->create();
     $vendor = VendorProfile::factory()->create();
@@ -102,6 +106,10 @@ it('lets a different invited vendor on the same request still respond independen
 });
 
 it('rolls back the whole response -- no row and no photos -- if the transaction fails', function () {
+    // Pin the disk regardless of the developer's own local FILESYSTEM_DISK
+    // override (CONVENTIONS.md "Local dev without S3") -- this test proves
+    // the real production disk works, not whatever's ambient locally.
+    config(['filesystems.default' => 's3']);
     Storage::fake('s3');
     $request = PartRequest::factory()->create();
     $vendor = VendorProfile::factory()->create();

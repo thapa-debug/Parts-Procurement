@@ -40,9 +40,13 @@ class RequestResponse extends Component
     public string $comment = '';
 
     /**
-     * @var array<int, TemporaryUploadedFile>
+     * A single file, not an array -- Livewire's S3 upload driver flatly
+     * rejects a "multiple" upload (S3DoesntSupportMultipleFileUploads),
+     * a restriction tied to the property being array-typed, not just the
+     * blade input's `multiple` HTML attribute. Matches the prototype's own
+     * one-photo-per-response behaviour anyway.
      */
-    public array $photos = [];
+    public ?TemporaryUploadedFile $photo = null;
 
     /**
      * @var 'unverified'|null
@@ -77,8 +81,7 @@ class RequestResponse extends Component
             'quality_rank' => ['required', Rule::enum(QualityRank::class)],
             'lead_time' => ['required', Rule::enum(LeadTime::class)],
             'comment' => ['required', 'string', 'max:2000'],
-            'photos' => ['required', 'array', 'min:1'],
-            'photos.*' => ['image', 'max:10240'],
+            'photo' => ['required', 'image', 'max:10240'],
         ];
     }
 
@@ -98,7 +101,7 @@ class RequestResponse extends Component
                 'lead_time' => $validated['lead_time'],
                 'comment' => $validated['comment'],
                 'is_no_stock' => false,
-            ], $validated['photos']);
+            ], [$validated['photo']]);
         } catch (VendorResponseNotAllowedException $e) {
             report($e);
             $this->addError('cost_price', __('vendor.request_response.submit_error'));
@@ -107,7 +110,7 @@ class RequestResponse extends Component
         }
 
         $this->submitted = true;
-        $this->reset(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
+        $this->reset(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photo']);
     }
 
     public function sendNoStock(SubmitVendorResponseAction $action): void

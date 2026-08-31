@@ -150,30 +150,24 @@
                 </div>
 
                 <div>
-                    <label for="photos" class="block text-sm font-medium text-ink">
+                    <label for="photo" class="block text-sm font-medium text-ink">
                         {{ __('vendor.request_response.photos_label') }} <x-required-mark />
                     </label>
                     <input
-                        id="photos"
+                        id="photo"
                         type="file"
-                        wire:model="photos"
-                        multiple
+                        wire:model="photo"
                         accept="image/*"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
                     >
                     <p class="mt-1 text-xs text-ink-muted">{{ __('vendor.request_response.photos_help') }}</p>
-                    @error('photos.*')
-                        <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                    @error('photos')
+                    @error('photo')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror
 
-                    @if ($photos)
-                        <div class="mt-2 flex flex-wrap gap-2">
-                            @foreach ($photos as $photo)
-                                <img src="{{ $photo->temporaryUrl() }}" class="h-16 w-16 rounded-md border border-line object-cover">
-                            @endforeach
+                    @if ($photo)
+                        <div class="mt-2">
+                            <img src="{{ $photo->temporaryUrl() }}" class="h-16 w-16 rounded-md border border-line object-cover">
                         </div>
                     @endif
                 </div>
