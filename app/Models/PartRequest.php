@@ -10,6 +10,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 
 #[Fillable([
     'buyer_id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
@@ -34,6 +35,18 @@ class PartRequest extends Model
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(BuyerProfile::class, 'buyer_id');
+    }
+
+    /**
+     * Vendors this request has been broadcast to (打診, CLAUDE.md §7's
+     * request_vendor pivot) -- who, and when they were invited.
+     *
+     * @return BelongsToMany<VendorProfile, $this>
+     */
+    public function vendors(): BelongsToMany
+    {
+        return $this->belongsToMany(VendorProfile::class, 'request_vendor', 'part_request_id', 'vendor_id')
+            ->withPivot('invited_at');
     }
 
     /**

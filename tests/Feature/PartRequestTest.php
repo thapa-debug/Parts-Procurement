@@ -82,3 +82,14 @@ it('never allows direct model updates -- status transitions are owned by guarded
 
     expect($admin->can('update', $request))->toBeFalse();
 });
+
+it('lets only an admin broadcast a request to vendors', function () {
+    $admin = User::factory()->admin()->create();
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+    $request = PartRequest::factory()->create();
+
+    expect($admin->can('broadcast', $request))->toBeTrue()
+        ->and($buyer->can('broadcast', $request))->toBeFalse()
+        ->and($vendor->can('broadcast', $request))->toBeFalse();
+});
