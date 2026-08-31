@@ -140,6 +140,12 @@ Every form field in the app follows the same three-part standard, applied consis
 
 All three go through `lang/en/*.php` like every other UI string -- see `App\Livewire\Buyer\RequestForm` and `lang/en/buyer.php`'s `request_form` section for the reference implementation.
 
+## Vendor response (打診 reply): never bind the full model as public Livewire state on an isolation-sensitive page
+
+`App\Livewire\Vendor\RequestResponse` keeps only `public int $partRequestId`, never `public PartRequest $partRequest`. A public Eloquent-model property gets its full attribute set serialized into Livewire's client-side snapshot (visible in page source/dev tools) -- on a page a vendor's own browser loads, that would put `buyer_id` (and everything else on the row, including columns the Blade view never renders) directly into their hands, regardless of how careful the view itself is. `mount()` still receives the full `PartRequest` via Laravel's normal route-model binding (needed to call `$this->authorize('respond', $partRequest)`), but only extracts `->id` before discarding it; `render()` re-fetches with an explicit `->select([...])` every request instead of trusting stored state. Same reasoning drove `App\Livewire\Vendor\Inbox`'s list query: an explicit column allowlist, not a bare `PartRequest::query()->get()`, so `buyer_id` is never loaded into memory at all on a vendor-facing screen.
+
+The same shape (structural Policy check + Action re-verifies the specific business rule) as `BroadcastRequestAction`/`PartRequestPolicy::broadcast` repeats here: `PartRequestPolicy::respond()` is the one place "was this vendor actually invited to this request" is checked, and both the page's `mount()` and `SubmitVendorResponseAction::execute()` call it/re-derive it independently rather than one trusting the other.
+
 ## Testing
 
 - Unit tests for pure business logic live under `tests/Unit`, grouped by the class under test (e.g. `tests/Unit/Services/PricingServiceTest.php`).
