@@ -5,6 +5,7 @@ use App\Enums\RequestStatus;
 use App\Models\BuyerProfile;
 use App\Models\PartRequest;
 use App\Models\User;
+use App\Models\VendorProfile;
 use Illuminate\Database\QueryException;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -92,4 +93,32 @@ it('lets only an admin broadcast a request to vendors', function () {
     expect($admin->can('broadcast', $request))->toBeTrue()
         ->and($buyer->can('broadcast', $request))->toBeFalse()
         ->and($vendor->can('broadcast', $request))->toBeFalse();
+});
+
+it('lets any vendor view the vendor inbox list, but not a buyer or admin', function () {
+    $vendor = User::factory()->vendor()->create();
+    $buyer = User::factory()->buyer()->create();
+    $admin = User::factory()->admin()->create();
+
+    expect($vendor->can('viewVendorInbox', PartRequest::class))->toBeTrue()
+        ->and($buyer->can('viewVendorInbox', PartRequest::class))->toBeFalse()
+        ->and($admin->can('viewVendorInbox', PartRequest::class))->toBeFalse();
+});
+
+it('lets a vendor respond only to a request actually broadcast to them, never one they were not invited to', function () {
+    $invitedUser = User::factory()->vendor()->create();
+    $invitedVendor = VendorProfile::factory()->for($invitedUser)->create();
+    $uninvitedUser = User::factory()->vendor()->create();
+    VendorProfile::factory()->for($uninvitedUser)->create();
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $request->vendors()->attach($invitedVendor->id, ['invited_at' => now()]);
+
+    $buyer = User::factory()->buyer()->create();
+    $admin = User::factory()->admin()->create();
+
+    expect($invitedUser->can('respond', $request))->toBeTrue()
+        ->and($uninvitedUser->can('respond', $request))->toBeFalse()
+        ->and($buyer->can('respond', $request))->toBeFalse()
+        ->and($admin->can('respond', $request))->toBeFalse();
 });

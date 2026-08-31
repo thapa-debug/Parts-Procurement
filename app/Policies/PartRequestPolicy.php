@@ -71,6 +71,36 @@ class PartRequestPolicy
     }
 
     /**
+     * The vendor inbox list -- any vendor may view their own inbox; scoping
+     * to only the requests actually broadcast to them happens in the
+     * inbox's own query, the same "coarse policy + query does the
+     * narrowing" shape as viewAny above.
+     */
+    public function viewVendorInbox(User $user): bool
+    {
+        return $user->isVendor();
+    }
+
+    /**
+     * A vendor may open or respond to ONE specific request only if it was
+     * actually broadcast to them (request_vendor pivot). Unlike broadcast()
+     * above, this can't be a coarse role check: showing an uninvited vendor
+     * a request's detail page at all would leak that the request exists
+     * and what's in it, even though nothing rendered there is "buyer
+     * identity" per se. SubmitVendorResponseAction re-checks the same
+     * eligibility itself -- defense-in-depth, the same shape as
+     * BroadcastRequestAction re-checking vendor status.
+     */
+    public function respond(User $user, PartRequest $partRequest): bool
+    {
+        if (! $user->isVendor() || ! $user->vendorProfile) {
+            return false;
+        }
+
+        return $partRequest->vendors()->where('vendor_profiles.id', $user->vendorProfile->id)->exists();
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies
