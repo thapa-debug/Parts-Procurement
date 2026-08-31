@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'buyer_id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
@@ -48,6 +49,14 @@ class PartRequest extends Model
         return $this->belongsToMany(VendorProfile::class, 'request_vendor', 'part_request_id', 'vendor_id')
             ->using(RequestVendorPivot::class)
             ->withPivot('invited_at');
+    }
+
+    /**
+     * @return HasMany<VendorResponse, $this>
+     */
+    public function vendorResponses(): HasMany
+    {
+        return $this->hasMany(VendorResponse::class);
     }
 
     /**
