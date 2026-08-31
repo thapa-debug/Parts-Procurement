@@ -12,5 +12,6 @@ return [
         'buyers' => 'Buyers',
         'settings' => 'Settings',
         'new_request' => 'New Request',
+        'inbox' => 'Inbox',
     ],
 ];

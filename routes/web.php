@@ -14,6 +14,8 @@ use App\Livewire\Auth\Login;
 use App\Livewire\Auth\PasswordChange;
 use App\Livewire\Auth\Register;
 use App\Livewire\Buyer\RequestForm;
+use App\Livewire\Vendor\Inbox;
+use App\Livewire\Vendor\RequestResponse;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
@@ -56,4 +58,9 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
 Route::prefix('buyer')->name('buyer.')->middleware(['auth', 'buyer'])->group(function () {
     Route::get('/requests/new', RequestForm::class)->name('requests.create');
+});
+
+Route::prefix('vendor')->name('vendor.')->middleware(['auth', 'vendor'])->group(function () {
+    Route::get('/inbox', Inbox::class)->name('inbox');
+    Route::get('/inbox/{partRequest}', RequestResponse::class)->name('inbox.show');
 });

@@ -37,6 +37,10 @@
                                 <a href="{{ route('buyer.requests.create') }}" class="hover:text-ink">
                                     {{ __('app.nav.new_request') }}
                                 </a>
+                            @elseif (auth()->user()->isVendor())
+                                <a href="{{ route('vendor.inbox') }}" class="hover:text-ink">
+                                    {{ __('app.nav.inbox') }}
+                                </a>
                             @endif
                         </nav>
                     @endauth
