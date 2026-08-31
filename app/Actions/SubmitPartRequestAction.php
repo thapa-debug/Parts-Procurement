@@ -22,14 +22,13 @@ class SubmitPartRequestAction
         PartType $partType,
         string $maker,
         string $carModel,
-        ?string $vin,
-        ?string $mfgDate,
+        string $vin,
         ?string $oemPartNumber,
         string $partName,
         ?string $referenceUrl,
         ?string $memo,
     ): PartRequest {
-        return DB::transaction(function () use ($buyer, $partType, $maker, $carModel, $vin, $mfgDate, $oemPartNumber, $partName, $referenceUrl, $memo) {
+        return DB::transaction(function () use ($buyer, $partType, $maker, $carModel, $vin, $oemPartNumber, $partName, $referenceUrl, $memo) {
             $partRequest = PartRequest::create([
                 'buyer_id' => $buyer->id,
                 'request_code' => null, // filled in below, once the id exists
@@ -37,7 +36,6 @@ class SubmitPartRequestAction
                 'maker' => $maker,
                 'car_model' => $carModel,
                 'vin' => $vin,
-                'mfg_date' => $mfgDate,
                 'oem_part_number' => $oemPartNumber,
                 'part_name' => $partName,
                 'reference_url' => $referenceUrl,

@@ -21,8 +21,6 @@ class RequestForm extends Component
 
     public string $vin = '';
 
-    public string $mfg_date = '';
-
     public string $oem_part_number = '';
 
     public string $part_name = '';
@@ -30,17 +28,6 @@ class RequestForm extends Component
     public string $reference_url = '';
 
     public string $memo = '';
-
-    /**
-     * Not a real field -- never bound to an input, never reset. Purely an
-     * anchor Livewire's own $this->validate() can validate the "at least
-     * one of vin/oem_part_number/reference_url" rule against (see rules()):
-     * Livewire requires every rules() key to be a real component property,
-     * and Laravel's validator skips a rule entirely for an attribute
-     * that's completely absent, so this has to both exist and stay
-     * permanently non-empty.
-     */
-    public string $identifier = 'n/a';
 
     /**
      * Why the form is hidden in favour of a "what's next" message, instead
@@ -97,14 +84,6 @@ class RequestForm extends Component
         return (new SubmitPartRequestRequest)->rules();
     }
 
-    /**
-     * @return array<string, string>
-     */
-    protected function messages(): array
-    {
-        return (new SubmitPartRequestRequest)->messages();
-    }
-
     public function submit(SubmitPartRequestAction $action): void
     {
         // Belt-and-suspenders (CONVENTIONS.md): the form is already hidden
@@ -125,8 +104,7 @@ class RequestForm extends Component
             PartType::from($validated['part_type']),
             $validated['maker'],
             $validated['car_model'],
-            $validated['vin'] ?: null,
-            $validated['mfg_date'] ?: null,
+            $validated['vin'],
             $validated['oem_part_number'] ?: null,
             $validated['part_name'],
             $validated['reference_url'] ?: null,
@@ -134,7 +112,7 @@ class RequestForm extends Component
         );
 
         $this->reset([
-            'part_type', 'maker', 'car_model', 'vin', 'mfg_date',
+            'part_type', 'maker', 'car_model', 'vin',
             'oem_part_number', 'part_name', 'reference_url', 'memo',
         ]);
 

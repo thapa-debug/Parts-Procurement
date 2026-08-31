@@ -112,6 +112,7 @@ it('resets the form and shows an inline confirmation after submitting', function
         ->set('part_type', PartType::Both->value)
         ->set('maker', 'Nissan')
         ->set('car_model', 'Skyline')
+        ->set('vin', 'BNR34-123456')
         ->set('oem_part_number', '81110-60M00')
         ->set('part_name', 'Rear bumper')
         ->call('submit')
@@ -149,12 +150,12 @@ it('rejects an incomplete submission', function () {
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
         ->call('submit')
-        ->assertHasErrors(['part_type', 'maker', 'car_model', 'part_name', 'identifier']);
+        ->assertHasErrors(['part_type', 'maker', 'car_model', 'part_name', 'vin']);
 
     expect(PartRequest::count())->toBe(0);
 });
 
-it('rejects submission when vin, oem_part_number, and reference_url are all left blank', function () {
+it('rejects a submission without a vin, even with oem_part_number and reference_url both present', function () {
     $buyer = actingBuyer();
 
     Livewire::actingAs($buyer)
@@ -163,23 +164,24 @@ it('rejects submission when vin, oem_part_number, and reference_url are all left
         ->set('maker', 'Toyota')
         ->set('car_model', 'Crown')
         ->set('part_name', 'Headlight')
-        ->call('submit')
-        ->assertHasErrors(['identifier'])
-        ->assertSee(__('buyer.request_form.identifier_required_error'));
-
-    expect(PartRequest::count())->toBe(0);
-});
-
-it('accepts submission with only a reference_url as the identifier', function () {
-    $buyer = actingBuyer();
-
-    Livewire::actingAs($buyer)
-        ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
-        ->set('maker', 'Toyota')
-        ->set('car_model', 'Crown')
-        ->set('part_name', 'Headlight')
+        ->set('oem_part_number', '81110-60M00')
         ->set('reference_url', 'https://example.com/listing')
+        ->call('submit')
+        ->assertHasErrors(['vin']);
+
+    expect(PartRequest::count())->toBe(0);
+});
+
+it('accepts a submission with a vin and no oem_part_number or reference_url', function () {
+    $buyer = actingBuyer();
+
+    Livewire::actingAs($buyer)
+        ->test(RequestForm::class)
+        ->set('part_type', PartType::Used->value)
+        ->set('maker', 'Toyota')
+        ->set('car_model', 'Crown')
+        ->set('part_name', 'Headlight')
+        ->set('vin', 'GRS184-0002255')
         ->call('submit')
         ->assertHasNoErrors();
 
