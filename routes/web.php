@@ -13,7 +13,9 @@ use App\Livewire\Admin\VendorMaster;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\PasswordChange;
 use App\Livewire\Auth\Register;
+use App\Livewire\Buyer\RequestDetail as BuyerRequestDetail;
 use App\Livewire\Buyer\RequestForm;
+use App\Livewire\Buyer\RequestList as BuyerRequestList;
 use App\Livewire\Vendor\Inbox;
 use App\Livewire\Vendor\RequestResponse;
 use Illuminate\Support\Facades\Route;
@@ -58,6 +60,8 @@ Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(fun
 
 Route::prefix('buyer')->name('buyer.')->middleware(['auth', 'buyer'])->group(function () {
     Route::get('/requests/new', RequestForm::class)->name('requests.create');
+    Route::get('/requests', BuyerRequestList::class)->name('requests.index');
+    Route::get('/requests/{partRequest}', BuyerRequestDetail::class)->name('requests.show');
 });
 
 Route::prefix('vendor')->name('vendor.')->middleware(['auth', 'vendor'])->group(function () {

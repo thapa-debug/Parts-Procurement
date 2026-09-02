@@ -34,6 +34,9 @@
                                     {{ __('app.nav.settings') }}
                                 </a>
                             @elseif (auth()->user()->isBuyer())
+                                <a href="{{ route('buyer.requests.index') }}" class="hover:text-ink">
+                                    {{ __('app.nav.my_requests') }}
+                                </a>
                                 <a href="{{ route('buyer.requests.create') }}" class="hover:text-ink">
                                     {{ __('app.nav.new_request') }}
                                 </a>

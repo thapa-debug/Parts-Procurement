@@ -133,3 +133,30 @@ it('lets only an admin present a quote to the buyer', function () {
         ->and($buyer->can('presentQuote', $request))->toBeFalse()
         ->and($vendor->can('presentQuote', $request))->toBeFalse();
 });
+
+it('lets only a buyer view their own "my requests" list -- never an admin, even though admin sees the real board elsewhere', function () {
+    $buyer = User::factory()->buyer()->create();
+    $admin = User::factory()->admin()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    expect($buyer->can('viewOwnRequests', PartRequest::class))->toBeTrue()
+        ->and($admin->can('viewOwnRequests', PartRequest::class))->toBeFalse()
+        ->and($vendor->can('viewOwnRequests', PartRequest::class))->toBeFalse();
+});
+
+it('lets a buyer view only their own request through viewOwn, never another buyer\'s or an admin\'s bypass', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create();
+
+    $otherBuyer = User::factory()->buyer()->create();
+    BuyerProfile::factory()->for($otherBuyer)->create();
+
+    $admin = User::factory()->admin()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    expect($owner->can('viewOwn', $request))->toBeTrue()
+        ->and($otherBuyer->can('viewOwn', $request))->toBeFalse()
+        ->and($admin->can('viewOwn', $request))->toBeFalse()
+        ->and($vendor->can('viewOwn', $request))->toBeFalse();
+});

@@ -53,4 +53,56 @@ return [
         'submitted' => 'Request :code submitted. Our team will review it and reach out with next steps.',
     ],
 
+    'request_list' => [
+        'title' => 'My Requests',
+        'heading' => 'My requests',
+        'subheading' => "Every part request you've submitted, and its current status.",
+        'empty' => "You haven't submitted any requests yet.",
+        'view_link' => 'View',
+
+        'table' => [
+            'code' => 'Request',
+            'details' => 'Car / Part',
+            'status' => 'Status',
+            'requested_at' => 'Requested',
+        ],
+
+        'status' => [
+            'new' => 'Submitted',
+            'vendor_inquiry' => 'Checking availability',
+            'quoted' => 'Quote ready',
+            'paid' => 'Processing',
+            'ordered_to_vendor' => 'Ordered',
+            'procurement_failed' => 'Re-quoting',
+            'shipped' => 'Shipped',
+            'received' => 'Received',
+        ],
+    ],
+
+    'request_detail' => [
+        'back_link' => 'Back to my requests',
+
+        'details_section' => 'Request details',
+        'part_type_label' => 'Part type',
+        'part_type' => [
+            'used' => 'Used',
+            'new' => 'New',
+            'both' => 'Either',
+        ],
+        'maker_label' => 'Maker',
+        'car_model_label' => 'Car model',
+        'vin_label' => 'VIN / chassis number',
+        'oem_part_number_label' => 'OEM part number',
+        'part_name_label' => 'Part name & details',
+        'reference_url_label' => 'Reference URL',
+        'memo_label' => 'Notes',
+        'requested_at_label' => 'Requested',
+        'not_provided' => '—',
+
+        'quote_section' => 'Your quote',
+        'quote_price_label' => 'Price',
+        'quote_quality_label' => 'Quality rank',
+        'awaiting_quote' => "We're still checking availability with our vendors. We'll notify you as soon as a quote is ready.",
+    ],
+
 ];
