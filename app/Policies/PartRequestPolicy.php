@@ -8,15 +8,41 @@ use App\Models\User;
 class PartRequestPolicy
 {
     /**
-     * The admin board (any admin, today just `isAdmin()` -- this is the
-     * slot CLAUDE.md §4's owner/staff permission split layers into later,
-     * since requests/quotes are operational work both tiers do) and a
-     * buyer's own "my requests" list both go through this same check;
-     * scoping to "own only" happens in the buyer's list query, not here.
+     * Coarse, admin-or-buyer structural check -- currently unused by any
+     * actual screen (the admin board uses the narrower viewBoard() below,
+     * and the buyer's own list uses viewOwnRequests()), kept only because
+     * it's the conventional Policy method Laravel expects to exist.
      */
     public function viewAny(User $user): bool
     {
         return $user->isAdmin() || $user->isBuyer();
+    }
+
+    /**
+     * The buyer's own "my requests" list -- buyer-only, no admin bypass.
+     * Deliberately not viewAny() above: that also permits an admin, and
+     * admin has its own dedicated /admin/requests board -- letting an
+     * admin through this buyer-only screen's component (bypassing route
+     * middleware in a Livewire::test(), the same gap viewBoard vs view()
+     * already guards against elsewhere in this policy) would be a second,
+     * unintended way to reach the same data. Scoping to "own only" happens
+     * in the list's own query, not here.
+     */
+    public function viewOwnRequests(User $user): bool
+    {
+        return $user->isBuyer();
+    }
+
+    /**
+     * One specific request, from the buyer's own portal -- buyer AND owner,
+     * no admin bypass, for the same reason as viewOwnRequests() above.
+     * Deliberately not view() below: that permits an admin (correctly, for
+     * the admin's own screens), which would let an admin's session mount
+     * this buyer-only component too if it were ever reached directly.
+     */
+    public function viewOwn(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isBuyer() && $user->buyerProfile?->id === $partRequest->buyer_id;
     }
 
     /**
