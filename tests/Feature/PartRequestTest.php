@@ -122,3 +122,14 @@ it('lets a vendor respond only to a request actually broadcast to them, never on
         ->and($buyer->can('respond', $request))->toBeFalse()
         ->and($admin->can('respond', $request))->toBeFalse();
 });
+
+it('lets only an admin present a quote to the buyer', function () {
+    $admin = User::factory()->admin()->create();
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+
+    expect($admin->can('presentQuote', $request))->toBeTrue()
+        ->and($buyer->can('presentQuote', $request))->toBeFalse()
+        ->and($vendor->can('presentQuote', $request))->toBeFalse();
+});

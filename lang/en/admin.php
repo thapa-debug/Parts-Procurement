@@ -262,8 +262,22 @@ return [
         'broadcast_error' => 'Something went wrong sending this inquiry. Please refresh the page and try again.',
 
         'sent_section' => 'Sent to vendors',
-        'sent_help' => 'This request has already been broadcast -- no response deadline, so vendors can quote whenever they\'re ready. Quote comparison lands in a later slice.',
+        'sent_help' => 'This request has already been broadcast -- no response deadline, so vendors can quote whenever they\'re ready.',
         'invited_at_column' => 'Invited',
+
+        'compare_section' => 'Vendor quotes',
+        'compare_help' => 'Compare each vendor\'s reply and present one to the buyer as a priced quote.',
+        'compare_locked_help' => 'A quote has already been presented to the buyer. Vendor replies are shown here for reference.',
+        'no_stock_badge' => 'No stock',
+        'presented_badge' => 'Presented to buyer',
+        'cost_price_column' => 'Cost price',
+        'buyer_price_column' => 'Buyer price',
+        'quality_rank_column' => 'Quality',
+        'lead_time_column' => 'Lead time',
+        'present_quote_button' => 'Present to buyer',
+        'present_quote_confirm' => 'Present this quote (¥:price) to the buyer? This snapshots the price and cannot be undone.',
+        'present_quote_confirmation' => 'Quote presented to the buyer at ¥:price.',
+        'present_quote_error' => 'Something went wrong presenting this quote. Please refresh the page and try again.',
     ],
 
 ];

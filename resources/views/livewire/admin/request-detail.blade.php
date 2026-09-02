@@ -80,6 +80,12 @@
         </div>
     @endif
 
+    @if ($justPresentedBuyerPrice !== null)
+        <div class="mt-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
+            {{ __('admin.request_detail.present_quote_confirmation', ['price' => number_format($justPresentedBuyerPrice)]) }}
+        </div>
+    @endif
+
     @if ($partRequest->status === \App\Enums\RequestStatus::New)
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.broadcast_section') }}</h2>
@@ -158,6 +164,98 @@
                         @endforeach
                     </tbody>
                 </table>
+            </div>
+        </div>
+    @endif
+
+    @if ($vendorResponses->isNotEmpty())
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted">
+                {{ $partRequest->status === \App\Enums\RequestStatus::VendorInquiry
+                    ? __('admin.request_detail.compare_help')
+                    : __('admin.request_detail.compare_locked_help') }}
+            </p>
+
+            @error('presentQuote')
+                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+            @enderror
+
+            <div class="mt-4 space-y-4">
+                @foreach ($vendorResponses as $response)
+                    @php $pricing = $vendorResponsePricing->get($response->id); @endphp
+                    <div class="rounded-md border p-4 {{ $partRequest->selected_response_id === $response->id ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
+                        <div class="flex flex-wrap items-start justify-between gap-3">
+                            <div>
+                                <span class="font-medium text-ink">{{ $response->vendor->company_name }}</span>
+                                <span class="ml-2 text-xs text-ink-muted">{{ $response->vendor->contact_person }}</span>
+                                @if ($partRequest->selected_response_id === $response->id)
+                                    <span class="ml-2 inline-flex rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
+                                        {{ __('admin.request_detail.presented_badge') }}
+                                    </span>
+                                @endif
+                            </div>
+
+                            @if ($response->is_no_stock)
+                                <span class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                                    {{ __('admin.request_detail.no_stock_badge') }}
+                                </span>
+                            @endif
+                        </div>
+
+                        @if (! $response->is_no_stock)
+                            <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
+                                <div>
+                                    <dt class="text-ink-muted">{{ __('admin.request_detail.cost_price_column') }}</dt>
+                                    <dd class="mt-0.5 font-mono font-medium text-ink">¥{{ number_format($response->cost_price) }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_price_column') }}</dt>
+                                    <dd class="mt-0.5 font-mono font-medium text-ink">
+                                        {{ $pricing ? '¥'.number_format($pricing['buyer_price']) : __('admin.request_detail.not_provided') }}
+                                    </dd>
+                                </div>
+                                <div>
+                                    <dt class="text-ink-muted">{{ __('admin.request_detail.quality_rank_column') }}</dt>
+                                    <dd class="mt-0.5 font-medium text-ink">{{ __('enums.quality_rank.'.$response->quality_rank->value) }}</dd>
+                                </div>
+                                <div>
+                                    <dt class="text-ink-muted">{{ __('admin.request_detail.lead_time_column') }}</dt>
+                                    <dd class="mt-0.5 font-medium text-ink">{{ __('enums.lead_time.'.$response->lead_time->value) }}</dd>
+                                </div>
+                            </dl>
+
+                            @if ($response->comment)
+                                <p class="mt-3 text-sm text-ink">{{ $response->comment }}</p>
+                            @endif
+
+                            @if ($response->photos->isNotEmpty())
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @foreach ($response->photos as $photo)
+                                        <a href="{{ $photo->url() }}" target="_blank" rel="noopener noreferrer">
+                                            <img src="{{ $photo->url() }}" class="h-16 w-16 rounded-md border border-line object-cover">
+                                        </a>
+                                    @endforeach
+                                </div>
+                            @endif
+
+                            @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
+                                <div class="mt-3">
+                                    <button
+                                        type="button"
+                                        wire:click="presentQuote({{ $response->id }})"
+                                        wire:confirm="{{ __('admin.request_detail.present_quote_confirm', ['price' => number_format($pricing['buyer_price'] ?? 0)]) }}"
+                                        wire:loading.attr="disabled"
+                                        wire:target="presentQuote({{ $response->id }})"
+                                        class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                    >
+                                        {{ __('admin.request_detail.present_quote_button') }}
+                                    </button>
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                @endforeach
             </div>
         </div>
     @endif

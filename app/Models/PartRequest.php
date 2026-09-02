@@ -12,17 +12,18 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
     'buyer_id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
     'oem_part_number', 'part_name', 'reference_url', 'memo',
-    'status', 'applied_rate', 'applied_min_fee', 'buyer_price',
-    'shipping_method', 'shipping_fee',
+    'status', 'cost_price', 'applied_rate', 'applied_min_fee', 'buyer_price',
+    'selected_response_id', 'shipping_method', 'shipping_fee',
 ])]
 class PartRequest extends Model
 {
     /** @use HasFactory<PartRequestFactory> */
-    use HasFactory;
+    use HasFactory, SoftDeletes;
 
     /**
      * @var array<string, string>
@@ -57,6 +58,18 @@ class PartRequest extends Model
     public function vendorResponses(): HasMany
     {
         return $this->hasMany(VendorResponse::class);
+    }
+
+    /**
+     * The vendor response presented to the buyer as this request's quote
+     * (CLAUDE.md §6.2) -- set once, by PresentQuoteAction, alongside the
+     * snapshotted price columns.
+     *
+     * @return BelongsTo<VendorResponse, $this>
+     */
+    public function selectedResponse(): BelongsTo
+    {
+        return $this->belongsTo(VendorResponse::class, 'selected_response_id');
     }
 
     /**

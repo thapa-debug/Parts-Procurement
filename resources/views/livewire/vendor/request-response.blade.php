@@ -83,7 +83,7 @@
                     {{ __('vendor.request_response.submitted_quote', [
                         'price' => number_format($myResponse->cost_price),
                         'rank' => strtoupper($myResponse->quality_rank->value),
-                        'lead_time' => __('vendor.request_response.lead_time.'.$myResponse->lead_time->value),
+                        'lead_time' => __('enums.lead_time.'.$myResponse->lead_time->value),
                     ]) }}
                 @endif
             </p>
@@ -121,7 +121,7 @@
                         >
                             <option value=""></option>
                             @foreach (\App\Enums\QualityRank::cases() as $option)
-                                <option value="{{ $option->value }}">{{ __('vendor.request_response.quality_rank.'.$option->value) }}</option>
+                                <option value="{{ $option->value }}">{{ __('enums.quality_rank.'.$option->value) }}</option>
                             @endforeach
                         </select>
                         @error('quality_rank')
@@ -141,7 +141,7 @@
                     >
                         <option value=""></option>
                         @foreach (\App\Enums\LeadTime::cases() as $option)
-                            <option value="{{ $option->value }}">{{ __('vendor.request_response.lead_time.'.$option->value) }}</option>
+                            <option value="{{ $option->value }}">{{ __('enums.lead_time.'.$option->value) }}</option>
                         @endforeach
                     </select>
                     @error('lead_time')
