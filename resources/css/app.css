@@ -33,3 +33,10 @@ body {
     background-color: var(--color-surface-muted);
     color: var(--color-ink);
 }
+
+/* Alpine.js hides [x-cloak] elements itself once it boots -- this rule only
+   covers the moment before that, so an x-show-toggled element doesn't flash
+   visible while the page is still loading. */
+[x-cloak] {
+    display: none !important;
+}

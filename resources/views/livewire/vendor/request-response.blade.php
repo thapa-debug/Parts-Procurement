@@ -149,7 +149,44 @@
                     @enderror
                 </div>
 
-                <div>
+                <div
+                    x-data="{
+                        uploading: false,
+                        uploadedCount: 0,
+                        totalCount: 0,
+                        async selectPhotos(event) {
+                            const files = Array.from(event.target.files);
+                            event.target.value = '';
+                            if (files.length === 0) return;
+
+                            this.uploading = true;
+                            this.uploadedCount = 0;
+                            this.totalCount = files.length;
+
+                            // One $wire.$upload() call per file, awaited in
+                            // sequence -- never $wire.$uploadMultiple(), which
+                            // Livewire's S3 driver rejects outright. Each call
+                            // is a genuine single-file upload
+                            // (UploadManager.upload() always sets
+                            // `multiple: false`), so this stays S3-safe no
+                            // matter how many files the native dialog let the
+                            // vendor pick at once. Sequential, not
+                            // concurrent, to avoid overlapping requests
+                            // against the local dev server's single-threaded
+                            // built-in PHP server.
+                            for (const file of files) {
+                                await new Promise((resolve) => {
+                                    $wire.$upload('photos', file,
+                                        () => { this.uploadedCount++; resolve(); },
+                                        () => { this.uploadedCount++; resolve(); },
+                                    );
+                                });
+                            }
+
+                            this.uploading = false;
+                        },
+                    }"
+                >
                     <label for="photos" class="block text-sm font-medium text-ink">
                         {{ __('vendor.request_response.photos_label') }} <x-required-mark />
                     </label>
@@ -158,13 +195,26 @@
                         <input
                             id="photos"
                             type="file"
-                            wire:model="photos"
+                            multiple
                             accept="image/*"
+                            x-on:change="selectPhotos($event)"
                             class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
                         >
                     @endif
 
-                    <p class="mt-1 text-xs text-ink-muted">
+                    {{-- Two plain elements toggled with x-show (visibility
+                         only), not x-if/<template> (which clones/destroys
+                         DOM content) -- the count/max text below is
+                         server-rendered on every Livewire update exactly
+                         like the thumbnails are, so it must stay a normal,
+                         continuously-present element for Livewire's morph
+                         to keep it in sync. A <template x-if> block instead
+                         left it showing whatever was baked in the one time
+                         Alpine last cloned it, which could go stale. --}}
+                    <p class="mt-1 text-xs text-ink-muted" x-show="uploading" x-cloak>
+                        {{ __('vendor.request_response.uploading') }} (<span x-text="uploadedCount"></span>/<span x-text="totalCount"></span>)
+                    </p>
+                    <p class="mt-1 text-xs text-ink-muted" x-show="!uploading">
                         {{ __('vendor.request_response.photos_help', ['count' => count($photos), 'max' => $maxPhotos]) }}
                     </p>
 
