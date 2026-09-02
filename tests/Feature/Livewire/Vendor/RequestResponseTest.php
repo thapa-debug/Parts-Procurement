@@ -11,6 +11,7 @@ use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
+use Livewire\Features\SupportFileUploads\S3DoesntSupportMultipleFileUploads;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -71,11 +72,15 @@ it('submits a quote with multiple photos, added one at a time, and shows a confi
 
     // Each ->set() call below passes a single UploadedFile (never an array)
     // -- Livewire's test harness maps that to $isMultiple = false, exactly
-    // mirroring how a real, non-`multiple` file input behaves in the
-    // browser. That's what keeps this S3-safe: if the accumulation pattern
-    // ever regressed to reporting more than one file per selection, this
-    // would throw Livewire's own S3DoesntSupportMultipleFileUploads here,
-    // since the disk is pinned to 's3' above.
+    // mirroring both what a real single-file input does AND what the
+    // Blade view's Alpine `selectPhotos()` handler does in the browser:
+    // it calls $wire.$upload() once per file from the native multi-select
+    // dialog's FileList, sequentially, never $wire.$uploadMultiple(). That's
+    // what keeps this S3-safe: if the accumulation pattern ever regressed
+    // to reporting more than one file per call, this would throw Livewire's
+    // own S3DoesntSupportMultipleFileUploads here, since the disk is pinned
+    // to 's3' above. See the dedicated regression test below for the
+    // explicit "an array still throws" guard.
     Livewire::actingAs($vendorUser)
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->set('cost_price', '45000')
@@ -95,6 +100,33 @@ it('submits a quote with multiple photos, added one at a time, and shows a confi
         ->and($response->vendor_id)->toBe($vendorProfile->id)
         ->and($response->cost_price)->toBe(45000)
         ->and($response->photos)->toHaveCount(2);
+});
+
+it('rejects a batched multi-file upload outright under S3, guarding against ever reintroducing `multiple`', function () {
+    // Regression guard: if the Blade view's file input ever regains the
+    // `multiple` HTML attribute bound via wire:model (Livewire's native,
+    // batched upload path) -- or the Alpine handler is ever changed to
+    // call $wire.$uploadMultiple() instead of looping $wire.$upload() --
+    // this is exactly the failure it would hit in production. Passing an
+    // array to set() here reproduces that: Livewire's own testing harness
+    // (Testable::set()) maps "value is an array of UploadedFile" to
+    // $isMultiple = true, the same signal a real `multiple` input sends.
+    config(['filesystems.default' => 's3']);
+    Storage::fake('s3');
+
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    $attempt = fn () => Livewire::actingAs($vendorUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->set('photos', [
+            UploadedFile::fake()->image('a.jpg'),
+            UploadedFile::fake()->image('b.jpg'),
+        ]);
+
+    expect($attempt)->toThrow(S3DoesntSupportMultipleFileUploads::class);
 });
 
 it('caps photos at MAX_PHOTOS and lets the vendor remove one before submitting', function () {

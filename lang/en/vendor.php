@@ -62,6 +62,7 @@ return [
         ],
         'photos_label' => 'Part photos',
         'photos_help' => 'Photos of the actual part -- different angles, any damage. :count of :max added.',
+        'uploading' => 'Uploading',
         'max_photos_error' => 'You can attach up to :max photos.',
         'remove_photo' => 'Remove photo',
         'comment_label' => 'Condition notes',
