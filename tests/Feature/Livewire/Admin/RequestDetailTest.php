@@ -1,10 +1,14 @@
 <?php
 
+use App\Enums\LeadTime;
+use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Livewire\Admin\RequestDetail;
 use App\Models\PartRequest;
+use App\Models\Setting;
 use App\Models\User;
 use App\Models\VendorProfile;
+use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 
@@ -124,4 +128,98 @@ it('rejects sending with no vendors selected', function () {
         ->assertSet('sentToCount', null);
 
     expect($request->fresh()->status)->toBe(RequestStatus::New);
+});
+
+// --- comparing and presenting quotes ---------------------------------------
+
+it('does not show the compare section until at least one vendor has responded', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('admin.request_detail.compare_section'));
+});
+
+it('shows each vendor response\'s cost, computed buyer price, quality rank, lead time, and comment', function () {
+    Setting::set('margin_rate', 20, 'integer');
+    Setting::set('margin_min_fee', 2000, 'integer');
+
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create(['company_name' => 'Yamato Auto']);
+    VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'quality_rank' => QualityRank::A,
+        'lead_time' => LeadTime::Within1Week,
+        'comment' => 'Clean, no visible damage.',
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee('Yamato Auto')
+        ->assertSee('45,000')
+        // max(45000 * 20%, 2000) = 9000 -> buyer_price 54000
+        ->assertSee('54,000')
+        ->assertSee(__('enums.quality_rank.a'))
+        ->assertSee(__('enums.lead_time.within_1_week'))
+        ->assertSee('Clean, no visible damage.')
+        ->assertSee(__('admin.request_detail.present_quote_button'));
+});
+
+it('shows a no-stock badge instead of price fields, with no present button, for a no-stock reply', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    VendorResponse::factory()->noStock()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.no_stock_badge'))
+        ->assertDontSee(__('admin.request_detail.present_quote_button'));
+});
+
+it('presents a quote, snapshotting the price and showing a confirmation', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->call('presentQuote', $response->id)
+        ->assertSet('justPresentedBuyerPrice', 54_000)
+        ->assertSee(__('admin.request_detail.present_quote_confirmation', ['price' => '54,000']));
+
+    $fresh = $request->fresh();
+    expect($fresh->status)->toBe(RequestStatus::Quoted)
+        ->and($fresh->selected_response_id)->toBe($response->id)
+        ->and($fresh->buyer_price)->toBe(54_000);
+});
+
+it('hides the present button and shows the locked help text once a quote has already been presented', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+    ]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->call('presentQuote', $response->id)
+        ->assertSee(__('admin.request_detail.compare_locked_help'))
+        ->assertSee(__('admin.request_detail.presented_badge'))
+        ->assertDontSee(__('admin.request_detail.present_quote_button'));
 });

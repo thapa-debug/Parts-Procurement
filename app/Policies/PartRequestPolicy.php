@@ -101,6 +101,20 @@ class PartRequestPolicy
     }
 
     /**
+     * Presenting a priced quote to the buyer (見積もり提示) is operational
+     * admin work -- today just `isAdmin()`, the same owner/staff permission
+     * slot as broadcast()/viewBoard()/create(). Which response is eligible
+     * (must belong to this request, must not be a no-stock reply) and
+     * whether the request itself is in the right status are business rules
+     * PresentQuoteAction enforces itself, not role checks, so they don't
+     * belong here.
+     */
+    public function presentQuote(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies
