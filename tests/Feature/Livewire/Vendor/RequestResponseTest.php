@@ -58,7 +58,7 @@ it('blocks an unverified vendor from seeing the response form', function () {
 
 // --- submitting a quote -----------------------------------------------------
 
-it('submits a quote with a photo and shows a confirmation', function () {
+it('submits a quote with multiple photos, added one at a time, and shows a confirmation', function () {
     // Pin the disk regardless of the developer's own local FILESYSTEM_DISK
     // override (CONVENTIONS.md "Local dev without S3").
     config(['filesystems.default' => 's3']);
@@ -69,13 +69,22 @@ it('submits a quote with a photo and shows a confirmation', function () {
     $request = PartRequest::factory()->create();
     $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
 
+    // Each ->set() call below passes a single UploadedFile (never an array)
+    // -- Livewire's test harness maps that to $isMultiple = false, exactly
+    // mirroring how a real, non-`multiple` file input behaves in the
+    // browser. That's what keeps this S3-safe: if the accumulation pattern
+    // ever regressed to reporting more than one file per selection, this
+    // would throw Livewire's own S3DoesntSupportMultipleFileUploads here,
+    // since the disk is pinned to 's3' above.
     Livewire::actingAs($vendorUser)
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->set('cost_price', '45000')
         ->set('quality_rank', QualityRank::A->value)
         ->set('lead_time', LeadTime::Within1Week->value)
         ->set('comment', 'Clean, no damage.')
-        ->set('photo', UploadedFile::fake()->image('bumper.jpg'))
+        ->set('photos', UploadedFile::fake()->image('bumper-front.jpg'))
+        ->set('photos', UploadedFile::fake()->image('bumper-side.jpg'))
+        ->assertSet('photos', fn ($photos) => count($photos) === 2)
         ->call('sendResponse')
         ->assertSet('submitted', true)
         ->assertHasNoErrors();
@@ -85,7 +94,31 @@ it('submits a quote with a photo and shows a confirmation', function () {
     expect($response->part_request_id)->toBe($request->id)
         ->and($response->vendor_id)->toBe($vendorProfile->id)
         ->and($response->cost_price)->toBe(45000)
-        ->and($response->photos)->toHaveCount(1);
+        ->and($response->photos)->toHaveCount(2);
+});
+
+it('caps photos at MAX_PHOTOS and lets the vendor remove one before submitting', function () {
+    config(['filesystems.default' => 's3']);
+    Storage::fake('s3');
+
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    $component = Livewire::actingAs($vendorUser)->test(RequestResponse::class, ['partRequest' => $request]);
+
+    foreach (range(1, RequestResponse::MAX_PHOTOS + 1) as $i) {
+        $component->set('photos', UploadedFile::fake()->image("photo-{$i}.jpg"));
+    }
+
+    $component
+        ->assertSet('photos', fn ($photos) => count($photos) === RequestResponse::MAX_PHOTOS)
+        ->assertHasErrors('photos');
+
+    $component->call('removePhoto', 0)
+        ->assertSet('photos', fn ($photos) => count($photos) === RequestResponse::MAX_PHOTOS - 1)
+        ->assertHasNoErrors('photos');
 });
 
 it('rejects a quote missing required fields', function () {
@@ -97,7 +130,7 @@ it('rejects a quote missing required fields', function () {
     Livewire::actingAs($vendorUser)
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->call('sendResponse')
-        ->assertHasErrors(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photo']);
+        ->assertHasErrors(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
 
     expect(VendorResponse::count())->toBe(0);
 });

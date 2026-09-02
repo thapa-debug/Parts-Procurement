@@ -43,6 +43,34 @@ it('records a priced quote with its photos for a vendor actually invited to the 
     Storage::disk('s3')->assertExists($response->photos->first()->path);
 });
 
+it('records every photo passed, not just the first, each stored on the same disk', function () {
+    config(['filesystems.default' => 's3']);
+    Storage::fake('s3');
+    $request = PartRequest::factory()->create();
+    $vendor = VendorProfile::factory()->create();
+    $request->vendors()->attach($vendor->id, ['invited_at' => now()]);
+
+    $photos = [
+        UploadedFile::fake()->image('front.jpg'),
+        UploadedFile::fake()->image('side.jpg'),
+        UploadedFile::fake()->image('damage-closeup.jpg'),
+    ];
+
+    $response = app(SubmitVendorResponseAction::class)->execute($request, $vendor, [
+        'cost_price' => 45_000,
+        'quality_rank' => QualityRank::A->value,
+        'lead_time' => LeadTime::Within1Week->value,
+        'comment' => 'Clean, no visible damage.',
+    ], $photos);
+
+    expect($response->photos)->toHaveCount(3)
+        ->and($response->photos->pluck('disk')->unique()->all())->toBe(['s3']);
+
+    foreach ($response->photos as $photo) {
+        Storage::disk('s3')->assertExists($photo->path);
+    }
+});
+
 it('records a one-tap no-stock reply with no price, rank, lead time, or photos', function () {
     $request = PartRequest::factory()->create();
     $vendor = VendorProfile::factory()->create();
