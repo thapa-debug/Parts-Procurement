@@ -21,6 +21,13 @@ class RequestResponse extends Component
     use WithFileUploads;
 
     /**
+     * Vendors can attach up to this many photos (different angles, damage,
+     * etc.) -- CLAUDE.md doesn't pin an exact number; 6 is a reasonable
+     * middle of the requested 5-8 range.
+     */
+    public const MAX_PHOTOS = 6;
+
+    /**
      * Only the id is kept as component state -- never the PartRequest
      * model itself. A public Eloquent-model property gets its full
      * attribute set serialized into Livewire's client-side snapshot, which
@@ -40,13 +47,22 @@ class RequestResponse extends Component
     public string $comment = '';
 
     /**
-     * A single file, not an array -- Livewire's S3 upload driver flatly
-     * rejects a "multiple" upload (S3DoesntSupportMultipleFileUploads),
-     * a restriction tied to the property being array-typed, not just the
-     * blade input's `multiple` HTML attribute. Matches the prototype's own
-     * one-photo-per-response behaviour anyway.
+     * Array-typed, but the file input in the Blade view deliberately has no
+     * `multiple` HTML attribute. Livewire's S3 upload driver flatly rejects
+     * a request where the client reports more than one file selected in a
+     * single change event (`S3DoesntSupportMultipleFileUploads`) -- but a
+     * single-file input bound to an array property is a documented, fully
+     * S3-safe Livewire pattern: each selection uploads as one file
+     * (`$isMultiple` is false), and `WithFileUploads::_finishUpload()`
+     * itself appends it onto the existing array rather than replacing it
+     * (see the vendor's own "if the property is an array, but the upload
+     * ISN'T set to multiple, then APPEND" comment in that method). The
+     * vendor re-opens the same picker to add each additional photo one at
+     * a time; removePhoto() below lets them drop one before submitting.
+     *
+     * @var array<int, TemporaryUploadedFile>
      */
-    public ?TemporaryUploadedFile $photo = null;
+    public array $photos = [];
 
     /**
      * @var 'unverified'|null
@@ -81,8 +97,30 @@ class RequestResponse extends Component
             'quality_rank' => ['required', Rule::enum(QualityRank::class)],
             'lead_time' => ['required', Rule::enum(LeadTime::class)],
             'comment' => ['required', 'string', 'max:2000'],
-            'photo' => ['required', 'image', 'max:10240'],
+            'photos' => ['required', 'array', 'min:1', 'max:'.self::MAX_PHOTOS],
+            'photos.*' => ['image', 'max:10240'],
         ];
+    }
+
+    /**
+     * Belt-and-suspenders against MAX_PHOTOS: the Blade view hides the
+     * file input once the cap is reached, but a selection made just
+     * before that re-render still lands here. Drop whatever's newest
+     * beyond the cap rather than silently accepting it.
+     */
+    public function updatedPhotos(): void
+    {
+        if (count($this->photos) > self::MAX_PHOTOS) {
+            $this->photos = array_slice($this->photos, 0, self::MAX_PHOTOS);
+            $this->addError('photos', __('vendor.request_response.max_photos_error', ['max' => self::MAX_PHOTOS]));
+        }
+    }
+
+    public function removePhoto(int $index): void
+    {
+        unset($this->photos[$index]);
+        $this->photos = array_values($this->photos);
+        $this->resetErrorBag('photos');
     }
 
     public function sendResponse(SubmitVendorResponseAction $action): void
@@ -101,7 +139,7 @@ class RequestResponse extends Component
                 'lead_time' => $validated['lead_time'],
                 'comment' => $validated['comment'],
                 'is_no_stock' => false,
-            ], [$validated['photo']]);
+            ], $validated['photos']);
         } catch (VendorResponseNotAllowedException $e) {
             report($e);
             $this->addError('cost_price', __('vendor.request_response.submit_error'));
@@ -110,7 +148,7 @@ class RequestResponse extends Component
         }
 
         $this->submitted = true;
-        $this->reset(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photo']);
+        $this->reset(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
     }
 
     public function sendNoStock(SubmitVendorResponseAction $action): void
@@ -158,6 +196,7 @@ class RequestResponse extends Component
         return view('livewire.vendor.request-response', [
             'partRequest' => $partRequest,
             'myResponse' => $myResponse,
+            'maxPhotos' => self::MAX_PHOTOS,
         ])->title($partRequest->request_code);
     }
 }
