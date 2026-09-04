@@ -2,6 +2,7 @@
 
 use App\Livewire\Admin\BuyerDetail;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
@@ -26,10 +27,11 @@ it('does not let the buyer themselves mount their own admin detail component', f
 
 it('lets an admin mount the buyer detail component with current values pre-filled', function () {
     $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create();
     $profile = BuyerProfile::factory()->create([
         'company_name' => 'Acme Imports',
         'phone' => '090-0000-0000',
-        'default_destination_country' => 'Australia',
+        'country_id' => $country->id,
         'default_yard' => 'Oceania Yard',
     ]);
 
@@ -38,7 +40,7 @@ it('lets an admin mount the buyer detail component with current values pre-fille
         ->assertSee('Acme Imports')
         ->assertSet('company_name', 'Acme Imports')
         ->assertSet('phone', '090-0000-0000')
-        ->assertSet('default_destination_country', 'Australia')
+        ->assertSet('country_id', (string) $country->id)
         ->assertSet('default_yard', 'Oceania Yard');
 });
 
@@ -66,7 +68,7 @@ it('renders buyer-specific fields and labels, not vendor-only ones', function ()
 
     Livewire::actingAs($admin)
         ->test(BuyerDetail::class, ['buyerProfile' => $profile])
-        ->assertSee(__('admin.buyer_master.create_form.default_destination_country_label'))
+        ->assertSee(__('admin.buyer_master.create_form.country_label'))
         ->assertSee(__('admin.buyer_master.create_form.default_yard_label'))
         ->assertDontSee(__('admin.vendor_master.create_form.contact_person_label'))
         ->assertDontSee(__('admin.vendor_master.create_form.notify_email_label'));
@@ -74,15 +76,16 @@ it('renders buyer-specific fields and labels, not vendor-only ones', function ()
 
 // --- saving --------------------------------------------------------------
 
-it('saves changes to the buyer profile', function () {
+it('saves changes to the buyer profile, including switching to a different country', function () {
     $admin = User::factory()->admin()->create();
     $profile = BuyerProfile::factory()->create();
+    $newCountry = Country::factory()->create();
 
     Livewire::actingAs($admin)
         ->test(BuyerDetail::class, ['buyerProfile' => $profile])
         ->set('company_name', 'Updated Imports')
         ->set('phone', '080-1234-5678')
-        ->set('default_destination_country', 'New Zealand')
+        ->set('country_id', (string) $newCountry->id)
         ->set('default_yard', 'North Island Yard')
         ->call('save')
         ->assertSet('justSaved', true);
@@ -91,8 +94,24 @@ it('saves changes to the buyer profile', function () {
 
     expect($profile->company_name)->toBe('Updated Imports')
         ->and($profile->phone)->toBe('080-1234-5678')
-        ->and($profile->default_destination_country)->toBe('New Zealand')
+        ->and($profile->country_id)->toBe($newCountry->id)
         ->and($profile->default_yard)->toBe('North Island Yard');
+});
+
+it('keeps a since-deactivated country accepted when the rest of the form is resubmitted unchanged', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->inactive()->create();
+    $profile = BuyerProfile::factory()->create(['country_id' => $country->id]);
+
+    Livewire::actingAs($admin)
+        ->test(BuyerDetail::class, ['buyerProfile' => $profile])
+        ->assertSet('country_id', (string) $country->id)
+        ->set('phone', '080-9999-0000')
+        ->call('save')
+        ->assertHasNoErrors()
+        ->assertSet('justSaved', true);
+
+    expect($profile->fresh()->country_id)->toBe($country->id);
 });
 
 it('clears the saved indicator as soon as a field changes again', function () {

@@ -126,7 +126,8 @@ No refund flow, no Stripe refund calls, no refund UI in this build. Refunds are 
 ## 7. Database schema (build to this)
 
 - **users**: name, email(unique), password, role(enum admin|buyer|vendor), is_active(bool), email_verified_at, timestamps, softDeletes
-- **buyer_profiles**: user_id(fk), company_name, member_code(unique), default_destination_country, default_yard, phone
+- **countries**: name(unique), is_active(bool default true), timestamps -- admin-managed reference data (client revision, replaces a free-text buyer_profiles field). Managed from the existing admin Settings page (add / rename / activate / deactivate), not a separate route. Never hard-deleted -- deactivate instead, so a buyer already assigned an inactive country keeps it.
+- **buyer_profiles**: user_id(fk), company_name, member_code(unique), country_id(fk → countries; active-only at write time for a new selection, but an existing row keeps a since-deactivated country rather than being forced to change it), default_yard, phone
 - **vendor_profiles**: user_id(fk), company_name, contact_person, phone, notify_email, status(enum active|suspended)
 - **part_requests**: request_code(unique), buyer_id(fk), part_type(enum used|new|both), maker, car_model, vin (always required, client-confirmed — no exceptions), oem_part_number(nullable), part_name, reference_url(nullable), memo(nullable), status(enum §5), selected_response_id(fk nullable), confirmed_vendor_id(fk nullable), cost_price(nullable), applied_rate(nullable), applied_min_fee(nullable), buyer_price(nullable), shipping_method(enum dhl|vehicle|container nullable), shipping_fee(nullable), timestamps, softDeletes
 - **vendor_responses**: part_request_id(fk), vendor_id(fk), cost_price(nullable), quality_rank(enum S|A|B|C nullable), lead_time(enum, nullable), comment(text, nullable), is_no_stock(bool), timestamps -- cost_price/quality_rank/lead_time/comment are all nullable together: a one-tap `is_no_stock` reply has none of them

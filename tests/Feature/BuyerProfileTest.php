@@ -1,6 +1,7 @@
 <?php
 
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -13,6 +14,13 @@ it('belongs to a user', function () {
     $profile = BuyerProfile::factory()->for($buyer)->create();
 
     expect($profile->user->is($buyer))->toBeTrue();
+});
+
+it('belongs to a country', function () {
+    $country = Country::factory()->create(['name' => 'Australia']);
+    $profile = BuyerProfile::factory()->create(['country_id' => $country->id]);
+
+    expect($profile->country->name)->toBe('Australia');
 });
 
 it('generates a member code from the user id', function () {

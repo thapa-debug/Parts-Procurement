@@ -2,6 +2,7 @@
 
 use App\Livewire\Auth\Register;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,12 +20,24 @@ function fillValidRegisterForm($component)
         ->set('password_confirmation', 'my-strong-password1')
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
-        ->set('default_destination_country', 'Australia')
+        ->set('country_id', Country::factory()->create()->id)
         ->set('default_yard', 'Oceania Yard');
 }
 
 it('renders the registration page for a guest', function () {
     $this->get('/register')->assertOk()->assertSee(__('auth.register.heading'));
+});
+
+it('offers only active countries in the dropdown, excluding inactive ones', function () {
+    $active = Country::factory()->create(['name' => 'Active Land']);
+    $inactive = Country::factory()->inactive()->create(['name' => 'Inactive Land']);
+
+    Livewire::test(Register::class)
+        ->assertSee('Active Land')
+        ->assertDontSee('Inactive Land');
+
+    expect($active->is_active)->toBeTrue()
+        ->and($inactive->is_active)->toBeFalse();
 });
 
 it('registers a buyer, logs them in immediately, and sends a verification email', function () {
@@ -50,7 +63,7 @@ it('rejects an incomplete registration form', function () {
         ->call('register')
         ->assertHasErrors([
             'name', 'email', 'password', 'company_name', 'phone',
-            'default_destination_country', 'default_yard',
+            'country_id', 'default_yard',
         ]);
 
     expect(User::count())->toBe(0);

@@ -4,6 +4,7 @@ use App\Actions\ApproveBuyerAction;
 use App\Enums\UserRole;
 use App\Livewire\Admin\BuyerMaster;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -92,6 +93,21 @@ it('finds a buyer by member code', function () {
 
 // --- create buyer + reveal ceremony --------------------------------------
 
+it('offers only active countries in the create-form dropdown, excluding inactive ones', function () {
+    $admin = User::factory()->admin()->create();
+    $active = Country::factory()->create(['name' => 'Active Land']);
+    $inactive = Country::factory()->inactive()->create(['name' => 'Inactive Land']);
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->call('openCreateForm')
+        ->assertSee('Active Land')
+        ->assertDontSee('Inactive Land');
+
+    expect($active->is_active)->toBeTrue()
+        ->and($inactive->is_active)->toBeFalse();
+});
+
 it('creates a buyer and reveals the temporary password', function () {
     Notification::fake();
 
@@ -104,7 +120,7 @@ it('creates a buyer and reveals the temporary password', function () {
         ->set('email', 'jane@example.com')
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
-        ->set('default_destination_country', 'Australia')
+        ->set('country_id', (string) Country::factory()->create()->id)
         ->set('default_yard', 'Oceania Yard')
         ->call('createBuyer')
         ->assertSet('showCreateForm', false)
@@ -156,7 +172,7 @@ it('creates a buyer pending approval when approve-immediately is unchecked, and 
         ->set('email', 'jane@example.com')
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
-        ->set('default_destination_country', 'Australia')
+        ->set('country_id', (string) Country::factory()->create()->id)
         ->set('default_yard', 'Oceania Yard')
         ->set('approve_immediately', false)
         ->call('createBuyer');
@@ -186,7 +202,7 @@ it('rejects an incomplete buyer creation form', function () {
         ->call('createBuyer')
         ->assertHasErrors([
             'name', 'email', 'company_name', 'phone',
-            'default_destination_country', 'default_yard',
+            'country_id', 'default_yard',
         ]);
 
     expect(User::where('role', UserRole::Buyer)->count())->toBe(0);
@@ -203,7 +219,7 @@ it('rejects a duplicate email on creation', function () {
         ->set('email', 'taken@example.com')
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
-        ->set('default_destination_country', 'Australia')
+        ->set('country_id', (string) Country::factory()->create()->id)
         ->set('default_yard', 'Oceania Yard')
         ->call('createBuyer')
         ->assertHasErrors(['email']);

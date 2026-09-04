@@ -70,7 +70,7 @@ it('renders vendor-specific fields and labels, not buyer-only ones', function ()
         ->assertSee(__('admin.vendor_master.create_form.contact_person_label'))
         ->assertSee(__('admin.vendor_master.create_form.notify_email_label'))
         ->assertDontSee(__('admin.buyer_master.create_form.default_yard_label'))
-        ->assertDontSee(__('admin.buyer_master.create_form.default_destination_country_label'))
+        ->assertDontSee(__('admin.buyer_master.create_form.country_label'))
         ->assertDontSee(__('admin.buyer_master.table.member_code'));
 });
 

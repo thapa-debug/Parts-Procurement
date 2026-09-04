@@ -11,7 +11,7 @@ use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
-    'user_id', 'company_name', 'member_code', 'default_destination_country',
+    'user_id', 'company_name', 'member_code', 'country_id',
     'default_yard', 'phone', 'approved_at', 'approved_by',
 ])]
 class BuyerProfile extends Model
@@ -29,6 +29,11 @@ class BuyerProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    public function country(): BelongsTo
+    {
+        return $this->belongsTo(Country::class);
     }
 
     public function approvedBy(): BelongsTo

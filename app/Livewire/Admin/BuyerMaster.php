@@ -7,9 +7,11 @@ use App\Actions\CreateBuyerAction;
 use App\Actions\ResetTemporaryPasswordAction;
 use App\Http\Requests\CreateBuyerRequest;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 use Livewire\WithPagination;
 
@@ -37,7 +39,7 @@ class BuyerMaster extends Component
 
     public string $company_name = '';
 
-    public string $default_destination_country = '';
+    public string $country_id = '';
 
     public string $default_yard = '';
 
@@ -92,7 +94,7 @@ class BuyerMaster extends Component
     {
         $this->authorize('create', BuyerProfile::class);
 
-        $this->reset(['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone']);
+        $this->reset(['name', 'email', 'company_name', 'country_id', 'default_yard', 'phone']);
         $this->approve_immediately = true;
         $this->resetErrorBag();
         $this->showCreateForm = true;
@@ -116,7 +118,7 @@ class BuyerMaster extends Component
             $validated['name'],
             $validated['email'],
             $validated['company_name'],
-            $validated['default_destination_country'],
+            (int) $validated['country_id'],
             $validated['default_yard'],
             $validated['phone'],
             $admin,
@@ -186,6 +188,14 @@ class BuyerMaster extends Component
     }
 
     /**
+     * @return Collection<int, Country>
+     */
+    protected function activeCountries(): Collection
+    {
+        return Country::query()->active()->orderBy('name')->get();
+    }
+
+    /**
      * @return LengthAwarePaginator<int, BuyerProfile>
      */
     protected function buyers(): LengthAwarePaginator
@@ -211,6 +221,7 @@ class BuyerMaster extends Component
     {
         return view('livewire.admin.buyer-master', [
             'buyers' => $this->buyers(),
+            'activeCountries' => $this->activeCountries(),
         ])->title(__('admin.buyer_master.title'));
     }
 }

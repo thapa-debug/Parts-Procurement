@@ -4,6 +4,7 @@ use App\Actions\CreateBuyerAction;
 use App\Enums\UserRole;
 use App\Http\Requests\CreateBuyerRequest;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -19,7 +20,7 @@ function buyerPayload(array $overrides = []): array
         'name' => 'Jane Buyer',
         'email' => 'jane@example.com',
         'company_name' => 'Acme Imports',
-        'default_destination_country' => 'Australia',
+        'country_id' => Country::factory()->create()->id,
         'default_yard' => 'Oceania Yard',
         'phone' => '090-0000-0000',
         'approve_immediately' => true,
@@ -38,7 +39,7 @@ it('creates a user and buyer profile together, atomically, approved immediately 
         $payload['name'],
         $payload['email'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
         $admin,
@@ -75,7 +76,7 @@ it('creates a buyer profile pending approval when the flag is false', function (
         $payload['name'],
         $payload['email'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
         $admin,
@@ -107,7 +108,7 @@ it('rolls back the entire transaction and creates zero users if the buyer profil
         $payload['name'],
         $payload['email'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
         $admin,
@@ -131,7 +132,7 @@ it('requires every admin-created buyer field', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['name', 'email', 'company_name', 'default_destination_country', 'default_yard', 'phone', 'approve_immediately'] as $field) {
+    foreach (['name', 'email', 'company_name', 'country_id', 'default_yard', 'phone', 'approve_immediately'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
 });
@@ -155,6 +156,17 @@ it('passes with a complete, unique payload', function () {
     $validator = Validator::make(buyerPayload(), (new CreateBuyerRequest)->rules());
 
     expect($validator->fails())->toBeFalse();
+});
+
+it('rejects an inactive country -- only active countries are a valid pick for a new buyer', function () {
+    $inactive = Country::factory()->inactive()->create();
+
+    $validator = Validator::make(
+        buyerPayload(['country_id' => $inactive->id]),
+        (new CreateBuyerRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('country_id'))->toBeTrue();
 });
 
 // --- CreateBuyerRequest: authorization ------------------------------------

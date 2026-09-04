@@ -97,8 +97,8 @@ return [
             'company_name_placeholder' => 'e.g. Acme Imports Ltd',
             'phone_label' => 'Phone',
             'phone_placeholder' => 'e.g. +61 4 1234 5678',
-            'default_destination_country_label' => 'Default destination country',
-            'default_destination_country_placeholder' => 'e.g. Australia',
+            'country_label' => 'Default destination country',
+            'country_placeholder_option' => '-- Select a country --',
             'default_yard_label' => 'Default yard',
             'default_yard_placeholder' => 'e.g. North Island Yard',
             'approve_immediately_label' => 'Approve immediately',
@@ -162,7 +162,7 @@ return [
     'settings' => [
         'title' => 'Settings',
         'heading' => 'Pricing & shipping settings',
-        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, and the address the system sends mail from.',
+        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, the address the system sends mail from, and the countries buyers can select.',
 
         'margin_section' => 'Margin',
         'margin_rate_label' => 'Margin rate (%)',
@@ -185,6 +185,30 @@ return [
 
         'save_button' => 'Save settings',
         'saved' => 'Saved.',
+
+        'countries_section' => 'Countries',
+        'countries_help' => 'Countries buyers can select as their default destination. Deactivate instead of deleting -- existing buyer records keep their country even after it stops appearing in the dropdown.',
+        'country_name_label' => 'Country name',
+        'country_name_placeholder' => 'e.g. Singapore',
+        'add_country_button' => 'Add country',
+        'country_added' => 'Country added.',
+        'country_updated' => 'Country updated.',
+        'country_search_placeholder' => 'Search countries...',
+        'country_empty' => 'No countries match your search.',
+        'country_table' => [
+            'name' => 'Name',
+            'status' => 'Status',
+            'actions' => 'Actions',
+        ],
+        'country_status' => [
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+        ],
+        'edit_country_button' => 'Edit',
+        'save_country_button' => 'Save',
+        'cancel_button' => 'Cancel',
+        'activate_country_button' => 'Activate',
+        'deactivate_country_button' => 'Deactivate',
     ],
 
     'request_board' => [

@@ -3,8 +3,10 @@
 namespace App\Livewire\Admin;
 
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class BuyerDetail extends Component
@@ -15,7 +17,7 @@ class BuyerDetail extends Component
 
     public string $phone = '';
 
-    public string $default_destination_country = '';
+    public string $country_id = '';
 
     public string $default_yard = '';
 
@@ -29,7 +31,7 @@ class BuyerDetail extends Component
         $this->buyerProfile = $buyerProfile;
         $this->company_name = $buyerProfile->company_name;
         $this->phone = $buyerProfile->phone;
-        $this->default_destination_country = $buyerProfile->default_destination_country;
+        $this->country_id = (string) $buyerProfile->country_id;
         $this->default_yard = $buyerProfile->default_yard;
     }
 
@@ -41,7 +43,12 @@ class BuyerDetail extends Component
         return [
             'company_name' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
-            'default_destination_country' => ['required', 'string', 'max:255'],
+            // Not restricted to active countries, unlike CreateBuyerRequest:
+            // this buyer may already be assigned a country the admin has
+            // since deactivated, and resubmitting the form unchanged (e.g.
+            // to save a phone-number edit) must not fail just because that
+            // selection is no longer offered for *new* picks.
+            'country_id' => ['required', 'integer', Rule::exists('countries', 'id')],
             'default_yard' => ['required', 'string', 'max:255'],
         ];
     }
@@ -56,6 +63,7 @@ class BuyerDetail extends Component
         $this->authorize('update', $this->buyerProfile);
 
         $validated = $this->validate();
+        $validated['country_id'] = (int) $validated['country_id'];
 
         $this->buyerProfile->update($validated);
 
@@ -67,11 +75,22 @@ class BuyerDetail extends Component
         /** @var User $user */
         $user = $this->buyerProfile->user;
 
+        // Active countries, plus this buyer's own current country even if
+        // it's since been deactivated -- otherwise the <select> would have
+        // no matching <option> for their real, unchanged value and render
+        // as if nothing were selected, misleading the admin into thinking
+        // it needs to be re-picked.
+        $countryOptions = Country::query()
+            ->where('is_active', true)
+            ->orWhere('id', $this->buyerProfile->country_id)
+            ->orderBy('name')
+            ->pluck('name', 'id');
+
         return view('livewire.admin.buyer-detail', [
             'fields' => [
                 ['name' => 'company_name', 'label' => __('admin.buyer_master.create_form.company_name_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.company_name_placeholder')],
                 ['name' => 'phone', 'label' => __('admin.buyer_master.create_form.phone_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.phone_placeholder')],
-                ['name' => 'default_destination_country', 'label' => __('admin.buyer_master.create_form.default_destination_country_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.default_destination_country_placeholder')],
+                ['name' => 'country_id', 'label' => __('admin.buyer_master.create_form.country_label'), 'required' => true, 'type' => 'select', 'options' => $countryOptions, 'placeholderOption' => __('admin.buyer_master.create_form.country_placeholder_option')],
                 ['name' => 'default_yard', 'label' => __('admin.buyer_master.create_form.default_yard_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.default_yard_placeholder')],
             ],
             'accountFields' => [

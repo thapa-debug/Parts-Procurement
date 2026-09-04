@@ -1,6 +1,8 @@
 <?php
 
 use App\Livewire\Admin\Settings;
+use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\PricingService;
@@ -148,4 +150,182 @@ it('changes what PricingService calculates once settings are saved', function ()
         ->and($after['applied_min_fee'])->toBe(5000)
         ->and($after['margin'])->toBe(5000)
         ->and($after['buyer_price'])->toBe(15000);
+});
+
+// --- country management (client revision) -----------------------------
+
+it('does not let a buyer or vendor add, edit, or toggle a country -- same gating as the rest of Settings', function () {
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    Livewire::actingAs($buyer)->test(Settings::class)->assertForbidden();
+    Livewire::actingAs($vendor)->test(Settings::class)->assertForbidden();
+});
+
+it('lists every country, active and inactive, with its status', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->create(['name' => 'Active Land']);
+    Country::factory()->inactive()->create(['name' => 'Inactive Land']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->assertSee('Active Land')
+        ->assertSee('Inactive Land')
+        ->assertSeeInOrder(['Active Land', __('admin.settings.country_status.active')])
+        ->assertSeeInOrder(['Inactive Land', __('admin.settings.country_status.inactive')]);
+});
+
+it('adds a new country, active by default', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('new_country_name', 'Singapore')
+        ->call('addCountry')
+        ->assertHasNoErrors()
+        ->assertSet('new_country_name', '')
+        ->assertSee('Singapore');
+
+    $country = Country::where('name', 'Singapore')->firstOrFail();
+    expect($country->is_active)->toBeTrue();
+});
+
+it('rejects adding a duplicate country name', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->create(['name' => 'Singapore']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('new_country_name', 'Singapore')
+        ->call('addCountry')
+        ->assertHasErrors(['new_country_name']);
+
+    expect(Country::where('name', 'Singapore')->count())->toBe(1);
+});
+
+it('edits a country\'s name', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create(['name' => 'Singapor']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCountry', $country->id)
+        ->assertSet('editing_country_name', 'Singapor')
+        ->set('editing_country_name', 'Singapore')
+        ->call('saveCountry')
+        ->assertHasNoErrors()
+        ->assertSet('editingCountryId', null);
+
+    expect($country->fresh()->name)->toBe('Singapore');
+});
+
+it('rejects renaming a country to a name another country already has', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->create(['name' => 'Taken']);
+    $country = Country::factory()->create(['name' => 'Original']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCountry', $country->id)
+        ->set('editing_country_name', 'Taken')
+        ->call('saveCountry')
+        ->assertHasErrors(['editing_country_name']);
+
+    expect($country->fresh()->name)->toBe('Original');
+});
+
+it('lets editing a country keep its own current name unchanged', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create(['name' => 'Australia']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCountry', $country->id)
+        ->call('saveCountry')
+        ->assertHasNoErrors();
+
+    expect($country->fresh()->name)->toBe('Australia');
+});
+
+it('cancels editing without saving', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create(['name' => 'Australia']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCountry', $country->id)
+        ->set('editing_country_name', 'Should not save')
+        ->call('cancelEditingCountry')
+        ->assertSet('editingCountryId', null)
+        ->assertSet('editing_country_name', '');
+
+    expect($country->fresh()->name)->toBe('Australia');
+});
+
+it('toggles a country between active and inactive, without deleting it', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleCountryActive', $country->id);
+
+    expect($country->fresh()->is_active)->toBeFalse();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleCountryActive', $country->id);
+
+    expect($country->fresh()->is_active)->toBeTrue();
+});
+
+it('filters the country list by name as the admin searches', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->create(['name' => 'Australia']);
+    Country::factory()->create(['name' => 'Austria']);
+    Country::factory()->create(['name' => 'New Zealand']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('countrySearch', 'Aust')
+        ->assertSee('Australia')
+        ->assertSee('Austria')
+        ->assertDontSee('New Zealand');
+});
+
+it('shows a message when no country matches the search', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->create(['name' => 'Australia']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('countrySearch', 'Nowhere')
+        ->assertSee(__('admin.settings.country_empty'))
+        ->assertDontSee('Australia');
+});
+
+it('lists active countries before inactive ones, alphabetical within each group', function () {
+    $admin = User::factory()->admin()->create();
+    Country::factory()->inactive()->create(['name' => 'Zed Inactive']);
+    Country::factory()->create(['name' => 'Zeta Active']);
+    Country::factory()->create(['name' => 'Alpha Active']);
+    Country::factory()->inactive()->create(['name' => 'Alpha Inactive']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->assertSeeInOrder(['Alpha Active', 'Zeta Active', 'Alpha Inactive', 'Zed Inactive']);
+});
+
+it('deactivating a country never deletes it or breaks an existing buyer\'s reference to it', function () {
+    $admin = User::factory()->admin()->create();
+    $country = Country::factory()->create();
+    $profile = BuyerProfile::factory()->create(['country_id' => $country->id]);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleCountryActive', $country->id);
+
+    expect(Country::find($country->id))->not->toBeNull()
+        ->and($profile->fresh()->country_id)->toBe($country->id)
+        ->and($profile->fresh()->country->name)->toBe($country->name);
 });
