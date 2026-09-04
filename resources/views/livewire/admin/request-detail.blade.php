@@ -26,7 +26,7 @@
 
             <div>
                 <dt class="text-ink-muted">{{ __('admin.request_detail.maker_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->maker }}</dd>
+                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->maker->name }}</dd>
             </div>
 
             <div>

@@ -30,8 +30,8 @@ class SubmitPartRequestRequest extends FormRequest
         return [
             'part_type' => ['required', new Enum(PartType::class)],
             // Never trust the <select> alone -- validate server-side against
-            // the same fixed list it's built from (lang/en/buyer.php).
-            'maker' => ['required', 'string', Rule::in(__('buyer.request_form.maker_options'))],
+            // active makers, the same set it's built from.
+            'maker_id' => ['required', 'integer', Rule::exists('makers', 'id')->where('is_active', true)],
             'car_model' => ['required', 'string', 'max:255'],
             // Always required, no exceptions (confirmed with the client) --
             // previously conditional on having an OEM part number or

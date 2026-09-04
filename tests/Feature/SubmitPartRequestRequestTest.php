@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Requests\SubmitPartRequestRequest;
+use App\Models\Maker;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Validator;
@@ -11,7 +12,7 @@ function submitRequestPayload(array $overrides = []): array
 {
     return array_merge([
         'part_type' => 'used',
-        'maker' => 'Toyota',
+        'maker_id' => Maker::factory()->create(['name' => 'Toyota'])->id,
         'car_model' => 'Crown',
         'part_name' => 'Right LED headlight',
         'vin' => 'GRS184-0002255',
@@ -23,7 +24,7 @@ it('requires the mandatory fields, including vin', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['part_type', 'maker', 'car_model', 'part_name', 'vin'] as $field) {
+    foreach (['part_type', 'maker_id', 'car_model', 'part_name', 'vin'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
 });
@@ -52,22 +53,35 @@ it('leaves oem_part_number, reference_url, and memo optional given vin is presen
     expect($validator->fails())->toBeFalse();
 });
 
-it('accepts a maker from the fixed list', function () {
+it('accepts an active maker', function () {
+    $maker = Maker::factory()->create(['name' => 'Imported / Other']);
+
     $validator = Validator::make(
-        submitRequestPayload(['maker' => 'Imported / Other']),
+        submitRequestPayload(['maker_id' => $maker->id]),
         (new SubmitPartRequestRequest)->rules(),
     );
 
     expect($validator->fails())->toBeFalse();
 });
 
-it('rejects a maker outside the fixed list -- never trust the <select> alone', function () {
+it('rejects a maker id that does not exist -- never trust the <select> alone', function () {
     $validator = Validator::make(
-        submitRequestPayload(['maker' => 'Ferrari']),
+        submitRequestPayload(['maker_id' => 999999]),
         (new SubmitPartRequestRequest)->rules(),
     );
 
-    expect($validator->errors()->has('maker'))->toBeTrue();
+    expect($validator->errors()->has('maker_id'))->toBeTrue();
+});
+
+it('rejects an inactive maker -- only active makers are a valid pick for a new request', function () {
+    $inactive = Maker::factory()->inactive()->create();
+
+    $validator = Validator::make(
+        submitRequestPayload(['maker_id' => $inactive->id]),
+        (new SubmitPartRequestRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('maker_id'))->toBeTrue();
 });
 
 it('rejects a part_type outside the enum', function () {

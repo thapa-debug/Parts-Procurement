@@ -20,7 +20,8 @@ class RequestList extends Component
         $user = auth()->user();
 
         $requests = PartRequest::query()
-            ->select(['id', 'request_code', 'maker', 'car_model', 'part_name', 'status', 'created_at'])
+            ->select(['id', 'request_code', 'maker_id', 'car_model', 'part_name', 'status', 'created_at'])
+            ->with('maker')
             ->where('buyer_id', $user->buyerProfile?->id)
             ->orderByDesc('created_at')
             ->get();

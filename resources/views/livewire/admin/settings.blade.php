@@ -235,4 +235,116 @@
             </table>
         </div>
     </div>
+
+    <div class="mt-8 rounded-lg border border-line bg-surface p-6 shadow-sm">
+        <h2 class="text-base font-semibold text-ink">{{ __('admin.settings.makers_section') }}</h2>
+        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.makers_help') }}</p>
+
+        <div class="mt-4 flex items-end gap-3">
+            <div class="flex-1">
+                <label for="new_maker_name" class="block text-sm font-medium text-ink">
+                    {{ __('admin.settings.maker_name_label') }} <x-required-mark />
+                </label>
+                <input
+                    id="new_maker_name"
+                    type="text"
+                    wire:model="new_maker_name"
+                    wire:keydown.enter.prevent="addMaker"
+                    placeholder="{{ __('admin.settings.maker_name_placeholder') }}"
+                    class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+            </div>
+            <button
+                type="button"
+                wire:click="addMaker"
+                wire:loading.attr="disabled"
+                wire:target="addMaker"
+                class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+                {{ __('admin.settings.add_maker_button') }}
+            </button>
+        </div>
+        @error('new_maker_name')
+            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+        @enderror
+
+        <div class="mt-4">
+            <input
+                type="search"
+                wire:model.live.debounce.300ms="makerSearch"
+                placeholder="{{ __('admin.settings.maker_search_placeholder') }}"
+                class="w-full max-w-sm rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+            >
+        </div>
+
+        <div class="mt-4 max-h-80 overflow-y-auto overflow-x-auto rounded-md border border-line">
+            <table class="min-w-full divide-y divide-line text-sm">
+                <thead class="sticky top-0 bg-surface-muted">
+                    <tr class="text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                        <th class="px-4 py-2.5">{{ __('admin.settings.maker_table.name') }}</th>
+                        <th class="px-4 py-2.5">{{ __('admin.settings.maker_table.status') }}</th>
+                        <th class="px-4 py-2.5">{{ __('admin.settings.maker_table.actions') }}</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-line">
+                    @forelse ($makers as $maker)
+                        <tr wire:key="maker-{{ $maker->id }}" class="{{ $maker->is_active ? '' : 'opacity-60' }}">
+                            @if ($editingMakerId === $maker->id)
+                                <td class="px-4 py-2.5" colspan="2">
+                                    <input
+                                        type="text"
+                                        wire:model="editing_maker_name"
+                                        wire:keydown.enter.prevent="saveMaker"
+                                        class="block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    >
+                                    @error('editing_maker_name')
+                                        <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                    @enderror
+                                </td>
+                                <td class="px-4 py-2.5 text-right">
+                                    <button type="button" wire:click="saveMaker" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+                                        {{ __('admin.settings.save_maker_button') }}
+                                    </button>
+                                    <button type="button" wire:click="cancelEditingMaker" class="ml-3 text-sm font-medium text-ink-muted hover:text-ink">
+                                        {{ __('admin.settings.cancel_button') }}
+                                    </button>
+                                </td>
+                            @else
+                                <td class="px-4 py-2.5 font-medium text-ink">{{ $maker->name }}</td>
+                                <td class="px-4 py-2.5">
+                                    @if ($maker->is_active)
+                                        <span class="inline-flex rounded-full bg-green-50 px-2.5 py-1 text-xs font-medium text-green-700">
+                                            {{ __('admin.settings.maker_status.active') }}
+                                        </span>
+                                    @else
+                                        <span class="inline-flex rounded-full bg-surface-muted px-2.5 py-1 text-xs font-medium text-ink-muted">
+                                            {{ __('admin.settings.maker_status.inactive') }}
+                                        </span>
+                                    @endif
+                                </td>
+                                <td class="px-4 py-2.5 text-right">
+                                    <button type="button" wire:click="startEditingMaker({{ $maker->id }})" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+                                        {{ __('admin.settings.edit_maker_button') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="toggleMakerActive({{ $maker->id }})"
+                                        class="ml-3 text-sm font-medium {{ $maker->is_active ? 'text-red-600 hover:text-red-700' : 'text-brand-700 hover:text-brand-800' }}"
+                                    >
+                                        {{ $maker->is_active ? __('admin.settings.deactivate_maker_button') : __('admin.settings.activate_maker_button') }}
+                                    </button>
+                                </td>
+                            @endif
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="3" class="px-4 py-8 text-center text-ink-muted">
+                                {{ __('admin.settings.maker_empty') }}
+                            </td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
+    </div>
 </div>

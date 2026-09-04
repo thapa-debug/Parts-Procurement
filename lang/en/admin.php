@@ -209,6 +209,29 @@ return [
         'cancel_button' => 'Cancel',
         'activate_country_button' => 'Activate',
         'deactivate_country_button' => 'Deactivate',
+
+        'makers_section' => 'Makers',
+        'makers_help' => 'Makers buyers can select on a part request. Deactivate instead of deleting -- existing requests keep their maker even after it stops appearing in the dropdown.',
+        'maker_name_label' => 'Maker name',
+        'maker_name_placeholder' => 'e.g. Isuzu',
+        'add_maker_button' => 'Add maker',
+        'maker_added' => 'Maker added.',
+        'maker_updated' => 'Maker updated.',
+        'maker_search_placeholder' => 'Search makers...',
+        'maker_empty' => 'No makers match your search.',
+        'maker_table' => [
+            'name' => 'Name',
+            'status' => 'Status',
+            'actions' => 'Actions',
+        ],
+        'maker_status' => [
+            'active' => 'Active',
+            'inactive' => 'Inactive',
+        ],
+        'edit_maker_button' => 'Edit',
+        'save_maker_button' => 'Save',
+        'activate_maker_button' => 'Activate',
+        'deactivate_maker_button' => 'Deactivate',
     ],
 
     'request_board' => [

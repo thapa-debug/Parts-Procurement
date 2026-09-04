@@ -184,7 +184,8 @@ class RequestResponse extends Component
     public function render(): View
     {
         $partRequest = PartRequest::query()
-            ->select(['id', 'request_code', 'part_type', 'maker', 'car_model', 'vin', 'oem_part_number', 'part_name', 'reference_url', 'memo', 'created_at'])
+            ->select(['id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin', 'oem_part_number', 'part_name', 'reference_url', 'memo', 'created_at'])
+            ->with('maker')
             ->findOrFail($this->partRequestId);
 
         $myResponse = VendorResponse::query()
