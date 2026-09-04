@@ -161,8 +161,14 @@ return [
 
     'settings' => [
         'title' => 'Settings',
-        'heading' => 'Pricing & shipping settings',
-        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, the address the system sends mail from, and the countries buyers can select.',
+        'heading' => 'Settings',
+        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, the address the system sends mail from, and the reference data (countries, makers) offered on buyer-facing forms.',
+
+        'nav' => [
+            'general' => 'General',
+            'countries' => 'Countries',
+            'makers' => 'Makers',
+        ],
 
         'margin_section' => 'Margin',
         'margin_rate_label' => 'Margin rate (%)',
