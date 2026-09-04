@@ -3,8 +3,10 @@
 namespace App\Livewire\Auth;
 
 use App\Actions\RegisterBuyerAction;
+use App\Models\Country;
 use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\Rules\Password;
 use Livewire\Component;
 
@@ -20,7 +22,7 @@ class Register extends Component
 
     public string $company_name = '';
 
-    public string $default_destination_country = '';
+    public string $country_id = '';
 
     public string $default_yard = '';
 
@@ -36,7 +38,7 @@ class Register extends Component
             'email' => ['required', 'string', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
             'company_name' => ['required', 'string', 'max:255'],
-            'default_destination_country' => ['required', 'string', 'max:255'],
+            'country_id' => ['required', 'integer', Rule::exists('countries', 'id')->where('is_active', true)],
             'default_yard' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
         ];
@@ -51,7 +53,7 @@ class Register extends Component
             $validated['email'],
             $validated['password'],
             $validated['company_name'],
-            $validated['default_destination_country'],
+            (int) $validated['country_id'],
             $validated['default_yard'],
             $validated['phone'],
         );
@@ -63,6 +65,8 @@ class Register extends Component
 
     public function render(): View
     {
-        return view('livewire.auth.register')->title(__('auth.register.title'));
+        return view('livewire.auth.register', [
+            'activeCountries' => Country::query()->active()->orderBy('name')->get(),
+        ])->title(__('auth.register.title'));
     }
 }

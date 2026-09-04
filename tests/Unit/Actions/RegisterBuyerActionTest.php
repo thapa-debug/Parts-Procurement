@@ -3,6 +3,7 @@
 use App\Actions\RegisterBuyerAction;
 use App\Enums\UserRole;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Auth\Notifications\VerifyEmail;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -18,7 +19,7 @@ function registerBuyerPayload(array $overrides = []): array
         'email' => 'jane@example.com',
         'password' => 'my-strong-password1',
         'company_name' => 'Acme Imports',
-        'default_destination_country' => 'Australia',
+        'country_id' => Country::factory()->create()->id,
         'default_yard' => 'Oceania Yard',
         'phone' => '090-0000-0000',
     ], $overrides);
@@ -34,7 +35,7 @@ it('creates a user and buyer profile, with a self-chosen password and no forced 
         $payload['email'],
         $payload['password'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
     );
@@ -59,7 +60,7 @@ it('sends a verification email notification on registration', function () {
         $payload['email'],
         $payload['password'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
     );
@@ -81,7 +82,7 @@ it('rolls back the whole transaction if the buyer profile write fails', function
         $payload['email'],
         $payload['password'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
     );
@@ -102,7 +103,7 @@ it('still creates the account even if sending the verification email fails', fun
         $payload['email'],
         $payload['password'],
         $payload['company_name'],
-        $payload['default_destination_country'],
+        $payload['country_id'],
         $payload['default_yard'],
         $payload['phone'],
     );

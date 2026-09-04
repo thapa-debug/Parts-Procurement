@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\VendorStatus;
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use App\Models\VendorProfile;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -93,11 +94,17 @@ class DemoSeeder extends Seeder
             $profileFactory = $profileFactory->pending();
         }
 
+        // firstOrCreate, not a hard dependency on CountrySeeder's own
+        // placeholder list -- this demo cast intentionally uses a wider
+        // variety of countries than the real starting list (Australia, New
+        // Zealand) to show a realistic international buyer spread.
+        $country = Country::query()->firstOrCreate(['name' => $destinationCountry]);
+
         $profileFactory->create([
             'user_id' => $user->id,
             'company_name' => $companyName,
             'member_code' => BuyerProfile::generateMemberCode($user),
-            'default_destination_country' => $destinationCountry,
+            'country_id' => $country->id,
             'default_yard' => $yard,
             'phone' => $phone,
         ]);

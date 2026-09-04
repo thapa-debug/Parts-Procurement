@@ -3,6 +3,7 @@
 namespace Database\Factories;
 
 use App\Models\BuyerProfile;
+use App\Models\Country;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Factories\Factory;
 
@@ -22,7 +23,7 @@ class BuyerProfileFactory extends Factory
             'user_id' => User::factory()->buyer(),
             'company_name' => fake()->company(),
             'member_code' => fake()->unique()->numerify('BYR-######'),
-            'default_destination_country' => fake()->country(),
+            'country_id' => Country::factory(),
             'default_yard' => fake()->city().' Yard',
             'phone' => fake()->phoneNumber(),
             // Approved by default -- most tests using this factory exercise
