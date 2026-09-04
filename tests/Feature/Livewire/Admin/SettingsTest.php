@@ -35,6 +35,45 @@ it('lets an admin mount the settings component', function () {
         ->assertSee(__('admin.settings.heading'));
 });
 
+// --- section navigation (client revision) -----------------------------
+
+it('defaults to the general section, showing the margin form and hiding the country/maker lists', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->assertSet('activeSection', 'general')
+        ->assertSee(__('admin.settings.save_button'))
+        ->assertDontSee(__('admin.settings.add_country_button'))
+        ->assertDontSee(__('admin.settings.add_maker_button'));
+});
+
+it('switches sections via showSection, rendering only the selected section', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('showSection', 'countries')
+        ->assertSet('activeSection', 'countries')
+        ->assertSee(__('admin.settings.add_country_button'))
+        ->assertDontSee(__('admin.settings.save_button'))
+        ->assertDontSee(__('admin.settings.add_maker_button'))
+        ->call('showSection', 'makers')
+        ->assertSet('activeSection', 'makers')
+        ->assertSee(__('admin.settings.add_maker_button'))
+        ->assertDontSee(__('admin.settings.save_button'))
+        ->assertDontSee(__('admin.settings.add_country_button'));
+});
+
+it('falls back to the general section for an unrecognized section key', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('showSection', 'not-a-real-section')
+        ->assertSet('activeSection', 'general');
+});
+
 // --- loading current values --------------------------------------------
 
 it('pre-fills the PricingService defaults when nothing has been configured yet', function () {
@@ -171,6 +210,7 @@ it('lists every country, active and inactive, with its status', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'countries')
         ->assertSee('Active Land')
         ->assertSee('Inactive Land')
         ->assertSeeInOrder(['Active Land', __('admin.settings.country_status.active')])
@@ -182,6 +222,7 @@ it('adds a new country, active by default', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'countries')
         ->set('new_country_name', 'Singapore')
         ->call('addCountry')
         ->assertHasNoErrors()
@@ -289,6 +330,7 @@ it('filters the country list by name as the admin searches', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'countries')
         ->set('countrySearch', 'Aust')
         ->assertSee('Australia')
         ->assertSee('Austria')
@@ -301,6 +343,7 @@ it('shows a message when no country matches the search', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'countries')
         ->set('countrySearch', 'Nowhere')
         ->assertSee(__('admin.settings.country_empty'))
         ->assertDontSee('Australia');
@@ -315,6 +358,7 @@ it('lists active countries before inactive ones, alphabetical within each group'
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'countries')
         ->assertSeeInOrder(['Alpha Active', 'Zeta Active', 'Alpha Inactive', 'Zed Inactive']);
 });
 
@@ -349,6 +393,7 @@ it('lists every maker, active and inactive, with its status', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'makers')
         ->assertSee('Active Motors')
         ->assertSee('Inactive Motors')
         ->assertSeeInOrder(['Active Motors', __('admin.settings.maker_status.active')])
@@ -360,6 +405,7 @@ it('adds a new maker, active by default', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'makers')
         ->set('new_maker_name', 'Isuzu')
         ->call('addMaker')
         ->assertHasNoErrors()
@@ -481,6 +527,7 @@ it('filters the maker list by name as the admin searches', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'makers')
         ->set('makerSearch', 'Toyota')
         ->assertSee('Toyota')
         ->assertSee('Toyota Industries')
@@ -493,6 +540,7 @@ it('shows a message when no maker matches the search', function () {
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'makers')
         ->set('makerSearch', 'Nowhere')
         ->assertSee(__('admin.settings.maker_empty'))
         ->assertDontSee('Toyota');
@@ -507,5 +555,6 @@ it('lists active makers before inactive ones, alphabetical within each group', f
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
+        ->set('activeSection', 'makers')
         ->assertSeeInOrder(['Alpha Active', 'Zeta Active', 'Alpha Inactive', 'Zed Inactive']);
 });

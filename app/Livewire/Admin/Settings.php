@@ -32,6 +32,32 @@ class Settings extends Component
     public bool $justSaved = false;
 
     /**
+     * Which section the left nav currently has selected -- purely a view
+     * concern (CLAUDE.md §8: no business logic in the component beyond
+     * this). Every section's underlying fields/methods stay exactly as
+     * they were before this nav existed; only one section's markup is
+     * ever rendered at a time.
+     */
+    public string $activeSection = 'general';
+
+    /**
+     * @return array<string, string>
+     */
+    public static function sections(): array
+    {
+        return [
+            'general' => __('admin.settings.nav.general'),
+            'countries' => __('admin.settings.nav.countries'),
+            'makers' => __('admin.settings.nav.makers'),
+        ];
+    }
+
+    public function showSection(string $section): void
+    {
+        $this->activeSection = array_key_exists($section, static::sections()) ? $section : 'general';
+    }
+
+    /**
      * Country management (client revision): a small CRUD list embedded in
      * this same page rather than a separate route, gated by the same
      * SettingPolicy::update check every other action here already uses --
