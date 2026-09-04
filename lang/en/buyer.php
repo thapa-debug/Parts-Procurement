@@ -23,10 +23,6 @@ return [
 
         'maker_label' => 'Maker',
         'maker_placeholder_option' => '-- Select a maker --',
-        'maker_options' => [
-            'Toyota', 'Nissan', 'Honda', 'Mazda', 'Subaru',
-            'Mitsubishi', 'Suzuki', 'Daihatsu', 'Imported / Other',
-        ],
 
         'car_model_label' => 'Car model',
         'car_model_placeholder' => 'Examples: Crown / Land Cruiser',

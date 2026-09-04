@@ -15,7 +15,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable([
-    'buyer_id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
+    'buyer_id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
     'oem_part_number', 'part_name', 'reference_url', 'memo',
     'status', 'cost_price', 'applied_rate', 'applied_min_fee', 'buyer_price',
     'selected_response_id', 'shipping_method', 'shipping_fee',
@@ -37,6 +37,11 @@ class PartRequest extends Model
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(BuyerProfile::class, 'buyer_id');
+    }
+
+    public function maker(): BelongsTo
+    {
+        return $this->belongsTo(Maker::class);
     }
 
     /**

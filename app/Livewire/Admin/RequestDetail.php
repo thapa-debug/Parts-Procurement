@@ -50,7 +50,7 @@ class RequestDetail extends Component
         // gating on 'update' rather than 'view'.
         $this->authorize('viewBoard', PartRequest::class);
 
-        $this->partRequest = $partRequest;
+        $this->partRequest = $partRequest->load('maker');
         $this->selectedVendorIds = $this->activeVendors()->pluck('id')->all();
     }
 

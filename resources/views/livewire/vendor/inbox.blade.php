@@ -16,7 +16,7 @@
                             <span class="font-mono text-xs text-ink-muted">{{ $request->request_code }}</span>
                             <span class="text-xs text-ink-muted">{{ $request->created_at->format('Y-m-d') }}</span>
                         </div>
-                        <div class="mt-1 font-medium text-ink">{{ $request->maker }} {{ $request->car_model }} -- {{ $request->part_name }}</div>
+                        <div class="mt-1 font-medium text-ink">{{ $request->maker->name }} {{ $request->car_model }} -- {{ $request->part_name }}</div>
                         <div class="mt-0.5 text-xs text-ink-muted">{{ $request->oem_part_number ?? '—' }}</div>
                     </a>
                 @empty
@@ -38,7 +38,7 @@
                             <span class="font-mono text-xs text-ink-muted">{{ $request->request_code }}</span>
                             <span class="text-xs text-ink-muted">{{ $request->created_at->format('Y-m-d') }}</span>
                         </div>
-                        <div class="mt-1 font-medium text-ink">{{ $request->maker }} {{ $request->car_model }} -- {{ $request->part_name }}</div>
+                        <div class="mt-1 font-medium text-ink">{{ $request->maker->name }} {{ $request->car_model }} -- {{ $request->part_name }}</div>
                         <div class="mt-0.5 text-xs text-ink-muted">{{ $request->oem_part_number ?? '—' }}</div>
                     </a>
                 @empty

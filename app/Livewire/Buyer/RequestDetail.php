@@ -46,10 +46,11 @@ class RequestDetail extends Component
         // buyer_price is the one price column a buyer is ever allowed to see.
         $partRequest = PartRequest::query()
             ->select([
-                'id', 'request_code', 'part_type', 'maker', 'car_model', 'vin',
+                'id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
                 'oem_part_number', 'part_name', 'reference_url', 'memo',
                 'status', 'buyer_price', 'created_at',
             ])
+            ->with('maker')
             ->findOrFail($this->partRequestId);
 
         $quote = $this->presentedQuote($selectedResponseId);

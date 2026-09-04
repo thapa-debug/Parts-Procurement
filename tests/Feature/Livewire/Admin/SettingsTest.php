@@ -3,6 +3,8 @@
 use App\Livewire\Admin\Settings;
 use App\Models\BuyerProfile;
 use App\Models\Country;
+use App\Models\Maker;
+use App\Models\PartRequest;
 use App\Models\Setting;
 use App\Models\User;
 use App\Services\PricingService;
@@ -328,4 +330,182 @@ it('deactivating a country never deletes it or breaks an existing buyer\'s refer
     expect(Country::find($country->id))->not->toBeNull()
         ->and($profile->fresh()->country_id)->toBe($country->id)
         ->and($profile->fresh()->country->name)->toBe($country->name);
+});
+
+// --- maker management (client revision, mirrors countries above) ----------
+
+it('does not let a buyer or vendor add, edit, or toggle a maker -- same gating as the rest of Settings', function () {
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    Livewire::actingAs($buyer)->test(Settings::class)->assertForbidden();
+    Livewire::actingAs($vendor)->test(Settings::class)->assertForbidden();
+});
+
+it('lists every maker, active and inactive, with its status', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->create(['name' => 'Active Motors']);
+    Maker::factory()->inactive()->create(['name' => 'Inactive Motors']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->assertSee('Active Motors')
+        ->assertSee('Inactive Motors')
+        ->assertSeeInOrder(['Active Motors', __('admin.settings.maker_status.active')])
+        ->assertSeeInOrder(['Inactive Motors', __('admin.settings.maker_status.inactive')]);
+});
+
+it('adds a new maker, active by default', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('new_maker_name', 'Isuzu')
+        ->call('addMaker')
+        ->assertHasNoErrors()
+        ->assertSet('new_maker_name', '')
+        ->assertSee('Isuzu');
+
+    $maker = Maker::where('name', 'Isuzu')->firstOrFail();
+    expect($maker->is_active)->toBeTrue();
+});
+
+it('rejects adding a duplicate maker name', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->create(['name' => 'Isuzu']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('new_maker_name', 'Isuzu')
+        ->call('addMaker')
+        ->assertHasErrors(['new_maker_name']);
+
+    expect(Maker::where('name', 'Isuzu')->count())->toBe(1);
+});
+
+it('edits a maker\'s name', function () {
+    $admin = User::factory()->admin()->create();
+    $maker = Maker::factory()->create(['name' => 'Isuz']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingMaker', $maker->id)
+        ->assertSet('editing_maker_name', 'Isuz')
+        ->set('editing_maker_name', 'Isuzu')
+        ->call('saveMaker')
+        ->assertHasNoErrors()
+        ->assertSet('editingMakerId', null);
+
+    expect($maker->fresh()->name)->toBe('Isuzu');
+});
+
+it('rejects renaming a maker to a name another maker already has', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->create(['name' => 'Taken']);
+    $maker = Maker::factory()->create(['name' => 'Original']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingMaker', $maker->id)
+        ->set('editing_maker_name', 'Taken')
+        ->call('saveMaker')
+        ->assertHasErrors(['editing_maker_name']);
+
+    expect($maker->fresh()->name)->toBe('Original');
+});
+
+it('lets editing a maker keep its own current name unchanged', function () {
+    $admin = User::factory()->admin()->create();
+    $maker = Maker::factory()->create(['name' => 'Toyota']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingMaker', $maker->id)
+        ->call('saveMaker')
+        ->assertHasNoErrors();
+
+    expect($maker->fresh()->name)->toBe('Toyota');
+});
+
+it('cancels editing a maker without saving', function () {
+    $admin = User::factory()->admin()->create();
+    $maker = Maker::factory()->create(['name' => 'Toyota']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingMaker', $maker->id)
+        ->set('editing_maker_name', 'Should not save')
+        ->call('cancelEditingMaker')
+        ->assertSet('editingMakerId', null)
+        ->assertSet('editing_maker_name', '');
+
+    expect($maker->fresh()->name)->toBe('Toyota');
+});
+
+it('toggles a maker between active and inactive, without deleting it', function () {
+    $admin = User::factory()->admin()->create();
+    $maker = Maker::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleMakerActive', $maker->id);
+
+    expect($maker->fresh()->is_active)->toBeFalse();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleMakerActive', $maker->id);
+
+    expect($maker->fresh()->is_active)->toBeTrue();
+});
+
+it('deactivating a maker never deletes it or breaks an existing part request\'s reference to it', function () {
+    $admin = User::factory()->admin()->create();
+    $maker = Maker::factory()->create();
+    $partRequest = PartRequest::factory()->create(['maker_id' => $maker->id]);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('toggleMakerActive', $maker->id);
+
+    expect(Maker::find($maker->id))->not->toBeNull()
+        ->and($partRequest->fresh()->maker_id)->toBe($maker->id)
+        ->and($partRequest->fresh()->maker->name)->toBe($maker->name);
+});
+
+it('filters the maker list by name as the admin searches', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->create(['name' => 'Toyota']);
+    Maker::factory()->create(['name' => 'Toyota Industries']);
+    Maker::factory()->create(['name' => 'Nissan']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('makerSearch', 'Toyota')
+        ->assertSee('Toyota')
+        ->assertSee('Toyota Industries')
+        ->assertDontSee('Nissan');
+});
+
+it('shows a message when no maker matches the search', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->create(['name' => 'Toyota']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('makerSearch', 'Nowhere')
+        ->assertSee(__('admin.settings.maker_empty'))
+        ->assertDontSee('Toyota');
+});
+
+it('lists active makers before inactive ones, alphabetical within each group', function () {
+    $admin = User::factory()->admin()->create();
+    Maker::factory()->inactive()->create(['name' => 'Zed Inactive']);
+    Maker::factory()->create(['name' => 'Zeta Active']);
+    Maker::factory()->create(['name' => 'Alpha Active']);
+    Maker::factory()->inactive()->create(['name' => 'Alpha Inactive']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->assertSeeInOrder(['Alpha Active', 'Zeta Active', 'Alpha Inactive', 'Zed Inactive']);
 });

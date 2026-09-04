@@ -6,16 +6,18 @@ use App\Actions\SubmitPartRequestAction;
 use App\Enums\PartType;
 use App\Http\Requests\SubmitPartRequestRequest;
 use App\Models\BuyerProfile;
+use App\Models\Maker;
 use App\Models\PartRequest;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
+use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
 
 class RequestForm extends Component
 {
     public string $part_type = '';
 
-    public string $maker = '';
+    public string $maker_id = '';
 
     public string $car_model = '';
 
@@ -102,7 +104,7 @@ class RequestForm extends Component
         $request = $action->execute(
             $buyerProfile,
             PartType::from($validated['part_type']),
-            $validated['maker'],
+            (int) $validated['maker_id'],
             $validated['car_model'],
             $validated['vin'],
             $validated['oem_part_number'] ?: null,
@@ -112,15 +114,25 @@ class RequestForm extends Component
         );
 
         $this->reset([
-            'part_type', 'maker', 'car_model', 'vin',
+            'part_type', 'maker_id', 'car_model', 'vin',
             'oem_part_number', 'part_name', 'reference_url', 'memo',
         ]);
 
         $this->submittedCode = $request->request_code;
     }
 
+    /**
+     * @return Collection<int, Maker>
+     */
+    protected function activeMakers(): Collection
+    {
+        return Maker::query()->active()->orderBy('name')->get();
+    }
+
     public function render(): View
     {
-        return view('livewire.buyer.request-form')->title(__('buyer.request_form.title'));
+        return view('livewire.buyer.request-form', [
+            'activeMakers' => $this->activeMakers(),
+        ])->title(__('buyer.request_form.title'));
     }
 }

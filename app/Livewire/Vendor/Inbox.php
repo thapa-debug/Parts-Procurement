@@ -27,7 +27,8 @@ class Inbox extends Component
         // column (status, snapshotted price fields, etc.) out of this
         // vendor-facing list entirely, not just out of the rendered HTML.
         $invited = PartRequest::query()
-            ->select(['id', 'request_code', 'part_type', 'maker', 'car_model', 'oem_part_number', 'part_name', 'created_at'])
+            ->select(['id', 'request_code', 'part_type', 'maker_id', 'car_model', 'oem_part_number', 'part_name', 'created_at'])
+            ->with('maker')
             ->whereHas('vendors', fn ($query) => $query->where('vendor_profiles.id', $vendorProfile->id))
             ->withExists(['vendorResponses as responded' => fn ($query) => $query->where('vendor_id', $vendorProfile->id)])
             ->orderByDesc('created_at')

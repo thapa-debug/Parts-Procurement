@@ -40,20 +40,20 @@
 
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
-                    <label for="maker" class="block text-sm font-medium text-ink">
+                    <label for="maker_id" class="block text-sm font-medium text-ink">
                         {{ __('buyer.request_form.maker_label') }} <x-required-mark />
                     </label>
                     <select
-                        id="maker"
-                        wire:model="maker"
+                        id="maker_id"
+                        wire:model="maker_id"
                         class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                     >
                         <option value="">{{ __('buyer.request_form.maker_placeholder_option') }}</option>
-                        @foreach (__('buyer.request_form.maker_options') as $makerOption)
-                            <option value="{{ $makerOption }}">{{ $makerOption }}</option>
+                        @foreach ($activeMakers as $makerOption)
+                            <option value="{{ $makerOption->id }}">{{ $makerOption->name }}</option>
                         @endforeach
                     </select>
-                    @error('maker')
+                    @error('maker_id')
                         <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                     @enderror
                 </div>

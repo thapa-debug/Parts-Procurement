@@ -4,6 +4,7 @@ use App\Actions\SubmitPartRequestAction;
 use App\Enums\PartType;
 use App\Enums\RequestStatus;
 use App\Models\BuyerProfile;
+use App\Models\Maker;
 use App\Models\PartRequest;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -11,11 +12,12 @@ uses(RefreshDatabase::class);
 
 it('creates a request with a request_code derived from its own id', function () {
     $buyer = BuyerProfile::factory()->create();
+    $maker = Maker::factory()->create(['name' => 'Toyota']);
 
     $request = app(SubmitPartRequestAction::class)->execute(
         $buyer,
         PartType::Used,
-        'Toyota',
+        $maker->id,
         'Crown',
         'GRS184-0002255',
         '81110-60M00',
@@ -35,11 +37,12 @@ it('creates a request with a request_code derived from its own id', function () 
 
 it('allows null oem_part_number, reference_url, and memo -- vin stays required', function () {
     $buyer = BuyerProfile::factory()->create();
+    $maker = Maker::factory()->create(['name' => 'Nissan']);
 
     $request = app(SubmitPartRequestAction::class)->execute(
         $buyer,
         PartType::Both,
-        'Nissan',
+        $maker->id,
         'Skyline',
         'BNR34-123456',
         null,
@@ -56,9 +59,10 @@ it('allows null oem_part_number, reference_url, and memo -- vin stays required',
 
 it('never collides on request_code across multiple requests, even with the null placeholder mid-creation', function () {
     $buyer = BuyerProfile::factory()->create();
+    $maker = Maker::factory()->create(['name' => 'Toyota']);
 
     $requests = collect(range(1, 5))->map(fn () => app(SubmitPartRequestAction::class)->execute(
-        $buyer, PartType::Used, 'Toyota', 'Crown', 'GRS184-0002255', null, 'Part', null, null,
+        $buyer, PartType::Used, $maker->id, 'Crown', 'GRS184-0002255', null, 'Part', null, null,
     ));
 
     expect($requests->pluck('request_code')->unique())->toHaveCount(5);

@@ -3,6 +3,7 @@
 namespace App\Livewire\Admin;
 
 use App\Models\Country;
+use App\Models\Maker;
 use App\Models\Setting;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -53,6 +54,19 @@ class Settings extends Component
      * a different, non-paginated collection scoped to this page.
      */
     public string $countrySearch = '';
+
+    /**
+     * Maker management (client revision): exact mirror of the country
+     * section above -- same reasoning for reusing SettingPolicy instead of
+     * a dedicated MakerPolicy, same immediately-applied-actions shape.
+     */
+    public string $new_maker_name = '';
+
+    public ?int $editingMakerId = null;
+
+    public string $editing_maker_name = '';
+
+    public string $makerSearch = '';
 
     public function mount(): void
     {
@@ -176,10 +190,82 @@ class Settings extends Component
             ->get();
     }
 
+    public function addMaker(): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $validated = $this->validate([
+            'new_maker_name' => ['required', 'string', 'max:255', 'unique:makers,name'],
+        ]);
+
+        Maker::create(['name' => $validated['new_maker_name'], 'is_active' => true]);
+
+        $this->reset('new_maker_name');
+        $this->resetErrorBag('new_maker_name');
+    }
+
+    public function startEditingMaker(int $makerId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $maker = Maker::findOrFail($makerId);
+
+        $this->editingMakerId = $makerId;
+        $this->editing_maker_name = $maker->name;
+    }
+
+    public function cancelEditingMaker(): void
+    {
+        $this->editingMakerId = null;
+        $this->editing_maker_name = '';
+        $this->resetErrorBag('editing_maker_name');
+    }
+
+    public function saveMaker(): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $validated = $this->validate([
+            'editing_maker_name' => [
+                'required', 'string', 'max:255',
+                Rule::unique('makers', 'name')->ignore($this->editingMakerId),
+            ],
+        ]);
+
+        Maker::findOrFail($this->editingMakerId)->update(['name' => $validated['editing_maker_name']]);
+
+        $this->editingMakerId = null;
+        $this->editing_maker_name = '';
+    }
+
+    public function toggleMakerActive(int $makerId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $maker = Maker::findOrFail($makerId);
+        $maker->update(['is_active' => ! $maker->is_active]);
+    }
+
+    /**
+     * Active makers first, then inactive, alphabetical within each group --
+     * same ordering as countries() above.
+     *
+     * @return Collection<int, Maker>
+     */
+    protected function makers(): Collection
+    {
+        return Maker::query()
+            ->when($this->makerSearch, fn ($query) => $query->where('name', 'like', "%{$this->makerSearch}%"))
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get();
+    }
+
     public function render(): View
     {
         return view('livewire.admin.settings', [
             'countries' => $this->countries(),
+            'makers' => $this->makers(),
         ])->title(__('admin.settings.title'));
     }
 }

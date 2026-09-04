@@ -21,7 +21,7 @@
                                 {{ $request->request_code }}
                             </a>
                         </td>
-                        <td class="px-4 py-2.5 text-ink">{{ $request->maker }} {{ $request->car_model }} / {{ $request->part_name }}</td>
+                        <td class="px-4 py-2.5 text-ink">{{ $request->maker->name }} {{ $request->car_model }} / {{ $request->part_name }}</td>
                         <td class="px-4 py-2.5 text-ink-muted">{{ $request->created_at->format('Y-m-d') }}</td>
                         <td class="px-4 py-2.5">
                             <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
