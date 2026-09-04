@@ -85,5 +85,8 @@ it('lets an admin-created user complete the forced password change and reach the
         ->call('update')
         ->assertRedirect('/');
 
-    $this->get('/')->assertOk();
+    // A vendor's "reaching the app" is now their inbox, not the generic
+    // landing page -- see HomePageTest for the dedicated coverage of
+    // that redirect itself.
+    $this->get('/')->assertRedirect(route('vendor.inbox'));
 });

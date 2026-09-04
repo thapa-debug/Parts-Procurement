@@ -21,6 +21,16 @@ use App\Livewire\Vendor\RequestResponse;
 use Illuminate\Support\Facades\Route;
 
 Route::get('/', function () {
+    // A vendor's home is their inbox, not the generic landing page --
+    // this runs after EnsureMustChangePassword (global web-group
+    // middleware, so it already redirected away if that flag is set)
+    // and doesn't touch the "act" gate at all, since viewing the inbox
+    // has never required email verification (CLAUDE.md §14: unverified
+    // users can log in and browse, just not act).
+    if (auth()->check() && auth()->user()->isVendor()) {
+        return redirect()->route('vendor.inbox');
+    }
+
     return view('welcome');
 });
 
