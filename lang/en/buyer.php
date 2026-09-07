@@ -14,13 +14,6 @@ return [
             'unapproved_body' => "Your account is awaiting admin approval. You'll be able to submit requests as soon as it's approved -- no action is needed from you in the meantime.",
         ],
 
-        'part_type_label' => 'Part type',
-        'part_type' => [
-            'used' => 'Used',
-            'new' => 'New',
-            'both' => 'Either -- show me both',
-        ],
-
         'maker_label' => 'Maker',
         'maker_placeholder_option' => '-- Select a maker --',
 

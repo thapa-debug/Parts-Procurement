@@ -83,6 +83,19 @@ it('does not let a vendor or admin mount the request form', function () {
     Livewire::actingAs($admin)->test(RequestForm::class)->assertForbidden();
 });
 
+// --- part type (client revision: the client only deals in new parts) -------
+
+it('never shows a part-type selector -- the client only deals in new parts', function () {
+    $buyer = actingBuyer();
+
+    Livewire::actingAs($buyer)
+        ->test(RequestForm::class)
+        ->assertDontSee('Used')
+        ->assertDontSee('Either -- show me both');
+
+    expect(property_exists(RequestForm::class, 'part_type'))->toBeFalse();
+});
+
 // --- submission ----------------------------------------------------------
 
 it('submits a request and generates a sequential request code', function () {
@@ -91,7 +104,6 @@ it('submits a request and generates a sequential request code', function () {
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $toyota->id)
         ->set('car_model', 'Crown')
         ->set('vin', 'GRS184-0002255')
@@ -101,7 +113,7 @@ it('submits a request and generates a sequential request code', function () {
 
     $request = PartRequest::firstOrFail();
 
-    expect($request->part_type)->toBe(PartType::Used)
+    expect($request->part_type)->toBe(PartType::New)
         ->and($request->maker_id)->toBe($toyota->id)
         ->and($request->car_model)->toBe('Crown')
         ->and($request->vin)->toBe('GRS184-0002255')
@@ -117,14 +129,12 @@ it('resets the form and shows an inline confirmation after submitting', function
 
     $component = Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Both->value)
         ->set('maker_id', (string) $nissan->id)
         ->set('car_model', 'Skyline')
         ->set('vin', 'BNR34-123456')
         ->set('oem_part_number', '81110-60M00')
         ->set('part_name', 'Rear bumper')
         ->call('submit')
-        ->assertSet('part_type', '')
         ->assertSet('maker_id', '')
         ->assertSet('car_model', '')
         ->assertSet('part_name', '');
@@ -143,7 +153,6 @@ it('clears the confirmation as soon as the buyer starts a new request', function
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $toyota->id)
         ->set('car_model', 'Crown')
         ->set('vin', 'GRS184-0002255')
@@ -160,7 +169,7 @@ it('rejects an incomplete submission', function () {
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
         ->call('submit')
-        ->assertHasErrors(['part_type', 'maker_id', 'car_model', 'part_name', 'vin']);
+        ->assertHasErrors(['maker_id', 'car_model', 'part_name', 'vin']);
 
     expect(PartRequest::count())->toBe(0);
 });
@@ -171,7 +180,6 @@ it('rejects a submission without a vin, even with oem_part_number and reference_
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $toyota->id)
         ->set('car_model', 'Crown')
         ->set('part_name', 'Headlight')
@@ -189,7 +197,6 @@ it('accepts a submission with a vin and no oem_part_number or reference_url', fu
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $toyota->id)
         ->set('car_model', 'Crown')
         ->set('part_name', 'Headlight')
@@ -217,7 +224,6 @@ it('rejects an inactive maker -- only active makers are a valid pick for a new r
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $inactive->id)
         ->set('car_model', 'Crown')
         ->set('part_name', 'Headlight')
@@ -234,7 +240,6 @@ it('blocks submission for an unapproved buyer even if the form were somehow reac
 
     Livewire::actingAs($buyer)
         ->test(RequestForm::class)
-        ->set('part_type', PartType::Used->value)
         ->set('maker_id', (string) $toyota->id)
         ->set('car_model', 'Crown')
         ->set('part_name', 'Headlight')

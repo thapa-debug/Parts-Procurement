@@ -15,8 +15,6 @@ use Livewire\Component;
 
 class RequestForm extends Component
 {
-    public string $part_type = '';
-
     public string $maker_id = '';
 
     public string $car_model = '';
@@ -103,7 +101,11 @@ class RequestForm extends Component
 
         $request = $action->execute(
             $buyerProfile,
-            PartType::from($validated['part_type']),
+            // The client only deals in new parts (client revision) -- the
+            // buyer no longer picks this, and part_type is always New.
+            // The column/enum stay as they are (CLAUDE.md: keep intact for
+            // future flexibility), only the buyer-facing choice is gone.
+            PartType::New,
             (int) $validated['maker_id'],
             $validated['car_model'],
             $validated['vin'],
@@ -114,7 +116,7 @@ class RequestForm extends Component
         );
 
         $this->reset([
-            'part_type', 'maker_id', 'car_model', 'vin',
+            'maker_id', 'car_model', 'vin',
             'oem_part_number', 'part_name', 'reference_url', 'memo',
         ]);
 

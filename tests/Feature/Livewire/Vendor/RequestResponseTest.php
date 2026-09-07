@@ -171,11 +171,38 @@ it('rejects a quote missing required fields', function () {
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->call('sendResponse')
         ->assertHasErrors([
-            'cost_price', 'quality_rank', 'lead_time', 'comment',
+            'cost_price', 'quality_rank', 'lead_time',
             'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'photos',
-        ]);
+        ])
+        ->assertHasNoErrors('comment');
 
     expect(VendorResponse::count())->toBe(0);
+});
+
+it('accepts a quote with no condition notes -- comment is optional, unlike weight/dimensions', function () {
+    config(['filesystems.default' => 's3']);
+    Storage::fake('s3');
+
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    Livewire::actingAs($vendorUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->set('cost_price', '45000')
+        ->set('quality_rank', QualityRank::A->value)
+        ->set('lead_time', LeadTime::Within1Week->value)
+        ->set('weight_kg', '3.5')
+        ->set('length_cm', '40')
+        ->set('width_cm', '25')
+        ->set('height_cm', '15')
+        ->set('photos', UploadedFile::fake()->image('bumper.jpg'))
+        ->call('sendResponse')
+        ->assertHasNoErrors()
+        ->assertSet('submitted', true);
+
+    expect(VendorResponse::sole()->comment)->toBeNull();
 });
 
 it('rejects non-numeric weight and dimensions on a real quote', function () {
