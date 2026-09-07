@@ -26,7 +26,7 @@ use Illuminate\Support\Facades\DB;
 class SubmitVendorResponseAction
 {
     /**
-     * @param  array{cost_price?: int|null, quality_rank?: string|null, lead_time?: string|null, comment?: string|null, is_no_stock?: bool}  $data
+     * @param  array{cost_price?: int|null, quality_rank?: string|null, lead_time?: string|null, comment?: string|null, weight_kg?: float|null, length_cm?: float|null, width_cm?: float|null, height_cm?: float|null, is_no_stock?: bool}  $data
      * @param  array<int, UploadedFile>  $photos
      */
     public function execute(PartRequest $partRequest, VendorProfile $vendorProfile, array $data, array $photos = []): VendorResponse
@@ -54,6 +54,10 @@ class SubmitVendorResponseAction
                 'quality_rank' => $data['quality_rank'] ?? null,
                 'lead_time' => $data['lead_time'] ?? null,
                 'comment' => $data['comment'] ?? null,
+                'weight_kg' => $data['weight_kg'] ?? null,
+                'length_cm' => $data['length_cm'] ?? null,
+                'width_cm' => $data['width_cm'] ?? null,
+                'height_cm' => $data['height_cm'] ?? null,
                 'is_no_stock' => $data['is_no_stock'] ?? false,
             ]);
 

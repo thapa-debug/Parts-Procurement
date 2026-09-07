@@ -87,6 +87,10 @@ it('submits a quote with multiple photos, added one at a time, and shows a confi
         ->set('quality_rank', QualityRank::A->value)
         ->set('lead_time', LeadTime::Within1Week->value)
         ->set('comment', 'Clean, no damage.')
+        ->set('weight_kg', '3.5')
+        ->set('length_cm', '40')
+        ->set('width_cm', '25')
+        ->set('height_cm', '15')
         ->set('photos', UploadedFile::fake()->image('bumper-front.jpg'))
         ->set('photos', UploadedFile::fake()->image('bumper-side.jpg'))
         ->assertSet('photos', fn ($photos) => count($photos) === 2)
@@ -99,6 +103,10 @@ it('submits a quote with multiple photos, added one at a time, and shows a confi
     expect($response->part_request_id)->toBe($request->id)
         ->and($response->vendor_id)->toBe($vendorProfile->id)
         ->and($response->cost_price)->toBe(45000)
+        ->and($response->weight_kg)->toBe('3.50')
+        ->and($response->length_cm)->toBe('40.00')
+        ->and($response->width_cm)->toBe('25.00')
+        ->and($response->height_cm)->toBe('15.00')
         ->and($response->photos)->toHaveCount(2);
 });
 
@@ -162,7 +170,28 @@ it('rejects a quote missing required fields', function () {
     Livewire::actingAs($vendorUser)
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->call('sendResponse')
-        ->assertHasErrors(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
+        ->assertHasErrors([
+            'cost_price', 'quality_rank', 'lead_time', 'comment',
+            'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'photos',
+        ]);
+
+    expect(VendorResponse::count())->toBe(0);
+});
+
+it('rejects non-numeric weight and dimensions on a real quote', function () {
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    Livewire::actingAs($vendorUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->set('weight_kg', 'heavy')
+        ->set('length_cm', 'long')
+        ->set('width_cm', 'wide')
+        ->set('height_cm', 'tall')
+        ->call('sendResponse')
+        ->assertHasErrors(['weight_kg', 'length_cm', 'width_cm', 'height_cm']);
 
     expect(VendorResponse::count())->toBe(0);
 });
@@ -184,7 +213,30 @@ it('submits a one-tap no-stock reply and shows a confirmation', function () {
     $response = VendorResponse::sole();
 
     expect($response->is_no_stock)->toBeTrue()
-        ->and($response->cost_price)->toBeNull();
+        ->and($response->cost_price)->toBeNull()
+        ->and($response->weight_kg)->toBeNull()
+        ->and($response->length_cm)->toBeNull()
+        ->and($response->width_cm)->toBeNull()
+        ->and($response->height_cm)->toBeNull();
+});
+
+it('never requires weight or dimensions for a no-stock reply, even if left blank', function () {
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    Livewire::actingAs($vendorUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertSet('weight_kg', '')
+        ->assertSet('length_cm', '')
+        ->assertSet('width_cm', '')
+        ->assertSet('height_cm', '')
+        ->call('sendNoStock')
+        ->assertHasNoErrors()
+        ->assertSet('submitted', true);
+
+    expect(VendorResponse::sole()->is_no_stock)->toBeTrue();
 });
 
 // --- already responded -----------------------------------------------------
