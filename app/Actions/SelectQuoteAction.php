@@ -5,7 +5,11 @@ namespace App\Actions;
 use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
+use App\Models\User;
+use App\Notifications\QuoteSelectedNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * The buyer's pick among the currently presented quotes (client revision:
@@ -36,7 +40,7 @@ class SelectQuoteAction
             throw SelectQuoteNotAllowedException::responseMismatch();
         }
 
-        return DB::transaction(function () use ($partRequest, $presentedQuote) {
+        $partRequest = DB::transaction(function () use ($partRequest, $presentedQuote) {
             $partRequest->update([
                 'selected_response_id' => $presentedQuote->vendor_response_id,
                 'cost_price' => $presentedQuote->cost_price,
@@ -47,5 +51,16 @@ class SelectQuoteAction
 
             return $partRequest->fresh();
         });
+
+        // Best-effort: a failed send must never undo a successful selection
+        // (CLAUDE.md §10) -- same try/catch(Throwable)+report() shape as
+        // RegisterBuyerAction's verification email.
+        try {
+            Notification::send(User::query()->admins()->get(), new QuoteSelectedNotification($partRequest));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $partRequest;
     }
 }

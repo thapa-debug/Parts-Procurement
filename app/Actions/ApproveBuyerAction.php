@@ -4,6 +4,8 @@ namespace App\Actions;
 
 use App\Models\BuyerProfile;
 use App\Models\User;
+use App\Notifications\BuyerApprovedNotification;
+use Throwable;
 
 /**
  * Approves a self-registered buyer (CLAUDE.md §14) so they can pass the
@@ -20,6 +22,17 @@ class ApproveBuyerAction
             'approved_by' => $admin->id,
         ]);
 
-        return $buyerProfile->fresh();
+        $buyerProfile = $buyerProfile->fresh();
+
+        // Best-effort: a failed send must never undo a successful approval
+        // (CLAUDE.md §10) -- same try/catch(Throwable)+report() shape as
+        // RegisterBuyerAction's verification email.
+        try {
+            $buyerProfile->user?->notify(new BuyerApprovedNotification);
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $buyerProfile;
     }
 }

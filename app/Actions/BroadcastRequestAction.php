@@ -7,7 +7,9 @@ use App\Enums\VendorStatus;
 use App\Exceptions\RequestCannotBeBroadcastException;
 use App\Models\PartRequest;
 use App\Models\VendorProfile;
+use App\Notifications\RequestBroadcastNotification;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * 打診: broadcasts a `new` request to the selected vendors -- records each
@@ -29,25 +31,39 @@ class BroadcastRequestAction
             throw RequestCannotBeBroadcastException::wrongStatus($partRequest);
         }
 
-        $eligibleVendorIds = VendorProfile::query()
+        $eligibleVendors = VendorProfile::query()
             ->where('status', VendorStatus::Active)
             ->whereIn('id', $vendorProfileIds)
-            ->pluck('id');
+            ->with('user')
+            ->get();
 
-        if ($eligibleVendorIds->isEmpty()) {
+        if ($eligibleVendors->isEmpty()) {
             throw RequestCannotBeBroadcastException::noEligibleVendors();
         }
 
-        return DB::transaction(function () use ($partRequest, $eligibleVendorIds) {
+        $partRequest = DB::transaction(function () use ($partRequest, $eligibleVendors) {
             $now = now();
 
             $partRequest->vendors()->attach(
-                $eligibleVendorIds->mapWithKeys(fn (int $id) => [$id => ['invited_at' => $now]])->all()
+                $eligibleVendors->mapWithKeys(fn (VendorProfile $vendor) => [$vendor->id => ['invited_at' => $now]])->all()
             );
 
             $partRequest->update(['status' => RequestStatus::VendorInquiry]);
 
             return $partRequest->fresh();
         });
+
+        // Best-effort, per vendor: one vendor's notification failing must
+        // never stop the others from being notified, and none of them may
+        // ever roll back the broadcast itself (CLAUDE.md §10).
+        foreach ($eligibleVendors as $vendor) {
+            try {
+                $vendor->user?->notify(new RequestBroadcastNotification($partRequest));
+            } catch (Throwable $e) {
+                report($e);
+            }
+        }
+
+        return $partRequest;
     }
 }

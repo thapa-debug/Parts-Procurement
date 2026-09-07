@@ -7,6 +7,7 @@ use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -47,6 +48,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isVendor(): bool
     {
         return $this->role === UserRole::Vendor;
+    }
+
+    /**
+     * Every admin user -- the recipient list for every admin-facing
+     * notification (Phase 3 §"admin" recipient = all users with the admin
+     * role). Same scope shape as Country::scopeActive/Maker::scopeActive.
+     *
+     * @param  Builder<User>  $query
+     * @return Builder<User>
+     */
+    public function scopeAdmins(Builder $query): Builder
+    {
+        return $query->where('role', UserRole::Admin);
     }
 
     /**

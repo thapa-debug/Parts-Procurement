@@ -43,11 +43,17 @@ class PresentedQuote extends Model
         'presented_at' => 'datetime',
     ];
 
+    /**
+     * @return BelongsTo<PartRequest, $this>
+     */
     public function partRequest(): BelongsTo
     {
         return $this->belongsTo(PartRequest::class);
     }
 
+    /**
+     * @return BelongsTo<VendorResponse, $this>
+     */
     public function vendorResponse(): BelongsTo
     {
         return $this->belongsTo(VendorResponse::class);

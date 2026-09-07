@@ -5,7 +5,9 @@ namespace App\Actions;
 use App\Enums\UserRole;
 use App\Models\BuyerProfile;
 use App\Models\User;
+use App\Notifications\BuyerRegisteredNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
 use Throwable;
 
 /**
@@ -55,6 +57,14 @@ class RegisterBuyerAction
         // verification banner's resend button.
         try {
             $result['user']->sendEmailVerificationNotification();
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        // Separate try/catch from the one above: the verification email
+        // failing must never suppress the admin notification, or vice versa.
+        try {
+            Notification::send(User::query()->admins()->get(), new BuyerRegisteredNotification($result['buyer_profile']));
         } catch (Throwable $e) {
             report($e);
         }
