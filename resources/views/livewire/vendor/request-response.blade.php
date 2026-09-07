@@ -258,9 +258,9 @@
                         uploading: false,
                         uploadedCount: 0,
                         totalCount: 0,
-                        async selectPhotos(event) {
-                            const files = Array.from(event.target.files);
-                            event.target.value = '';
+                        isDraggingOver: false,
+                        async uploadFiles(fileList) {
+                            const files = Array.from(fileList);
                             if (files.length === 0) return;
 
                             this.uploading = true;
@@ -269,15 +269,15 @@
 
                             // One $wire.$upload() call per file, awaited in
                             // sequence -- never $wire.$uploadMultiple(), which
-                            // Livewire's S3 driver rejects outright. Each call
-                            // is a genuine single-file upload
-                            // (UploadManager.upload() always sets
-                            // `multiple: false`), so this stays S3-safe no
-                            // matter how many files the native dialog let the
-                            // vendor pick at once. Sequential, not
-                            // concurrent, to avoid overlapping requests
-                            // against the local dev server's single-threaded
-                            // built-in PHP server.
+                            // Livewire's S3 driver rejects outright. Both entry
+                            // points below (click-to-browse and drag-and-drop)
+                            // funnel through this one loop, so each call is a
+                            // genuine single-file upload (UploadManager.upload()
+                            // always sets `multiple: false`), staying S3-safe
+                            // no matter how many files arrived at once.
+                            // Sequential, not concurrent, to avoid overlapping
+                            // requests against the local dev server's
+                            // single-threaded built-in PHP server.
                             for (const file of files) {
                                 await new Promise((resolve) => {
                                     $wire.$upload('photos', file,
@@ -291,19 +291,36 @@
                         },
                     }"
                 >
-                    <label for="photos" class="block text-sm font-medium text-ink">
-                        {{ __('vendor.request_response.photos_label') }} <x-required-mark />
-                    </label>
+                    <div class="flex items-center justify-between">
+                        <label for="photos" class="block text-sm font-medium text-ink">
+                            {{ __('vendor.request_response.photos_label') }} <x-required-mark />
+                        </label>
+                        <span class="text-xs font-medium text-ink-muted">
+                            {{ __('vendor.request_response.photos_counter', ['count' => count($photos), 'max' => $maxPhotos]) }}
+                        </span>
+                    </div>
 
                     @if (count($photos) < $maxPhotos)
-                        <input
-                            id="photos"
-                            type="file"
-                            multiple
-                            accept="image/*"
-                            x-on:change="selectPhotos($event)"
-                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm file:mr-3 file:rounded-md file:border-0 file:bg-brand-50 file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-brand-700"
+                        <label
+                            for="photos"
+                            x-on:dragover.prevent="isDraggingOver = true"
+                            x-on:dragenter.prevent="isDraggingOver = true"
+                            x-on:dragleave.prevent="isDraggingOver = false"
+                            x-on:drop.prevent="isDraggingOver = false; uploadFiles($event.dataTransfer.files)"
+                            :class="isDraggingOver ? 'border-brand-500 bg-brand-50' : 'border-line bg-surface hover:border-brand-300'"
+                            class="mt-1.5 flex cursor-pointer flex-col items-center justify-center gap-1 rounded-md border-2 border-dashed px-4 py-6 text-center transition"
                         >
+                            <span class="text-sm font-medium text-brand-700">{{ __('vendor.request_response.photos_dropzone_label') }}</span>
+                            <span class="text-xs text-ink-muted">{{ __('vendor.request_response.photos_dropzone_help') }}</span>
+                            <input
+                                id="photos"
+                                type="file"
+                                multiple
+                                accept="image/*"
+                                class="sr-only"
+                                x-on:change="uploadFiles($event.target.files); $event.target.value = ''"
+                            >
+                        </label>
                     @endif
 
                     {{-- Two plain elements toggled with x-show (visibility
@@ -319,7 +336,7 @@
                         {{ __('vendor.request_response.uploading') }} (<span x-text="uploadedCount"></span>/<span x-text="totalCount"></span>)
                     </p>
                     <p class="mt-1 text-xs text-ink-muted" x-show="!uploading">
-                        {{ __('vendor.request_response.photos_help', ['count' => count($photos), 'max' => $maxPhotos]) }}
+                        {{ __('vendor.request_response.photos_help') }}
                     </p>
 
                     @error('photos.*')

@@ -64,7 +64,10 @@ return [
         'height_caption' => 'Height',
 
         'photos_label' => 'Part photos',
-        'photos_help' => 'Photos of the actual part -- different angles, any damage. :count of :max added.',
+        'photos_counter' => ':count / :max',
+        'photos_dropzone_label' => 'Drag photos here, or click to browse',
+        'photos_dropzone_help' => 'JPG or PNG, different angles, any damage.',
+        'photos_help' => 'Photos of the actual part -- different angles, any damage.',
         'uploading' => 'Uploading',
         'max_photos_error' => 'You can attach up to :max photos.',
         'remove_photo' => 'Remove photo',

@@ -21,13 +21,6 @@ class RequestResponse extends Component
     use WithFileUploads;
 
     /**
-     * Vendors can attach up to this many photos (different angles, damage,
-     * etc.) -- CLAUDE.md doesn't pin an exact number; 6 is a reasonable
-     * middle of the requested 5-8 range.
-     */
-    public const MAX_PHOTOS = 6;
-
-    /**
      * Only the id is kept as component state -- never the PartRequest
      * model itself. A public Eloquent-model property gets its full
      * attribute set serialized into Livewire's client-side snapshot, which
@@ -63,17 +56,21 @@ class RequestResponse extends Component
 
     /**
      * Array-typed, but the file input in the Blade view deliberately has no
-     * `multiple` HTML attribute. Livewire's S3 upload driver flatly rejects
-     * a request where the client reports more than one file selected in a
-     * single change event (`S3DoesntSupportMultipleFileUploads`) -- but a
-     * single-file input bound to an array property is a documented, fully
-     * S3-safe Livewire pattern: each selection uploads as one file
-     * (`$isMultiple` is false), and `WithFileUploads::_finishUpload()`
-     * itself appends it onto the existing array rather than replacing it
-     * (see the vendor's own "if the property is an array, but the upload
-     * ISN'T set to multiple, then APPEND" comment in that method). The
-     * vendor re-opens the same picker to add each additional photo one at
-     * a time; removePhoto() below lets them drop one before submitting.
+     * `multiple` HTML attribute, and drag-and-drop never binds `wire:model`
+     * either. Livewire's S3 upload driver flatly rejects a request where the
+     * client reports more than one file selected in a single change event
+     * (`S3DoesntSupportMultipleFileUploads`) -- but a single-file input
+     * bound to an array property is a documented, fully S3-safe Livewire
+     * pattern: each selection uploads as one file (`$isMultiple` is false),
+     * and `WithFileUploads::_finishUpload()` itself appends it onto the
+     * existing array rather than replacing it (see the vendor's own "if the
+     * property is an array, but the upload ISN'T set to multiple, then
+     * APPEND" comment in that method). Both entry points (click-to-browse
+     * and drag-and-drop) funnel through the same Alpine `uploadFiles()`
+     * helper in the Blade view, which loops over whatever `FileList` it's
+     * given and calls `$wire.$upload()` once per file, sequentially --
+     * never `$wire.$uploadMultiple()`. removePhoto() below lets the vendor
+     * drop one before submitting.
      *
      * @var array<int, TemporaryUploadedFile>
      */
@@ -116,23 +113,34 @@ class RequestResponse extends Component
             'length_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'width_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'height_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
-            'photos' => ['required', 'array', 'min:1', 'max:'.self::MAX_PHOTOS],
+            'photos' => ['required', 'array', 'min:1', 'max:'.$this->maxPhotos()],
             'photos.*' => ['image', 'max:10240'],
         ];
     }
 
     /**
-     * Belt-and-suspenders against MAX_PHOTOS: the Blade view hides the
-     * file input once the cap is reached, but a selection made just
-     * before that re-render still lands here. Drop whatever's newest
-     * beyond the cap rather than silently accepting it.
+     * Belt-and-suspenders against the configured max: the Blade view hides
+     * the drop zone/file input once the cap is reached, but a drag-and-drop
+     * or selection made just before that re-render still lands here. Drop
+     * whatever's newest beyond the cap rather than silently accepting it.
      */
     public function updatedPhotos(): void
     {
-        if (count($this->photos) > self::MAX_PHOTOS) {
-            $this->photos = array_slice($this->photos, 0, self::MAX_PHOTOS);
-            $this->addError('photos', __('vendor.request_response.max_photos_error', ['max' => self::MAX_PHOTOS]));
+        $max = $this->maxPhotos();
+
+        if (count($this->photos) > $max) {
+            $this->photos = array_slice($this->photos, 0, $max);
+            $this->addError('photos', __('vendor.request_response.max_photos_error', ['max' => $max]));
         }
+    }
+
+    /**
+     * Configurable rather than a hardcoded magic number (config/vendor.php)
+     * so it's easy to raise or lower later.
+     */
+    public function maxPhotos(): int
+    {
+        return (int) config('vendor.max_response_photos', 10);
     }
 
     public function removePhoto(int $index): void
@@ -223,7 +231,7 @@ class RequestResponse extends Component
         return view('livewire.vendor.request-response', [
             'partRequest' => $partRequest,
             'myResponse' => $myResponse,
-            'maxPhotos' => self::MAX_PHOTOS,
+            'maxPhotos' => $this->maxPhotos(),
         ])->title($partRequest->request_code);
     }
 }

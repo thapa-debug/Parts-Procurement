@@ -137,8 +137,33 @@ it('rejects a batched multi-file upload outright under S3, guarding against ever
     expect($attempt)->toThrow(S3DoesntSupportMultipleFileUploads::class);
 });
 
-it('caps photos at MAX_PHOTOS and lets the vendor remove one before submitting', function () {
+it('caps photos at the configured max and lets the vendor remove one before submitting', function () {
     config(['filesystems.default' => 's3']);
+    Storage::fake('s3');
+
+    $vendorUser = User::factory()->vendor()->create();
+    $vendorProfile = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create();
+    $request->vendors()->attach($vendorProfile->id, ['invited_at' => now()]);
+
+    $max = config('vendor.max_response_photos');
+    $component = Livewire::actingAs($vendorUser)->test(RequestResponse::class, ['partRequest' => $request]);
+
+    foreach (range(1, $max + 1) as $i) {
+        $component->set('photos', UploadedFile::fake()->image("photo-{$i}.jpg"));
+    }
+
+    $component
+        ->assertSet('photos', fn ($photos) => count($photos) === $max)
+        ->assertHasErrors('photos');
+
+    $component->call('removePhoto', 0)
+        ->assertSet('photos', fn ($photos) => count($photos) === $max - 1)
+        ->assertHasNoErrors('photos');
+});
+
+it('respects a custom configured max-photos value', function () {
+    config(['vendor.max_response_photos' => 3, 'filesystems.default' => 's3']);
     Storage::fake('s3');
 
     $vendorUser = User::factory()->vendor()->create();
@@ -148,17 +173,14 @@ it('caps photos at MAX_PHOTOS and lets the vendor remove one before submitting',
 
     $component = Livewire::actingAs($vendorUser)->test(RequestResponse::class, ['partRequest' => $request]);
 
-    foreach (range(1, RequestResponse::MAX_PHOTOS + 1) as $i) {
+    foreach (range(1, 4) as $i) {
         $component->set('photos', UploadedFile::fake()->image("photo-{$i}.jpg"));
     }
 
     $component
-        ->assertSet('photos', fn ($photos) => count($photos) === RequestResponse::MAX_PHOTOS)
-        ->assertHasErrors('photos');
-
-    $component->call('removePhoto', 0)
-        ->assertSet('photos', fn ($photos) => count($photos) === RequestResponse::MAX_PHOTOS - 1)
-        ->assertHasNoErrors('photos');
+        ->assertSet('photos', fn ($photos) => count($photos) === 3)
+        ->assertHasErrors('photos')
+        ->assertSee(__('vendor.request_response.max_photos_error', ['max' => 3]));
 });
 
 it('rejects a quote missing required fields', function () {
