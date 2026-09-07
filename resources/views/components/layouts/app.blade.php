@@ -51,6 +51,8 @@
 
                 @auth
                     <div class="flex items-center gap-4 text-sm">
+                        <livewire:notification-center />
+
                         <span class="text-ink-muted">{{ auth()->user()->name }}</span>
 
                         <form method="POST" action="{{ route('logout') }}">
