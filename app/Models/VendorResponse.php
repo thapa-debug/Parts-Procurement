@@ -34,11 +34,17 @@ class VendorResponse extends Model
         'height_cm' => 'decimal:2',
     ];
 
+    /**
+     * @return BelongsTo<PartRequest, $this>
+     */
     public function partRequest(): BelongsTo
     {
         return $this->belongsTo(PartRequest::class);
     }
 
+    /**
+     * @return BelongsTo<VendorProfile, $this>
+     */
     public function vendor(): BelongsTo
     {
         return $this->belongsTo(VendorProfile::class, 'vendor_id');

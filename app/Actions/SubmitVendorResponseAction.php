@@ -4,10 +4,14 @@ namespace App\Actions;
 
 use App\Exceptions\VendorResponseNotAllowedException;
 use App\Models\PartRequest;
+use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
+use App\Notifications\VendorResponseSubmittedNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * Records a vendor's reply to a 打診 broadcast -- either a priced quote
@@ -46,7 +50,7 @@ class SubmitVendorResponseAction
             throw VendorResponseNotAllowedException::alreadyResponded();
         }
 
-        return DB::transaction(function () use ($partRequest, $vendorProfile, $data, $photos) {
+        $response = DB::transaction(function () use ($partRequest, $vendorProfile, $data, $photos) {
             $response = VendorResponse::create([
                 'part_request_id' => $partRequest->id,
                 'vendor_id' => $vendorProfile->id,
@@ -83,5 +87,16 @@ class SubmitVendorResponseAction
 
             return $response->fresh('photos');
         });
+
+        // Best-effort: a failed send must never undo a successful response
+        // (CLAUDE.md §10) -- same try/catch(Throwable)+report() shape as
+        // RegisterBuyerAction's verification email.
+        try {
+            Notification::send(User::query()->admins()->get(), new VendorResponseSubmittedNotification($response));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $response;
     }
 }

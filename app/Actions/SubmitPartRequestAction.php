@@ -6,7 +6,11 @@ use App\Enums\PartType;
 use App\Enums\RequestStatus;
 use App\Models\BuyerProfile;
 use App\Models\PartRequest;
+use App\Models\User;
+use App\Notifications\PartRequestSubmittedNotification;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Notification;
+use Throwable;
 
 /**
  * Buyer request submission. request_code is generated from the row's own
@@ -28,7 +32,7 @@ class SubmitPartRequestAction
         ?string $referenceUrl,
         ?string $memo,
     ): PartRequest {
-        return DB::transaction(function () use ($buyer, $partType, $makerId, $carModel, $vin, $oemPartNumber, $partName, $referenceUrl, $memo) {
+        $partRequest = DB::transaction(function () use ($buyer, $partType, $makerId, $carModel, $vin, $oemPartNumber, $partName, $referenceUrl, $memo) {
             $partRequest = PartRequest::create([
                 'buyer_id' => $buyer->id,
                 'request_code' => null, // filled in below, once the id exists
@@ -47,5 +51,16 @@ class SubmitPartRequestAction
 
             return $partRequest;
         });
+
+        // Best-effort: a failed send must never undo a successful submission
+        // (CLAUDE.md §10) -- same try/catch(Throwable)+report() shape as
+        // RegisterBuyerAction's verification email.
+        try {
+            Notification::send(User::query()->admins()->get(), new PartRequestSubmittedNotification($partRequest));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $partRequest;
     }
 }

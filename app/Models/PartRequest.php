@@ -34,11 +34,17 @@ class PartRequest extends Model
         'shipping_method' => ShippingMethod::class,
     ];
 
+    /**
+     * @return BelongsTo<BuyerProfile, $this>
+     */
     public function buyer(): BelongsTo
     {
         return $this->belongsTo(BuyerProfile::class, 'buyer_id');
     }
 
+    /**
+     * @return BelongsTo<Maker, $this>
+     */
     public function maker(): BelongsTo
     {
         return $this->belongsTo(Maker::class);

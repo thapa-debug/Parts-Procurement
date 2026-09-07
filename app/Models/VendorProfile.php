@@ -26,6 +26,9 @@ class VendorProfile extends Model
         'status' => VendorStatus::class,
     ];
 
+    /**
+     * @return BelongsTo<User, $this>
+     */
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);

@@ -7,8 +7,10 @@ use App\Exceptions\PresentQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
 use App\Models\VendorResponse;
+use App\Notifications\QuotePresentedNotification;
 use App\Services\PricingService;
 use Illuminate\Support\Facades\DB;
+use Throwable;
 
 /**
  * 見積もり提示: the admin presents a vendor response to the buyer as a priced
@@ -67,7 +69,7 @@ class PresentQuoteAction
 
         $pricing = $this->pricingService->calculate($vendorResponse->cost_price);
 
-        return DB::transaction(function () use ($partRequest, $vendorResponse, $pricing) {
+        $presentedQuote = DB::transaction(function () use ($partRequest, $vendorResponse, $pricing) {
             $presentedQuote = PresentedQuote::create([
                 'part_request_id' => $partRequest->id,
                 'vendor_response_id' => $vendorResponse->id,
@@ -84,5 +86,16 @@ class PresentQuoteAction
 
             return $presentedQuote;
         });
+
+        // Best-effort: a failed send must never undo a successful present
+        // (CLAUDE.md §10) -- same try/catch(Throwable)+report() shape as
+        // RegisterBuyerAction's verification email.
+        try {
+            $partRequest->buyer->user?->notify(new QuotePresentedNotification($presentedQuote));
+        } catch (Throwable $e) {
+            report($e);
+        }
+
+        return $presentedQuote;
     }
 }
