@@ -111,45 +111,25 @@
                 @enderror
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="country_id" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.country_label') }} <x-required-mark />
-                    </label>
-                    <select
-                        id="country_id"
-                        wire:model="country_id"
-                        required
-                        class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                        <option value="">{{ __('auth.register.country_placeholder_option') }}</option>
-                        @foreach ($activeCountries as $country)
-                            <option value="{{ $country->id }}">{{ $country->name }}</option>
-                        @endforeach
-                    </select>
-                    <p class="mt-1 text-xs text-ink-muted">{{ __('auth.register.country_help') }}</p>
-                    @error('country_id')
-                        <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
-
-                <div>
-                    <label for="default_yard" class="block text-sm font-medium text-ink">
-                        {{ __('auth.register.default_yard_label') }} <x-required-mark />
-                    </label>
-                    <input
-                        id="default_yard"
-                        type="text"
-                        wire:model="default_yard"
-                        required
-                        placeholder="{{ __('auth.register.default_yard_placeholder') }}"
-                        class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                    >
-                    <p class="mt-1 text-xs text-ink-muted">{{ __('auth.register.default_yard_help') }}</p>
-                    @error('default_yard')
-                        <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                    @enderror
-                </div>
+            <div>
+                <label for="country_id" class="block text-sm font-medium text-ink">
+                    {{ __('auth.register.country_label') }} <x-required-mark />
+                </label>
+                <select
+                    id="country_id"
+                    wire:model="country_id"
+                    required
+                    class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                >
+                    <option value="">{{ __('auth.register.country_placeholder_option') }}</option>
+                    @foreach ($activeCountries as $country)
+                        <option value="{{ $country->id }}">{{ $country->name }}</option>
+                    @endforeach
+                </select>
+                <p class="mt-1 text-xs text-ink-muted">{{ __('auth.register.country_help') }}</p>
+                @error('country_id')
+                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                @enderror
             </div>
 
             <button

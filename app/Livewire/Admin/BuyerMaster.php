@@ -41,8 +41,6 @@ class BuyerMaster extends Component
 
     public string $country_id = '';
 
-    public string $default_yard = '';
-
     public string $phone = '';
 
     /**
@@ -94,7 +92,7 @@ class BuyerMaster extends Component
     {
         $this->authorize('create', BuyerProfile::class);
 
-        $this->reset(['name', 'email', 'company_name', 'country_id', 'default_yard', 'phone']);
+        $this->reset(['name', 'email', 'company_name', 'country_id', 'phone']);
         $this->approve_immediately = true;
         $this->resetErrorBag();
         $this->showCreateForm = true;
@@ -119,7 +117,6 @@ class BuyerMaster extends Component
             $validated['email'],
             $validated['company_name'],
             (int) $validated['country_id'],
-            $validated['default_yard'],
             $validated['phone'],
             $admin,
             $validated['approve_immediately'],

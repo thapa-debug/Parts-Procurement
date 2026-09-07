@@ -99,8 +99,6 @@ return [
             'phone_placeholder' => 'e.g. +61 4 1234 5678',
             'country_label' => 'Default destination country',
             'country_placeholder_option' => '-- Select a country --',
-            'default_yard_label' => 'Default yard',
-            'default_yard_placeholder' => 'e.g. North Island Yard',
             'approve_immediately_label' => 'Approve immediately',
             'approve_immediately_help' => 'Checked: this buyer can act as soon as they verify their email. Unchecked: they land in the pending-approval queue instead.',
             'submit' => 'Create buyer',

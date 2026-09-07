@@ -41,12 +41,11 @@ class CreateBuyerAction
         string $email,
         string $companyName,
         int $countryId,
-        string $defaultYard,
         string $phone,
         User $admin,
         bool $approveImmediately,
     ): array {
-        $result = DB::transaction(function () use ($name, $email, $companyName, $countryId, $defaultYard, $phone, $admin, $approveImmediately) {
+        $result = DB::transaction(function () use ($name, $email, $companyName, $countryId, $phone, $admin, $approveImmediately) {
             $result = $this->createAdminManagedUser->execute($name, $email, UserRole::Buyer);
 
             $buyerProfile = BuyerProfile::create([
@@ -54,7 +53,6 @@ class CreateBuyerAction
                 'company_name' => $companyName,
                 'member_code' => BuyerProfile::generateMemberCode($result['user']),
                 'country_id' => $countryId,
-                'default_yard' => $defaultYard,
                 'phone' => $phone,
                 'approved_at' => $approveImmediately ? now() : null,
                 'approved_by' => $approveImmediately ? $admin->id : null,

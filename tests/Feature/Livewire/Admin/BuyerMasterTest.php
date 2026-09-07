@@ -121,7 +121,6 @@ it('creates a buyer and reveals the temporary password', function () {
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
         ->set('country_id', (string) Country::factory()->create()->id)
-        ->set('default_yard', 'Oceania Yard')
         ->call('createBuyer')
         ->assertSet('showCreateForm', false)
         ->assertSet('revealedContext', 'created')
@@ -173,7 +172,6 @@ it('creates a buyer pending approval when approve-immediately is unchecked, and 
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
         ->set('country_id', (string) Country::factory()->create()->id)
-        ->set('default_yard', 'Oceania Yard')
         ->set('approve_immediately', false)
         ->call('createBuyer');
 
@@ -201,8 +199,7 @@ it('rejects an incomplete buyer creation form', function () {
         ->call('openCreateForm')
         ->call('createBuyer')
         ->assertHasErrors([
-            'name', 'email', 'company_name', 'phone',
-            'country_id', 'default_yard',
+            'name', 'email', 'company_name', 'phone', 'country_id',
         ]);
 
     expect(User::where('role', UserRole::Buyer)->count())->toBe(0);
@@ -220,7 +217,6 @@ it('rejects a duplicate email on creation', function () {
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
         ->set('country_id', (string) Country::factory()->create()->id)
-        ->set('default_yard', 'Oceania Yard')
         ->call('createBuyer')
         ->assertHasErrors(['email']);
 });

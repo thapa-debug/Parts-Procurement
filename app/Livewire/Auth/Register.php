@@ -24,8 +24,6 @@ class Register extends Component
 
     public string $country_id = '';
 
-    public string $default_yard = '';
-
     public string $phone = '';
 
     /**
@@ -39,7 +37,6 @@ class Register extends Component
             'password' => ['required', 'confirmed', Password::min(8)->letters()->numbers()],
             'company_name' => ['required', 'string', 'max:255'],
             'country_id' => ['required', 'integer', Rule::exists('countries', 'id')->where('is_active', true)],
-            'default_yard' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
         ];
     }
@@ -54,7 +51,6 @@ class Register extends Component
             $validated['password'],
             $validated['company_name'],
             (int) $validated['country_id'],
-            $validated['default_yard'],
             $validated['phone'],
         );
 
