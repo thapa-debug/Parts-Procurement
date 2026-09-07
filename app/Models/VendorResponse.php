@@ -13,7 +13,8 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'part_request_id', 'vendor_id', 'cost_price', 'quality_rank',
-    'lead_time', 'comment', 'is_no_stock',
+    'lead_time', 'comment', 'weight_kg', 'length_cm', 'width_cm',
+    'height_cm', 'is_no_stock',
 ])]
 class VendorResponse extends Model
 {
@@ -27,6 +28,10 @@ class VendorResponse extends Model
         'quality_rank' => QualityRank::class,
         'lead_time' => LeadTime::class,
         'is_no_stock' => 'boolean',
+        'weight_kg' => 'decimal:2',
+        'length_cm' => 'decimal:2',
+        'width_cm' => 'decimal:2',
+        'height_cm' => 'decimal:2',
     ];
 
     public function partRequest(): BelongsTo

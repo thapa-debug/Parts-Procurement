@@ -28,6 +28,10 @@ class VendorResponseFactory extends Factory
             'quality_rank' => fake()->randomElement(QualityRank::cases()),
             'lead_time' => fake()->randomElement(LeadTime::cases()),
             'comment' => fake()->sentence(),
+            'weight_kg' => fake()->randomFloat(2, 0.5, 40),
+            'length_cm' => fake()->randomFloat(2, 10, 150),
+            'width_cm' => fake()->randomFloat(2, 10, 150),
+            'height_cm' => fake()->randomFloat(2, 10, 150),
             'is_no_stock' => false,
         ];
     }
@@ -38,6 +42,10 @@ class VendorResponseFactory extends Factory
             'cost_price' => null,
             'quality_rank' => null,
             'lead_time' => null,
+            'weight_kg' => null,
+            'length_cm' => null,
+            'width_cm' => null,
+            'height_cm' => null,
             'is_no_stock' => true,
         ]);
     }

@@ -30,6 +30,10 @@ it('records a priced quote with its photos for a vendor actually invited to the 
         'quality_rank' => QualityRank::A->value,
         'lead_time' => LeadTime::Within1Week->value,
         'comment' => 'Clean, no visible damage.',
+        'weight_kg' => 3.5,
+        'length_cm' => 40,
+        'width_cm' => 25,
+        'height_cm' => 15,
     ], [$photo]);
 
     expect($response->part_request_id)->toBe($request->id)
@@ -37,6 +41,10 @@ it('records a priced quote with its photos for a vendor actually invited to the 
         ->and($response->cost_price)->toBe(45_000)
         ->and($response->quality_rank)->toBe(QualityRank::A)
         ->and($response->lead_time)->toBe(LeadTime::Within1Week)
+        ->and($response->weight_kg)->toBe('3.50')
+        ->and($response->length_cm)->toBe('40.00')
+        ->and($response->width_cm)->toBe('25.00')
+        ->and($response->height_cm)->toBe('15.00')
         ->and($response->is_no_stock)->toBeFalse()
         ->and($response->photos)->toHaveCount(1);
 
@@ -71,7 +79,7 @@ it('records every photo passed, not just the first, each stored on the same disk
     }
 });
 
-it('records a one-tap no-stock reply with no price, rank, lead time, or photos', function () {
+it('records a one-tap no-stock reply with no price, rank, lead time, weight, dimensions, or photos', function () {
     $request = PartRequest::factory()->create();
     $vendor = VendorProfile::factory()->create();
     $request->vendors()->attach($vendor->id, ['invited_at' => now()]);
@@ -82,6 +90,10 @@ it('records a one-tap no-stock reply with no price, rank, lead time, or photos',
         ->and($response->cost_price)->toBeNull()
         ->and($response->quality_rank)->toBeNull()
         ->and($response->lead_time)->toBeNull()
+        ->and($response->weight_kg)->toBeNull()
+        ->and($response->length_cm)->toBeNull()
+        ->and($response->width_cm)->toBeNull()
+        ->and($response->height_cm)->toBeNull()
         ->and($response->photos)->toHaveCount(0);
 });
 

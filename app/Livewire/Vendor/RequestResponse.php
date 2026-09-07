@@ -47,6 +47,21 @@ class RequestResponse extends Component
     public string $comment = '';
 
     /**
+     * Weight and dimensions of the part as the vendor would ship it --
+     * required on a real quote (not on a no-stock reply), so admin->buyer
+     * shipping cost can be calculated later (Phase 4 checkout) without
+     * going back to the vendor after the fact, while they still have the
+     * part in hand to measure accurately.
+     */
+    public string $weight_kg = '';
+
+    public string $length_cm = '';
+
+    public string $width_cm = '';
+
+    public string $height_cm = '';
+
+    /**
      * Array-typed, but the file input in the Blade view deliberately has no
      * `multiple` HTML attribute. Livewire's S3 upload driver flatly rejects
      * a request where the client reports more than one file selected in a
@@ -97,6 +112,10 @@ class RequestResponse extends Component
             'quality_rank' => ['required', Rule::enum(QualityRank::class)],
             'lead_time' => ['required', Rule::enum(LeadTime::class)],
             'comment' => ['required', 'string', 'max:2000'],
+            'weight_kg' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'length_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'width_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
+            'height_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'photos' => ['required', 'array', 'min:1', 'max:'.self::MAX_PHOTOS],
             'photos.*' => ['image', 'max:10240'],
         ];
@@ -138,6 +157,10 @@ class RequestResponse extends Component
                 'quality_rank' => $validated['quality_rank'],
                 'lead_time' => $validated['lead_time'],
                 'comment' => $validated['comment'],
+                'weight_kg' => (float) $validated['weight_kg'],
+                'length_cm' => (float) $validated['length_cm'],
+                'width_cm' => (float) $validated['width_cm'],
+                'height_cm' => (float) $validated['height_cm'],
                 'is_no_stock' => false,
             ], $validated['photos']);
         } catch (VendorResponseNotAllowedException $e) {
@@ -148,7 +171,10 @@ class RequestResponse extends Component
         }
 
         $this->submitted = true;
-        $this->reset(['cost_price', 'quality_rank', 'lead_time', 'comment', 'photos']);
+        $this->reset([
+            'cost_price', 'quality_rank', 'lead_time', 'comment',
+            'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'photos',
+        ]);
     }
 
     public function sendNoStock(SubmitVendorResponseAction $action): void

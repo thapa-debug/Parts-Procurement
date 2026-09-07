@@ -149,6 +149,110 @@
                     @enderror
                 </div>
 
+                <div class="rounded-md border border-line bg-surface-muted p-4">
+                    <h3 class="text-sm font-semibold text-ink">
+                        {{ __('vendor.request_response.weight_dimensions_section') }} <x-required-mark />
+                    </h3>
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('vendor.request_response.weight_dimensions_help') }}</p>
+
+                    <div class="mt-3">
+                        <label for="weight_kg" class="block text-xs font-medium text-ink-muted">
+                            {{ __('vendor.request_response.weight_label') }}
+                        </label>
+                        <div class="relative mt-1 max-w-40">
+                            <input
+                                id="weight_kg"
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                wire:model="weight_kg"
+                                placeholder="{{ __('vendor.request_response.weight_placeholder') }}"
+                                class="block w-full rounded-md border border-line bg-surface py-2 pl-3 pr-9 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted">
+                                {{ __('vendor.request_response.weight_unit') }}
+                            </span>
+                        </div>
+                        @error('weight_kg')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div class="mt-4">
+                        <label class="block text-xs font-medium text-ink-muted">
+                            {{ __('vendor.request_response.dimensions_label') }}
+                        </label>
+                        <div class="mt-1 flex max-w-md items-start gap-2">
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input
+                                        id="length_cm"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        wire:model="length_cm"
+                                        placeholder="{{ __('vendor.request_response.length_placeholder') }}"
+                                        class="block w-full rounded-md border border-line bg-surface py-2 pl-3 pr-9 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    >
+                                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted">
+                                        {{ __('vendor.request_response.dimensions_unit') }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-center text-xs text-ink-muted">{{ __('vendor.request_response.length_caption') }}</p>
+                            </div>
+
+                            <span class="pt-2 text-sm text-ink-muted">&times;</span>
+
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input
+                                        id="width_cm"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        wire:model="width_cm"
+                                        placeholder="{{ __('vendor.request_response.width_placeholder') }}"
+                                        class="block w-full rounded-md border border-line bg-surface py-2 pl-3 pr-9 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    >
+                                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted">
+                                        {{ __('vendor.request_response.dimensions_unit') }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-center text-xs text-ink-muted">{{ __('vendor.request_response.width_caption') }}</p>
+                            </div>
+
+                            <span class="pt-2 text-sm text-ink-muted">&times;</span>
+
+                            <div class="flex-1">
+                                <div class="relative">
+                                    <input
+                                        id="height_cm"
+                                        type="number"
+                                        step="0.01"
+                                        min="0"
+                                        wire:model="height_cm"
+                                        placeholder="{{ __('vendor.request_response.height_placeholder') }}"
+                                        class="block w-full rounded-md border border-line bg-surface py-2 pl-3 pr-9 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                    >
+                                    <span class="pointer-events-none absolute inset-y-0 right-3 flex items-center text-xs text-ink-muted">
+                                        {{ __('vendor.request_response.dimensions_unit') }}
+                                    </span>
+                                </div>
+                                <p class="mt-1 text-center text-xs text-ink-muted">{{ __('vendor.request_response.height_caption') }}</p>
+                            </div>
+                        </div>
+                        @error('length_cm')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('width_cm')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                        @error('height_cm')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
                 <div
                     x-data="{
                         uploading: false,
