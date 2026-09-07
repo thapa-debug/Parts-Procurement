@@ -16,7 +16,8 @@ class PresentQuoteNotAllowedException extends RuntimeException
         return new self(
             "Request {$partRequest->request_code} cannot have a quote presented from its ".
             "current status ({$partRequest->status->value}) -- only a request awaiting vendor ".
-            'responses (vendor_inquiry) can be quoted.'
+            'responses (vendor_inquiry) or already showing presented quotes (quoted), and not yet '.
+            'paid for, can have another quote presented.'
         );
     }
 
@@ -28,5 +29,10 @@ class PresentQuoteNotAllowedException extends RuntimeException
     public static function noStockResponse(): self
     {
         return new self('A "no stock" reply has no price and cannot be presented as a quote.');
+    }
+
+    public static function alreadyPresented(): self
+    {
+        return new self('This vendor response is already presented to the buyer.');
     }
 }

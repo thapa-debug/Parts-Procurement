@@ -134,6 +134,23 @@ it('lets only an admin present a quote to the buyer', function () {
         ->and($vendor->can('presentQuote', $request))->toBeFalse();
 });
 
+it('lets a buyer select one of their own request\'s presented quotes, never another buyer\'s or an admin/vendor bypass', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::Quoted]);
+
+    $otherBuyer = User::factory()->buyer()->create();
+    BuyerProfile::factory()->for($otherBuyer)->create();
+
+    $admin = User::factory()->admin()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    expect($owner->can('selectQuote', $request))->toBeTrue()
+        ->and($otherBuyer->can('selectQuote', $request))->toBeFalse()
+        ->and($admin->can('selectQuote', $request))->toBeFalse()
+        ->and($vendor->can('selectQuote', $request))->toBeFalse();
+});
+
 it('lets only a buyer view their own "my requests" list -- never an admin, even though admin sees the real board elsewhere', function () {
     $buyer = User::factory()->buyer()->create();
     $admin = User::factory()->admin()->create();

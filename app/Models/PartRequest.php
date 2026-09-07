@@ -66,15 +66,50 @@ class PartRequest extends Model
     }
 
     /**
-     * The vendor response presented to the buyer as this request's quote
-     * (CLAUDE.md §6.2) -- set once, by PresentQuoteAction, alongside the
-     * snapshotted price columns.
+     * Every vendor response currently on offer to the buyer (client
+     * revision: multiple quotes may be presented at once). Presenting is
+     * final -- there is no admin action that ever removes a row -- so this
+     * is also every quote that has ever been presented; see PresentedQuote's
+     * own docblock.
+     *
+     * @return HasMany<PresentedQuote, $this>
+     */
+    public function presentedQuotes(): HasMany
+    {
+        return $this->hasMany(PresentedQuote::class);
+    }
+
+    /**
+     * The buyer's current pick among the presented quotes (CLAUDE.md §6.2) --
+     * populated, and re-populated on re-selection, by SelectQuoteAction,
+     * alongside the snapshotted price columns copied from that quote's own
+     * PresentedQuote row. Despite the name/column staying as it was in
+     * Phase 2's single-quote model, this now means "what the buyer picked",
+     * not "what the admin presented" -- see SelectQuoteAction's docblock.
      *
      * @return BelongsTo<VendorResponse, $this>
      */
     public function selectedResponse(): BelongsTo
     {
         return $this->belongsTo(VendorResponse::class, 'selected_response_id');
+    }
+
+    /**
+     * The universal "still open to admin/buyer changes" gate (client
+     * revision): presenting, and selecting/re-selecting a quote, are both
+     * allowed until the request has actually been paid for. Phase 4 payment
+     * doesn't exist yet, so none of these statuses are reachable today --
+     * this reads gracefully as "always open" until that lands and starts
+     * setting one of them.
+     */
+    public function hasBeenPaid(): bool
+    {
+        return in_array($this->status, [
+            RequestStatus::Paid,
+            RequestStatus::OrderedToVendor,
+            RequestStatus::Shipped,
+            RequestStatus::Received,
+        ], true);
     }
 
     /**
