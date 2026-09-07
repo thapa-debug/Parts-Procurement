@@ -121,6 +121,11 @@ No refund flow, no Stripe refund calls, no refund UI in this build. Refunds are 
 - Never destroy or overwrite payment data.
 - The `procurement_failed` state today routes to re-quote (no money returned); later it simply gains a second exit for refunds.
 
+### 6.5 Notifications must never point at vanished state (forward note for Phase 3)
+General principle: any buyer-facing notification that references a specific mutable record (a quote, a message, anything the admin can still change or remove) needs defined behavior for "the thing changed after the notification was sent, before the buyer looked." Silently going stale — a notification that leads to a blank or confusing page — is not acceptable.
+
+Relevant case from the multi-quote-presentation slice (client revision): a buyer can be presented several quotes at once and notified about them. Presenting is deliberately final today — there is no admin withdraw/remove action, by explicit client decision, so this specific scenario doesn't yet arise in practice. But if a future revision ever reintroduces a way to pull an already-presented quote (e.g. the vendor's part sold in the meantime), that action **must** be paired with a follow-up notification ("a previously presented option is no longer available") the moment Phase 3 notifications exist — never a silent delete. Keep this principle in mind for any future mutable-record notification, not just this one.
+
 ---
 
 ## 7. Database schema (build to this)
