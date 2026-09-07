@@ -90,6 +90,7 @@
                     <div>
                         <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_price_label') }}</dt>
                         <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
+                        <p class="mt-1 max-w-xs text-xs text-ink-muted">{{ __('buyer.request_detail.quote_price_excludes_shipping') }}</p>
                     </div>
                 </dl>
             </div>
