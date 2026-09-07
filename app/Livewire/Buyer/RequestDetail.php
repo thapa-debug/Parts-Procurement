@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Buyer;
 
+use App\Actions\SelectQuoteAction;
 use App\Enums\QualityRank;
+use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
+use App\Models\PresentedQuote;
 use App\Models\VendorResponse;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
@@ -33,6 +36,28 @@ class RequestDetail extends Component
         $this->partRequestId = $partRequest->id;
     }
 
+    /**
+     * The buyer picking (or re-picking) one of their own request's
+     * presented quotes (client revision: replaces Phase 2's one-quote,
+     * no-choice model). $partRequest is re-fetched here rather than kept as
+     * component state -- see the class docblock -- so authorize() always
+     * checks the real, current row.
+     */
+    public function selectQuote(int $presentedQuoteId, SelectQuoteAction $action): void
+    {
+        $partRequest = PartRequest::findOrFail($this->partRequestId);
+        $this->authorize('selectQuote', $partRequest);
+
+        $presentedQuote = PresentedQuote::findOrFail($presentedQuoteId);
+
+        try {
+            $action->execute($partRequest, $presentedQuote);
+        } catch (SelectQuoteNotAllowedException $e) {
+            report($e);
+            $this->addError('selectQuote', __('buyer.request_detail.select_quote_error'));
+        }
+    }
+
     public function render(): View
     {
         // Fetched separately from the main query below, and never selected
@@ -53,43 +78,55 @@ class RequestDetail extends Component
             ->with('maker')
             ->findOrFail($this->partRequestId);
 
-        $quote = $this->presentedQuote($selectedResponseId);
+        $options = $this->presentedQuoteOptions($selectedResponseId);
 
         return view('livewire.buyer.request-detail', [
             'partRequest' => $partRequest,
-            'quote' => $quote,
+            'options' => $options,
         ])->title($partRequest->request_code);
     }
 
     /**
-     * Builds a plain, hand-picked array -- not the VendorResponse model --
-     * so there is no property on it a future Blade edit could accidentally
-     * reach for `->vendor` or `->cost_price` through. Only what CLAUDE.md §4
-     * allows a buyer to see: the photo(s) and the quality rank. Never the
-     * comment (free text a vendor writes themselves, with no practical way
-     * to guarantee it never mentions their own name) and never lead_time --
-     * neither was asked for in the buyer-facing spec for this quote view.
+     * Every vendor response currently presented as an option to choose
+     * from (client revision: multiple quotes may be presented at once,
+     * replacing Phase 2's single $quote lookup). Built as a plain array per
+     * option, never a model -- so there is no property a future Blade edit
+     * could accidentally reach for ->vendor or ->cost_price through, and
+     * nothing here ever becomes public component state (never serialized
+     * into Livewire's client-side snapshot). Only what CLAUDE.md §4 allows
+     * a buyer to see per option: its own id (to select it), the photo(s),
+     * the quality rank, its own snapshotted buyer_price -- never
+     * recomputed from the vendor's cost -- and whether it's the buyer's
+     * current pick (a plain boolean, never the raw selected_response_id
+     * this is compared against).
      *
-     * @return array{quality_rank: QualityRank, photos: array<int, string>}|null
+     * @return array<int, array{presented_quote_id: int, buyer_price: int, quality_rank: QualityRank, photos: array<int, string>, is_selected: bool}>
      */
-    protected function presentedQuote(?int $selectedResponseId): ?array
+    protected function presentedQuoteOptions(?int $selectedResponseId): array
     {
-        if ($selectedResponseId === null) {
-            return null;
+        $presentedQuotes = PresentedQuote::query()
+            ->where('part_request_id', $this->partRequestId)
+            ->get(['id', 'vendor_response_id', 'buyer_price']);
+
+        if ($presentedQuotes->isEmpty()) {
+            return [];
         }
 
-        $vendorResponse = VendorResponse::query()
+        $vendorResponses = VendorResponse::query()
             ->select(['id', 'quality_rank'])
             ->with('photos')
-            ->find($selectedResponseId);
+            ->whereIn('id', $presentedQuotes->pluck('vendor_response_id'))
+            ->get()
+            ->keyBy('id');
 
-        if (! $vendorResponse) {
-            return null;
-        }
-
-        return [
-            'quality_rank' => $vendorResponse->quality_rank,
-            'photos' => $vendorResponse->photos->map(fn ($photo) => $photo->url())->all(),
-        ];
+        return $presentedQuotes
+            ->map(fn (PresentedQuote $presentedQuote) => [
+                'presented_quote_id' => $presentedQuote->id,
+                'buyer_price' => $presentedQuote->buyer_price,
+                'quality_rank' => $vendorResponses[$presentedQuote->vendor_response_id]->quality_rank,
+                'photos' => $vendorResponses[$presentedQuote->vendor_response_id]->photos->map(fn ($photo) => $photo->url())->all(),
+                'is_selected' => $presentedQuote->vendor_response_id === $selectedResponseId,
+            ])
+            ->all();
     }
 }

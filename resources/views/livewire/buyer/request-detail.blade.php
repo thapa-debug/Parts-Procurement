@@ -72,28 +72,52 @@
     <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
         <h2 class="text-base font-semibold text-ink">{{ __('buyer.request_detail.quote_section') }}</h2>
 
-        @if ($quote)
-            <div class="mt-4 flex flex-wrap gap-6">
-                @if ($quote['photos'] !== [])
-                    <div class="flex flex-wrap gap-2">
-                        @foreach ($quote['photos'] as $photoUrl)
-                            <img src="{{ $photoUrl }}" class="h-24 w-24 rounded-md border border-line object-cover">
-                        @endforeach
-                    </div>
-                @endif
+        @error('selectQuote')
+            <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+        @enderror
 
-                <dl class="space-y-3 text-sm">
-                    <div>
-                        <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_quality_label') }}</dt>
-                        <dd class="mt-0.5 font-medium text-ink">{{ __('enums.quality_rank.'.$quote['quality_rank']->value) }}</dd>
+        @if (count($options) > 0)
+            <p class="mt-1 text-sm text-ink-muted">{{ __('buyer.request_detail.quote_options_help') }}</p>
+
+            <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                @foreach ($options as $option)
+                    <div class="rounded-md border p-4 {{ $option['is_selected'] ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
+                        <x-photo-gallery :photos="$option['photos']" />
+
+                        <dl class="mt-3 space-y-2 text-sm">
+                            <div>
+                                <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_quality_label') }}</dt>
+                                <dd class="mt-0.5 font-medium text-ink">{{ __('enums.quality_rank.'.$option['quality_rank']->value) }}</dd>
+                            </div>
+                            <div>
+                                <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_price_label') }}</dt>
+                                <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($option['buyer_price']) }}</dd>
+                            </div>
+                        </dl>
+
+                        <div class="mt-3">
+                            @if ($option['is_selected'])
+                                <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
+                                    {{ __('buyer.request_detail.quote_selected_badge') }}
+                                </span>
+                            @else
+                                <button
+                                    type="button"
+                                    wire:click="selectQuote({{ $option['presented_quote_id'] }})"
+                                    wire:confirm="{{ __('buyer.request_detail.select_quote_confirm', ['price' => number_format($option['buyer_price'])]) }}"
+                                    wire:loading.attr="disabled"
+                                    wire:target="selectQuote({{ $option['presented_quote_id'] }})"
+                                    class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    {{ __('buyer.request_detail.select_quote_button') }}
+                                </button>
+                            @endif
+                        </div>
                     </div>
-                    <div>
-                        <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_price_label') }}</dt>
-                        <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
-                        <p class="mt-1 max-w-xs text-xs text-ink-muted">{{ __('buyer.request_detail.quote_price_excludes_shipping') }}</p>
-                    </div>
-                </dl>
+                @endforeach
             </div>
+
+            <p class="mt-4 max-w-md text-xs text-ink-muted">{{ __('buyer.request_detail.quote_price_excludes_shipping') }}</p>
         @else
             <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 {{ __('buyer.request_detail.awaiting_quote') }}
