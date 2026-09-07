@@ -82,6 +82,7 @@ it('shows the presented quote\'s photo, quality rank, and marked-up price -- nev
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->assertSee(__('enums.quality_rank.a'))
         ->assertSee('54,000')
+        ->assertSee(__('buyer.request_detail.quote_price_excludes_shipping'))
         ->assertDontSee('Secret Vendor Co')
         ->assertDontSee('Secret Contact Person')
         ->assertDontSee('45,000')

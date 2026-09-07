@@ -90,6 +90,7 @@ return [
 
         'quote_section' => 'Your quote',
         'quote_price_label' => 'Price',
+        'quote_price_excludes_shipping' => 'Price excludes shipping -- shipping is calculated at checkout based on your delivery address.',
         'quote_quality_label' => 'Quality rank',
         'awaiting_quote' => "We're still checking availability with our vendors. We'll notify you as soon as a quote is ready.",
     ],
