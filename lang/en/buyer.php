@@ -89,10 +89,15 @@ return [
         'not_provided' => '—',
 
         'quote_section' => 'Your quote',
+        'quote_options_help' => "Compare the options below and select the one you'd like to purchase. You can change your selection any time before you pay.",
         'quote_price_label' => 'Price',
         'quote_price_excludes_shipping' => 'Price excludes shipping -- shipping is calculated at checkout based on your delivery address.',
         'quote_quality_label' => 'Quality rank',
-        'awaiting_quote' => "We're still checking availability with our vendors. We'll notify you as soon as a quote is ready.",
+        'quote_selected_badge' => 'Selected',
+        'select_quote_button' => 'Select this quote',
+        'select_quote_confirm' => 'Select this quote (¥:price)? You can change your selection any time before you pay.',
+        'select_quote_error' => 'Something went wrong selecting this quote. Please refresh the page and try again.',
+        'awaiting_quote' => 'No quotes are currently available for this request. Our team is sourcing options and will notify you when they\'re ready.',
     ],
 
 ];

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\PresentQuoteAction;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Livewire\Buyer\RequestDetail;
@@ -53,7 +54,7 @@ it('shows an awaiting-quote message before any quote has been presented', functi
 
 // --- after a quote is presented: content + isolation ------------------------
 
-it('shows the presented quote\'s photo, quality rank, and marked-up price -- never the vendor\'s identity, cost, or comment', function () {
+it('shows a presented quote\'s photo, quality rank, and marked-up price -- never the vendor\'s identity, cost, or comment', function () {
     $owner = User::factory()->buyer()->create();
     $ownerProfile = BuyerProfile::factory()->for($owner)->create();
 
@@ -62,10 +63,7 @@ it('shows the presented quote\'s photo, quality rank, and marked-up price -- nev
         'contact_person' => 'Secret Contact Person',
     ]);
 
-    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create([
-        'status' => RequestStatus::Quoted,
-        'buyer_price' => 54_000,
-    ]);
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
 
     $response = VendorResponse::factory()->create([
         'part_request_id' => $request->id,
@@ -76,17 +74,76 @@ it('shows the presented quote\'s photo, quality rank, and marked-up price -- nev
     ]);
     ResponsePhoto::factory()->create(['vendor_response_id' => $response->id, 'disk' => 'public']);
 
-    $request->update(['selected_response_id' => $response->id, 'cost_price' => 45_000]);
+    app(PresentQuoteAction::class)->execute($request, $response);
 
     Livewire::actingAs($owner)
-        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
         ->assertSee(__('enums.quality_rank.a'))
         ->assertSee('54,000')
         ->assertSee(__('buyer.request_detail.quote_price_excludes_shipping'))
+        ->assertSee(__('buyer.request_detail.select_quote_button'))
         ->assertDontSee('Secret Vendor Co')
         ->assertDontSee('Secret Contact Person')
         ->assertDontSee('45,000')
         ->assertDontSee('Secret comment naming Secret Vendor Co directly.');
+});
+
+it('shows the "Selected" badge instead of a select button for the buyer\'s current pick', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->call('selectQuote', $presentedQuote->id)
+        ->assertSee(__('buyer.request_detail.quote_selected_badge'))
+        ->assertDontSee(__('buyer.request_detail.select_quote_button'));
+
+    expect($request->fresh()->selected_response_id)->toBe($response->id);
+});
+
+it('lets the buyer re-select a different presented quote at any time before paying', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
+
+    $presentedQuoteA = app(PresentQuoteAction::class)->execute($request, $responseA);
+    $presentedQuoteB = app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    $component = Livewire::actingAs($owner)->test(RequestDetail::class, ['partRequest' => $request->fresh()]);
+
+    $component->call('selectQuote', $presentedQuoteA->id);
+    expect($request->fresh()->selected_response_id)->toBe($responseA->id);
+
+    $component->call('selectQuote', $presentedQuoteB->id)->assertHasNoErrors();
+    expect($request->fresh()->selected_response_id)->toBe($responseB->id);
+});
+
+it('shows every currently presented quote side by side', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
+
+    app(PresentQuoteAction::class)->execute($request, $responseA);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    // max(30000*20%,2000)=6000 -> 36000; max(50000*20%,2000)=10000 -> 60000
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee('36,000')
+        ->assertSee('60,000');
 });
 
 it('never sends the PartRequest\'s cost fields to the browser, even for a Livewire component with a "PartRequest $partRequest" method parameter name', function () {
@@ -116,4 +173,64 @@ it('never sends the PartRequest\'s cost fields to the browser, even for a Livewi
         // partRequestId is the only PartRequest-shaped state that should
         // survive into the snapshot.
         ->and($snapshotJson)->toContain('partRequestId');
+});
+
+// --- multiple presented quotes: isolation must hold at N, not just 1 --------
+
+it('never sends any vendor\'s cost, identity, or comment to the browser, even with multiple quotes presented at once', function () {
+    // Client revision: multiple quotes may be presented at once
+    // (presented_quotes, one row per option). The buyer-facing selection
+    // UI itself is a later slice -- this proves the underlying data this
+    // page's render() now builds (RequestDetail::presentedQuoteOptions())
+    // can't leak vendor cost/identity at N=2, the same way the single-
+    // quote case above proves it at N=1, before any Blade view exists to
+    // display it.
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+
+    $vendorA = VendorProfile::factory()->create(['company_name' => 'Secret Vendor A', 'contact_person' => 'Secret Contact A']);
+    $responseA = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendorA->id,
+        'cost_price' => 40_000,
+        'comment' => 'Secret comment naming Vendor A directly.',
+    ]);
+
+    $vendorB = VendorProfile::factory()->create(['company_name' => 'Secret Vendor B', 'contact_person' => 'Secret Contact B']);
+    $responseB = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendorB->id,
+        'cost_price' => 60_000,
+        'comment' => 'Secret comment naming Vendor B directly.',
+    ]);
+
+    app(PresentQuoteAction::class)->execute($request, $responseA);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    $component = Livewire::actingAs($owner)->test(RequestDetail::class, ['partRequest' => $request->fresh()]);
+
+    $snapshotJson = json_encode($component->snapshot);
+
+    expect($snapshotJson)->not->toContain('Secret Vendor A')
+        ->and($snapshotJson)->not->toContain('Secret Vendor B')
+        ->and($snapshotJson)->not->toContain('Secret Contact A')
+        ->and($snapshotJson)->not->toContain('Secret Contact B')
+        ->and($snapshotJson)->not->toContain('naming Vendor A')
+        ->and($snapshotJson)->not->toContain('naming Vendor B')
+        ->and($snapshotJson)->not->toContain('40000')
+        ->and($snapshotJson)->not->toContain('60000')
+        ->and($snapshotJson)->not->toContain('vendor_response_id')
+        ->and($snapshotJson)->not->toContain('cost_price')
+        ->and($snapshotJson)->toContain('partRequestId');
+
+    $component
+        ->assertDontSee('Secret Vendor A')
+        ->assertDontSee('Secret Vendor B')
+        ->assertDontSee('Secret Contact A')
+        ->assertDontSee('Secret Contact B')
+        ->assertDontSee('naming Vendor A')
+        ->assertDontSee('naming Vendor B')
+        ->assertDontSee('40,000')
+        ->assertDontSee('60,000');
 });
