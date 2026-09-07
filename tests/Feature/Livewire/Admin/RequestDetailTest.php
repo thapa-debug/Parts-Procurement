@@ -1,10 +1,12 @@
 <?php
 
+use App\Actions\PresentQuoteAction;
 use App\Enums\LeadTime;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Livewire\Admin\RequestDetail;
 use App\Models\PartRequest;
+use App\Models\PresentedQuote;
 use App\Models\Setting;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -166,10 +168,10 @@ it('shows each vendor response\'s cost, computed buyer price, quality rank, lead
         ->assertSee(__('enums.quality_rank.a'))
         ->assertSee(__('enums.lead_time.within_1_week'))
         ->assertSee('Clean, no visible damage.')
-        ->assertSee(__('admin.request_detail.present_quote_button'));
+        ->assertSee(__('admin.request_detail.present_checkbox_label'));
 });
 
-it('shows a no-stock badge instead of price fields, with no present button, for a no-stock reply', function () {
+it('shows a no-stock badge instead of price fields, with no present checkbox, for a no-stock reply', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
     $vendor = VendorProfile::factory()->create();
@@ -181,45 +183,98 @@ it('shows a no-stock badge instead of price fields, with no present button, for 
     Livewire::actingAs($admin)
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->assertSee(__('admin.request_detail.no_stock_badge'))
-        ->assertDontSee(__('admin.request_detail.present_quote_button'));
+        ->assertDontSee(__('admin.request_detail.present_checkbox_label'));
 });
 
-it('presents a quote, snapshotting the price and showing a confirmation', function () {
+it('presents every checked quote in one deliberate batch action, each snapshotting its own price', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
-    $vendor = VendorProfile::factory()->create();
-    $response = VendorResponse::factory()->create([
-        'part_request_id' => $request->id,
-        'vendor_id' => $vendor->id,
-        'cost_price' => 45_000,
-    ]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
 
     Livewire::actingAs($admin)
         ->test(RequestDetail::class, ['partRequest' => $request])
-        ->call('presentQuote', $response->id)
-        ->assertSet('justPresentedBuyerPrice', 54_000)
-        ->assertSee(__('admin.request_detail.present_quote_confirmation', ['price' => '54,000']));
+        ->set('selectedResponseIdsToPresent', [$responseA->id, $responseB->id])
+        ->call('presentSelectedQuotes')
+        ->assertHasNoErrors()
+        ->assertSet('selectedResponseIdsToPresent', [])
+        ->assertSee(__('admin.request_detail.presented_badge'))
+        ->assertDispatched('admin-toast', message: __('admin.request_detail.presented_toast', ['count' => 2]), type: 'success');
 
     $fresh = $request->fresh();
+    // Presenting alone never selects anything (client revision --
+    // that's SelectQuoteAction's own, separate job).
     expect($fresh->status)->toBe(RequestStatus::Quoted)
-        ->and($fresh->selected_response_id)->toBe($response->id)
-        ->and($fresh->buyer_price)->toBe(54_000);
+        ->and($fresh->selected_response_id)->toBeNull()
+        ->and(PresentedQuote::count())->toBe(2)
+        ->and(PresentedQuote::where('vendor_response_id', $responseA->id)->value('buyer_price'))->toBe(36_000)
+        ->and(PresentedQuote::where('vendor_response_id', $responseB->id)->value('buyer_price'))->toBe(60_000);
 });
 
-it('hides the present button and shows the locked help text once a quote has already been presented', function () {
+it('rejects presenting when nothing is checked', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
     $vendor = VendorProfile::factory()->create();
-    $response = VendorResponse::factory()->create([
-        'part_request_id' => $request->id,
-        'vendor_id' => $vendor->id,
-        'cost_price' => 45_000,
-    ]);
+    VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000]);
 
     Livewire::actingAs($admin)
         ->test(RequestDetail::class, ['partRequest' => $request])
-        ->call('presentQuote', $response->id)
+        ->call('presentSelectedQuotes')
+        ->assertHasErrors(['presentQuote'])
+        ->assertDispatched('admin-toast', message: __('admin.request_detail.select_at_least_one_quote'), type: 'error');
+
+    expect(PresentedQuote::count())->toBe(0);
+});
+
+it('distinguishes the buyer-selected quote from merely-presented ones', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
+
+    app(PresentQuoteAction::class)->execute($request, $responseA);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    // Simulates the buyer having picked quote A (SelectQuoteAction's own
+    // job -- not exercised here, just its effect on the badge).
+    $request->fresh()->update(['selected_response_id' => $responseA->id, 'buyer_price' => 39_000]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        // Both badges render at once here: quote A is presented AND the
+        // buyer's pick; quote B is presented but not selected -- so
+        // "Presented" must appear (for B, and also for A), while "Buyer
+        // selected" appears exactly once (only for A).
+        ->assertSeeInOrder([
+            __('admin.request_detail.presented_badge'),
+            __('admin.request_detail.buyer_selected_badge'),
+        ])
+        // Neither presented response shows a checkbox any more -- there is
+        // no remove action of any kind, just the badges.
+        ->assertDontSee(__('admin.request_detail.present_checkbox_label'));
+});
+
+it('locks out presenting entirely and shows the locked help text once the request has been paid for', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $presentedResponse = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 45_000]);
+    $unpresentedResponse = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 30_000]);
+
+    app(PresentQuoteAction::class)->execute($request, $presentedResponse);
+    $request->fresh()->update(['status' => RequestStatus::Paid]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
         ->assertSee(__('admin.request_detail.compare_locked_help'))
         ->assertSee(__('admin.request_detail.presented_badge'))
-        ->assertDontSee(__('admin.request_detail.present_quote_button'));
+        // The never-presented response still shows its checkbox, but
+        // disabled -- and the batch "Present to buyer" button is gone.
+        ->assertSeeHtml('disabled')
+        ->assertDontSee(__('admin.request_detail.present_selected_button'));
 });
