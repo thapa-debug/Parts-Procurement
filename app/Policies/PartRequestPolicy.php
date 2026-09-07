@@ -141,6 +141,18 @@ class PartRequestPolicy
     }
 
     /**
+     * The buyer picking (or re-picking) one of their own request's
+     * presented quotes -- buyer AND owner, no admin bypass, same shape as
+     * viewOwn(). Whether the request is still open to selection (not yet
+     * paid) is a business rule SelectQuoteAction enforces itself, not a
+     * role check.
+     */
+    public function selectQuote(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isBuyer() && $user->buyerProfile?->id === $partRequest->buyer_id;
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies
