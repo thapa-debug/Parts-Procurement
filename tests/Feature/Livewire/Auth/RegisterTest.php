@@ -20,8 +20,7 @@ function fillValidRegisterForm($component)
         ->set('password_confirmation', 'my-strong-password1')
         ->set('company_name', 'Acme Imports')
         ->set('phone', '090-0000-0000')
-        ->set('country_id', Country::factory()->create()->id)
-        ->set('default_yard', 'Oceania Yard');
+        ->set('country_id', Country::factory()->create()->id);
 }
 
 it('renders the registration page for a guest', function () {
@@ -62,8 +61,7 @@ it('rejects an incomplete registration form', function () {
     Livewire::test(Register::class)
         ->call('register')
         ->assertHasErrors([
-            'name', 'email', 'password', 'company_name', 'phone',
-            'country_id', 'default_yard',
+            'name', 'email', 'password', 'company_name', 'phone', 'country_id',
         ]);
 
     expect(User::count())->toBe(0);

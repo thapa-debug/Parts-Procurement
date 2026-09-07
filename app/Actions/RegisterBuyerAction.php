@@ -27,10 +27,9 @@ class RegisterBuyerAction
         string $password,
         string $companyName,
         int $countryId,
-        string $defaultYard,
         string $phone,
     ): array {
-        $result = DB::transaction(function () use ($name, $email, $password, $companyName, $countryId, $defaultYard, $phone) {
+        $result = DB::transaction(function () use ($name, $email, $password, $companyName, $countryId, $phone) {
             $user = User::create([
                 'name' => $name,
                 'email' => $email,
@@ -45,7 +44,6 @@ class RegisterBuyerAction
                 'company_name' => $companyName,
                 'member_code' => BuyerProfile::generateMemberCode($user),
                 'country_id' => $countryId,
-                'default_yard' => $defaultYard,
                 'phone' => $phone,
             ]);
 

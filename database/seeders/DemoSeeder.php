@@ -35,17 +35,17 @@ class DemoSeeder extends Seeder
         $this->vendor('Kyushu Used Parts Center', 'Misaki Tanaka', 'vendor3@demo.test', '092-345-5603');
         $this->vendor('Hokkaido Recycle Auto', 'Naoki Ito', 'vendor4@demo.test', '011-456-5604');
 
-        $this->buyer('Global Auto Parts Ltd', 'James Carter', 'buyer1@demo.test', '+971-4-000-1001', 'United Arab Emirates', 'Jebel Ali Yard');
-        $this->buyer('Pacific Rim Motors', 'Fatima Al-Sayed', 'buyer2@demo.test', '+64-9-000-1002', 'New Zealand', 'Auckland Yard');
+        $this->buyer('Global Auto Parts Ltd', 'James Carter', 'buyer1@demo.test', '+971-4-000-1001', 'United Arab Emirates');
+        $this->buyer('Pacific Rim Motors', 'Fatima Al-Sayed', 'buyer2@demo.test', '+64-9-000-1002', 'New Zealand');
 
         // Deliberately unverified -- the one account that shows the
         // Unverified badge + resend action on the buyer master list.
-        $this->buyer('Southern Cross Auto Imports', "Liam O'Connor", 'buyer3@demo.test', '+61-7-000-1003', 'Australia', 'Brisbane Yard', unverified: true);
+        $this->buyer('Southern Cross Auto Imports', "Liam O'Connor", 'buyer3@demo.test', '+61-7-000-1003', 'Australia', unverified: true);
 
         // Deliberately verified but not yet approved -- CLAUDE.md §14's
         // buyer-approval gate: gives the (upcoming) approval-queue screen
         // something real to show.
-        $this->buyer('Andes Auto Traders', 'Sofia Herrera', 'buyer4@demo.test', '+56-32-000-1004', 'Chile', 'Valparaiso Yard', pending: true);
+        $this->buyer('Andes Auto Traders', 'Sofia Herrera', 'buyer4@demo.test', '+56-32-000-1004', 'Chile', pending: true);
     }
 
     private function vendor(string $companyName, string $contactPerson, string $email, string $phone): void
@@ -72,7 +72,6 @@ class DemoSeeder extends Seeder
         string $email,
         string $phone,
         string $destinationCountry,
-        string $yard,
         bool $unverified = false,
         bool $pending = false,
     ): void {
@@ -105,7 +104,6 @@ class DemoSeeder extends Seeder
             'company_name' => $companyName,
             'member_code' => BuyerProfile::generateMemberCode($user),
             'country_id' => $country->id,
-            'default_yard' => $yard,
             'phone' => $phone,
         ]);
     }

@@ -14,7 +14,6 @@ return new class extends Migration
             $table->string('company_name');
             $table->string('member_code')->unique();
             $table->string('default_destination_country');
-            $table->string('default_yard');
             $table->string('phone');
             $table->timestamps();
         });

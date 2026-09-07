@@ -78,8 +78,8 @@ credentials table above. Roughly 10–15 minutes end to end.
    buyer** creation (below) sends this automatically, no click needed.
 3. Choose **Edit** from a buyer's Actions menu to see the same shared
    detail-edit view used for vendors, with buyer-specific fields
-   (destination country, yard) instead of vendor ones — same
-   component, different data, proving the reuse (see `CONVENTIONS.md`).
+   (destination country) instead of vendor ones — same component,
+   different data, proving the reuse (see `CONVENTIONS.md`).
 4. Click **New buyer** and note the **Approve immediately** checkbox at
    the bottom of the form, checked by default. Leave it checked and the
    new buyer can act as soon as they verify; uncheck it and they land in

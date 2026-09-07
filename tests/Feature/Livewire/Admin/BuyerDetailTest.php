@@ -32,7 +32,6 @@ it('lets an admin mount the buyer detail component with current values pre-fille
         'company_name' => 'Acme Imports',
         'phone' => '090-0000-0000',
         'country_id' => $country->id,
-        'default_yard' => 'Oceania Yard',
     ]);
 
     Livewire::actingAs($admin)
@@ -40,8 +39,7 @@ it('lets an admin mount the buyer detail component with current values pre-fille
         ->assertSee('Acme Imports')
         ->assertSet('company_name', 'Acme Imports')
         ->assertSet('phone', '090-0000-0000')
-        ->assertSet('country_id', (string) $country->id)
-        ->assertSet('default_yard', 'Oceania Yard');
+        ->assertSet('country_id', (string) $country->id);
 });
 
 it('shows the buyer account\'s login name, email, and member code as read-only', function () {
@@ -69,7 +67,6 @@ it('renders buyer-specific fields and labels, not vendor-only ones', function ()
     Livewire::actingAs($admin)
         ->test(BuyerDetail::class, ['buyerProfile' => $profile])
         ->assertSee(__('admin.buyer_master.create_form.country_label'))
-        ->assertSee(__('admin.buyer_master.create_form.default_yard_label'))
         ->assertDontSee(__('admin.vendor_master.create_form.contact_person_label'))
         ->assertDontSee(__('admin.vendor_master.create_form.notify_email_label'));
 });
@@ -86,7 +83,6 @@ it('saves changes to the buyer profile, including switching to a different count
         ->set('company_name', 'Updated Imports')
         ->set('phone', '080-1234-5678')
         ->set('country_id', (string) $newCountry->id)
-        ->set('default_yard', 'North Island Yard')
         ->call('save')
         ->assertSet('justSaved', true);
 
@@ -94,8 +90,7 @@ it('saves changes to the buyer profile, including switching to a different count
 
     expect($profile->company_name)->toBe('Updated Imports')
         ->and($profile->phone)->toBe('080-1234-5678')
-        ->and($profile->country_id)->toBe($newCountry->id)
-        ->and($profile->default_yard)->toBe('North Island Yard');
+        ->and($profile->country_id)->toBe($newCountry->id);
 });
 
 it('keeps a since-deactivated country accepted when the rest of the form is resubmitted unchanged', function () {
@@ -135,9 +130,9 @@ it('rejects empty required fields', function () {
     Livewire::actingAs($admin)
         ->test(BuyerDetail::class, ['buyerProfile' => $profile])
         ->set('company_name', '')
-        ->set('default_yard', '')
+        ->set('phone', '')
         ->call('save')
-        ->assertHasErrors(['company_name', 'default_yard']);
+        ->assertHasErrors(['company_name', 'phone']);
 });
 
 it('never accepts member_code as an editable field', function () {

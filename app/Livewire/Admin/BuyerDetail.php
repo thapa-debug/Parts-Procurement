@@ -19,8 +19,6 @@ class BuyerDetail extends Component
 
     public string $country_id = '';
 
-    public string $default_yard = '';
-
     public bool $justSaved = false;
 
     public function mount(BuyerProfile $buyerProfile): void
@@ -32,7 +30,6 @@ class BuyerDetail extends Component
         $this->company_name = $buyerProfile->company_name;
         $this->phone = $buyerProfile->phone;
         $this->country_id = (string) $buyerProfile->country_id;
-        $this->default_yard = $buyerProfile->default_yard;
     }
 
     /**
@@ -49,7 +46,6 @@ class BuyerDetail extends Component
             // to save a phone-number edit) must not fail just because that
             // selection is no longer offered for *new* picks.
             'country_id' => ['required', 'integer', Rule::exists('countries', 'id')],
-            'default_yard' => ['required', 'string', 'max:255'],
         ];
     }
 
@@ -91,7 +87,6 @@ class BuyerDetail extends Component
                 ['name' => 'company_name', 'label' => __('admin.buyer_master.create_form.company_name_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.company_name_placeholder')],
                 ['name' => 'phone', 'label' => __('admin.buyer_master.create_form.phone_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.phone_placeholder')],
                 ['name' => 'country_id', 'label' => __('admin.buyer_master.create_form.country_label'), 'required' => true, 'type' => 'select', 'options' => $countryOptions, 'placeholderOption' => __('admin.buyer_master.create_form.country_placeholder_option')],
-                ['name' => 'default_yard', 'label' => __('admin.buyer_master.create_form.default_yard_label'), 'required' => true, 'placeholder' => __('admin.buyer_master.create_form.default_yard_placeholder')],
             ],
             'accountFields' => [
                 ['label' => __('admin.profile_edit.name_label'), 'value' => $user->name],

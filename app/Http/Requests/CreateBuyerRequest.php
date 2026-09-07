@@ -34,7 +34,6 @@ class CreateBuyerRequest extends FormRequest
             // existing buyer, where a since-deactivated country the buyer
             // already has must stay accepted (see BuyerDetail::rules()).
             'country_id' => ['required', 'integer', Rule::exists('countries', 'id')->where('is_active', true)],
-            'default_yard' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
             // CLAUDE.md §14's buyer-approval gate: whether this admin-created
             // buyer is approved immediately or lands in the pending queue.

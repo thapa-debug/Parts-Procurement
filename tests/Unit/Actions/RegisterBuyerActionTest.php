@@ -20,7 +20,6 @@ function registerBuyerPayload(array $overrides = []): array
         'password' => 'my-strong-password1',
         'company_name' => 'Acme Imports',
         'country_id' => Country::factory()->create()->id,
-        'default_yard' => 'Oceania Yard',
         'phone' => '090-0000-0000',
     ], $overrides);
 }
@@ -36,7 +35,6 @@ it('creates a user and buyer profile, with a self-chosen password and no forced 
         $payload['password'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
     );
 
@@ -61,7 +59,6 @@ it('sends a verification email notification on registration', function () {
         $payload['password'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
     );
 
@@ -83,7 +80,6 @@ it('rolls back the whole transaction if the buyer profile write fails', function
         $payload['password'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
     );
 
@@ -104,7 +100,6 @@ it('still creates the account even if sending the verification email fails', fun
         $payload['password'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
     );
 

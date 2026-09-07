@@ -21,7 +21,6 @@ function buyerPayload(array $overrides = []): array
         'email' => 'jane@example.com',
         'company_name' => 'Acme Imports',
         'country_id' => Country::factory()->create()->id,
-        'default_yard' => 'Oceania Yard',
         'phone' => '090-0000-0000',
         'approve_immediately' => true,
     ], $overrides);
@@ -40,7 +39,6 @@ it('creates a user and buyer profile together, atomically, approved immediately 
         $payload['email'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
         $admin,
         $payload['approve_immediately'],
@@ -77,7 +75,6 @@ it('creates a buyer profile pending approval when the flag is false', function (
         $payload['email'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
         $admin,
         $payload['approve_immediately'],
@@ -109,7 +106,6 @@ it('rolls back the entire transaction and creates zero users if the buyer profil
         $payload['email'],
         $payload['company_name'],
         $payload['country_id'],
-        $payload['default_yard'],
         $payload['phone'],
         $admin,
         $payload['approve_immediately'],
@@ -132,7 +128,7 @@ it('requires every admin-created buyer field', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['name', 'email', 'company_name', 'country_id', 'default_yard', 'phone', 'approve_immediately'] as $field) {
+    foreach (['name', 'email', 'company_name', 'country_id', 'phone', 'approve_immediately'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
 });

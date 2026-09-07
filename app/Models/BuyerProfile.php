@@ -12,7 +12,7 @@ use Spatie\Activitylog\Support\LogOptions;
 
 #[Fillable([
     'user_id', 'company_name', 'member_code', 'country_id',
-    'default_yard', 'phone', 'approved_at', 'approved_by',
+    'phone', 'approved_at', 'approved_by',
 ])]
 class BuyerProfile extends Model
 {

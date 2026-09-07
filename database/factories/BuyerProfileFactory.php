@@ -24,7 +24,6 @@ class BuyerProfileFactory extends Factory
             'company_name' => fake()->company(),
             'member_code' => fake()->unique()->numerify('BYR-######'),
             'country_id' => Country::factory(),
-            'default_yard' => fake()->city().' Yard',
             'phone' => fake()->phoneNumber(),
             // Approved by default -- most tests using this factory exercise
             // something unrelated to the approval gate and shouldn't have to
