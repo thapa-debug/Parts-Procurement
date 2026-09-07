@@ -1,4 +1,42 @@
 <div class="max-w-3xl">
+    {{-- Brief, dismissable toast for presenting -- deliberately not a
+         persistent banner (see RequestDetail::presentSelectedQuotes()),
+         since the admin may present in quick succession across requests.
+         The durable feedback is each row's own "Presented" badge below.
+         Color-coded by outcome: green for success, red for error -- see
+         the 'type' passed to dispatch(). --}}
+    <div
+        x-data="{ show: false, message: '', type: 'success' }"
+        x-on:admin-toast.window="
+            message = $event.detail.message;
+            type = $event.detail.type ?? 'success';
+            show = true;
+            clearTimeout(window.__adminToastTimer);
+            window.__adminToastTimer = setTimeout(() => (show = false), 4500);
+        "
+        x-show="show"
+        x-transition:enter="transition ease-out duration-200"
+        x-transition:enter-start="opacity-0 translate-y-2"
+        x-transition:enter-end="opacity-100 translate-y-0"
+        x-transition:leave="transition ease-in duration-150"
+        x-transition:leave-start="opacity-100 translate-y-0"
+        x-transition:leave-end="opacity-0 translate-y-2"
+        x-cloak
+        class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border-l-4 px-4 py-3.5 text-sm font-medium shadow-xl"
+        :class="{
+            'border-green-500 bg-green-50 text-green-800': type === 'success',
+            'border-red-500 bg-red-50 text-red-800': type === 'error',
+        }"
+    >
+        <svg x-show="type === 'success'" class="h-5 w-5 shrink-0 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
+        </svg>
+        <svg x-show="type === 'error'" class="h-5 w-5 shrink-0 text-red-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
+        </svg>
+        <span x-text="message"></span>
+    </div>
+
     <a href="{{ route('admin.requests.index') }}" class="text-sm text-ink-muted hover:text-ink">
         &larr; {{ __('admin.request_detail.back_link') }}
     </a>
@@ -77,12 +115,6 @@
     @if ($sentToCount !== null)
         <div class="mt-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
             {{ __('admin.request_detail.sent_confirmation', ['count' => $sentToCount]) }}
-        </div>
-    @endif
-
-    @if ($justPresentedBuyerPrice !== null)
-        <div class="mt-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
-            {{ __('admin.request_detail.present_quote_confirmation', ['price' => number_format($justPresentedBuyerPrice)]) }}
         </div>
     @endif
 
@@ -172,9 +204,9 @@
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
             <p class="mt-1 text-sm text-ink-muted">
-                {{ $partRequest->status === \App\Enums\RequestStatus::VendorInquiry
-                    ? __('admin.request_detail.compare_help')
-                    : __('admin.request_detail.compare_locked_help') }}
+                {{ $partRequest->hasBeenPaid()
+                    ? __('admin.request_detail.compare_locked_help')
+                    : __('admin.request_detail.compare_help') }}
             </p>
 
             @error('presentQuote')
@@ -183,17 +215,28 @@
 
             <div class="mt-4 space-y-4">
                 @foreach ($vendorResponses as $response)
-                    @php $pricing = $vendorResponsePricing->get($response->id); @endphp
-                    <div class="rounded-md border p-4 {{ $partRequest->selected_response_id === $response->id ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
+                    @php
+                        $pricing = $vendorResponsePricing->get($response->id);
+                        $isPresented = in_array($response->id, $presentedResponseIds, true);
+                        $isBuyerSelected = $partRequest->selected_response_id === $response->id;
+                    @endphp
+                    @php
+                        // Two independent signals, deliberately styled
+                        // differently so a row can show either, both, or
+                        // neither: "on offer" (presented) and "the buyer's
+                        // pick" (selected) are separate concepts now -- see
+                        // CLAUDE.md's client-revision note on this slice.
+                        $rowClass = match (true) {
+                            $isBuyerSelected => 'border-brand-500 bg-brand-50',
+                            $isPresented => 'border-blue-200 bg-blue-50/60',
+                            default => 'border-line',
+                        };
+                    @endphp
+                    <div class="rounded-md border p-4 {{ $rowClass }}">
                         <div class="flex flex-wrap items-start justify-between gap-3">
                             <div>
                                 <span class="font-medium text-ink">{{ $response->vendor->company_name }}</span>
                                 <span class="ml-2 text-xs text-ink-muted">{{ $response->vendor->contact_person }}</span>
-                                @if ($partRequest->selected_response_id === $response->id)
-                                    <span class="ml-2 inline-flex rounded-full bg-brand-100 px-2 py-0.5 text-xs font-medium text-brand-700">
-                                        {{ __('admin.request_detail.presented_badge') }}
-                                    </span>
-                                @endif
                             </div>
 
                             @if ($response->is_no_stock)
@@ -229,34 +272,60 @@
                                 <p class="mt-3 text-sm text-ink">{{ $response->comment }}</p>
                             @endif
 
-                            @if ($response->photos->isNotEmpty())
-                                <div class="mt-3 flex flex-wrap gap-2">
-                                    @foreach ($response->photos as $photo)
-                                        <a href="{{ $photo->url() }}" target="_blank" rel="noopener noreferrer">
-                                            <img src="{{ $photo->url() }}" class="h-16 w-16 rounded-md border border-line object-cover">
-                                        </a>
-                                    @endforeach
-                                </div>
-                            @endif
+                            <div class="mt-3 max-w-sm">
+                                <x-photo-gallery :photos="$response->photos->map(fn ($photo) => $photo->url())->all()" />
+                            </div>
 
-                            @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
-                                <div class="mt-3">
-                                    <button
-                                        type="button"
-                                        wire:click="presentQuote({{ $response->id }})"
-                                        wire:confirm="{{ __('admin.request_detail.present_quote_confirm', ['price' => number_format($pricing['buyer_price'] ?? 0)]) }}"
-                                        wire:loading.attr="disabled"
-                                        wire:target="presentQuote({{ $response->id }})"
-                                        class="rounded-md bg-brand-600 px-3 py-1.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                                    >
-                                        {{ __('admin.request_detail.present_quote_button') }}
-                                    </button>
-                                </div>
-                            @endif
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                @if ($isPresented)
+                                    <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                        {{ __('admin.request_detail.presented_badge') }}
+                                    </span>
+
+                                    @if ($isBuyerSelected)
+                                        <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
+                                            {{ __('admin.request_detail.buyer_selected_badge') }}
+                                        </span>
+                                    @endif
+                                @else
+                                    <label class="flex items-center gap-2 text-sm font-medium text-ink {{ $partRequest->hasBeenPaid() ? 'opacity-50' : '' }}">
+                                        <input
+                                            type="checkbox"
+                                            wire:model="selectedResponseIdsToPresent"
+                                            value="{{ $response->id }}"
+                                            {{ $partRequest->hasBeenPaid() ? 'disabled' : '' }}
+                                            class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                                        >
+                                        {{ __('admin.request_detail.present_checkbox_label') }}
+                                    </label>
+                                @endif
+                            </div>
                         @endif
                     </div>
                 @endforeach
             </div>
+
+            @unless ($partRequest->hasBeenPaid())
+                @php
+                    $hasSelectablePresentableQuotes = $vendorResponses
+                        ->filter(fn ($response) => ! $response->is_no_stock && ! in_array($response->id, $presentedResponseIds, true))
+                        ->isNotEmpty();
+                @endphp
+                @if ($hasSelectablePresentableQuotes)
+                    <div class="mt-4">
+                        <button
+                            type="button"
+                            wire:click="presentSelectedQuotes"
+                            wire:confirm="{{ __('admin.request_detail.present_selected_confirm') }}"
+                            wire:loading.attr="disabled"
+                            wire:target="presentSelectedQuotes"
+                            class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {{ __('admin.request_detail.present_selected_button') }}
+                        </button>
+                    </div>
+                @endif
+            @endunless
         </div>
     @endif
 </div>

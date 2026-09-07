@@ -35,11 +35,16 @@ class RequestDetail extends Component
     public ?int $sentToCount = null;
 
     /**
-     * Same "shown once, never cleared" reasoning as $sentToCount -- the
-     * compare-and-present section disappears in its place once the request
-     * moves to `quoted`.
+     * Which not-yet-presented responses the admin has checked, staged for
+     * one deliberate "Present to buyer" click (client revision -- checking
+     * a box used to present it immediately; a buyer could then be notified
+     * about a quote the admin un-checked moments later, landing on a
+     * confusing blank). Mirrors $selectedVendorIds's own
+     * checkboxes-then-one-button shape above.
+     *
+     * @var array<int, int>
      */
-    public ?int $justPresentedBuyerPrice = null;
+    public array $selectedResponseIdsToPresent = [];
 
     public function mount(PartRequest $partRequest): void
     {
@@ -81,22 +86,55 @@ class RequestDetail extends Component
         $this->sentToCount = $this->partRequest->vendors()->count();
     }
 
-    public function presentQuote(int $vendorResponseId, PresentQuoteAction $action): void
+    /**
+     * Presents every currently-checked response in one deliberate action,
+     * confirmed client-side (wire:confirm in the Blade view) before this
+     * ever runs -- client revision: replaces a casual per-checkbox toggle
+     * that presented the instant a box was checked. There is deliberately
+     * no way to un-present/withdraw a quote once presented (client
+     * revision: a buyer could otherwise be notified about a quote that's
+     * then silently pulled out from under them) -- presenting is final. A
+     * response that fails (already presented, turned no-stock, etc. -- e.g.
+     * a second admin tab) is skipped rather than aborting the whole batch;
+     * only a total failure surfaces an error.
+     */
+    public function presentSelectedQuotes(PresentQuoteAction $action): void
     {
         $this->authorize('presentQuote', $this->partRequest);
 
-        $vendorResponse = VendorResponse::findOrFail($vendorResponseId);
-
-        try {
-            $this->partRequest = $action->execute($this->partRequest, $vendorResponse);
-        } catch (PresentQuoteNotAllowedException $e) {
-            report($e);
-            $this->addError('presentQuote', __('admin.request_detail.present_quote_error'));
+        if ($this->selectedResponseIdsToPresent === []) {
+            $message = __('admin.request_detail.select_at_least_one_quote');
+            $this->addError('presentQuote', $message);
+            $this->dispatch('admin-toast', message: $message, type: 'error');
 
             return;
         }
 
-        $this->justPresentedBuyerPrice = $this->partRequest->buyer_price;
+        $presentedCount = 0;
+
+        foreach (VendorResponse::query()->find($this->selectedResponseIdsToPresent) as $vendorResponse) {
+            try {
+                $action->execute($this->partRequest, $vendorResponse);
+                $presentedCount++;
+            } catch (PresentQuoteNotAllowedException $e) {
+                report($e);
+            }
+        }
+
+        $this->partRequest = $this->partRequest->fresh();
+        $this->reset('selectedResponseIdsToPresent');
+
+        if ($presentedCount === 0) {
+            $message = __('admin.request_detail.present_quote_error');
+            $this->addError('presentQuote', $message);
+            $this->dispatch('admin-toast', message: $message, type: 'error');
+
+            return;
+        }
+
+        // Durable feedback is the "Presented" badge (see the Blade view)
+        // -- this toast is just a brief, dismissable extra.
+        $this->dispatch('admin-toast', message: __('admin.request_detail.presented_toast', ['count' => $presentedCount]), type: 'success');
     }
 
     /**
@@ -130,6 +168,7 @@ class RequestDetail extends Component
                 : Collection::make(),
             'vendorResponses' => $vendorResponses,
             'vendorResponsePricing' => $vendorResponsePricing,
+            'presentedResponseIds' => $this->partRequest->presentedQuotes()->pluck('vendor_response_id')->all(),
         ])->title($this->partRequest->request_code);
     }
 }
