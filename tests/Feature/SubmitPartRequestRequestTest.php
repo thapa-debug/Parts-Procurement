@@ -11,7 +11,6 @@ uses(RefreshDatabase::class);
 function submitRequestPayload(array $overrides = []): array
 {
     return array_merge([
-        'part_type' => 'used',
         'maker_id' => Maker::factory()->create(['name' => 'Toyota'])->id,
         'car_model' => 'Crown',
         'part_name' => 'Right LED headlight',
@@ -24,9 +23,13 @@ it('requires the mandatory fields, including vin', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['part_type', 'maker_id', 'car_model', 'part_name', 'vin'] as $field) {
+    foreach (['maker_id', 'car_model', 'part_name', 'vin'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
+});
+
+it('never validates part_type -- it is no longer a buyer-facing field', function () {
+    expect((new SubmitPartRequestRequest)->rules())->not->toHaveKey('part_type');
 });
 
 it('rejects a submission without a vin', function () {
@@ -82,15 +85,6 @@ it('rejects an inactive maker -- only active makers are a valid pick for a new r
     );
 
     expect($validator->errors()->has('maker_id'))->toBeTrue();
-});
-
-it('rejects a part_type outside the enum', function () {
-    $validator = Validator::make(
-        submitRequestPayload(['part_type' => 'refurbished']),
-        (new SubmitPartRequestRequest)->rules(),
-    );
-
-    expect($validator->errors()->has('part_type'))->toBeTrue();
 });
 
 it('rejects a non-URL reference_url', function () {

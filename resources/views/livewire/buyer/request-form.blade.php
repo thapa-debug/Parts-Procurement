@@ -21,23 +21,6 @@
         </div>
     @else
         <form wire:submit="submit" class="mt-6 max-w-2xl space-y-5">
-            <div>
-                <label class="block text-sm font-medium text-ink">
-                    {{ __('buyer.request_form.part_type_label') }} <x-required-mark />
-                </label>
-                <div class="mt-1.5 flex flex-wrap gap-3">
-                    @foreach (\App\Enums\PartType::cases() as $option)
-                        <label class="flex items-center gap-2 rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm has-[:checked]:border-brand-500 has-[:checked]:bg-brand-50">
-                            <input type="radio" wire:model="part_type" value="{{ $option->value }}" class="text-brand-600 focus:ring-1 focus:ring-brand-500">
-                            {{ __('buyer.request_form.part_type.'.$option->value) }}
-                        </label>
-                    @endforeach
-                </div>
-                @error('part_type')
-                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                @enderror
-            </div>
-
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <div>
                     <label for="maker_id" class="block text-sm font-medium text-ink">

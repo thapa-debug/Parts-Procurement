@@ -2,12 +2,10 @@
 
 namespace App\Http\Requests;
 
-use App\Enums\PartType;
 use App\Models\PartRequest;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
-use Illuminate\Validation\Rules\Enum;
 
 class SubmitPartRequestRequest extends FormRequest
 {
@@ -28,7 +26,10 @@ class SubmitPartRequestRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'part_type' => ['required', new Enum(PartType::class)],
+            // part_type is no longer a buyer-facing field (client revision:
+            // the client only deals in new parts) -- RequestForm always
+            // passes PartType::New to the action directly. Not validated
+            // here since it's never submitted.
             // Never trust the <select> alone -- validate server-side against
             // active makers, the same set it's built from.
             'maker_id' => ['required', 'integer', Rule::exists('makers', 'id')->where('is_active', true)],

@@ -348,7 +348,7 @@
 
                 <div>
                     <label for="comment" class="block text-sm font-medium text-ink">
-                        {{ __('vendor.request_response.comment_label') }} <x-required-mark />
+                        {{ __('vendor.request_response.comment_label') }}
                     </label>
                     <textarea
                         id="comment"
