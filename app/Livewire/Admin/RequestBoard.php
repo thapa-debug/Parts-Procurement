@@ -100,11 +100,33 @@ class RequestBoard extends Component
         return $counts;
     }
 
+    /**
+     * Tab color reads from the same single source as every status badge
+     * (RequestStatus::badgeClasses(), UX brush-up) -- each tab uses its
+     * group's first/representative status ('order_confirmed''s is Paid,
+     * the happy path; a row that's actually procurement_failed still
+     * shows red on its own badge regardless of which tab it's sitting in).
+     * 'all' isn't a real status, so it stays neutral.
+     *
+     * @return array<string, string>
+     */
+    protected function tabBadgeClasses(): array
+    {
+        $classes = ['all' => 'bg-surface-muted text-ink-muted'];
+
+        foreach (static::tabStatuses() as $tab => $statuses) {
+            $classes[$tab] = $statuses[0]->badgeClasses();
+        }
+
+        return $classes;
+    }
+
     public function render(): View
     {
         return view('livewire.admin.request-board', [
             'requests' => $this->requests(),
             'tabCounts' => $this->tabCounts(),
+            'tabBadgeClasses' => $this->tabBadgeClasses(),
         ])->title(__('admin.request_board.title'));
     }
 }

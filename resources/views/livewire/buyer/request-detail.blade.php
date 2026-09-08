@@ -5,7 +5,7 @@
 
     <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-2xl font-semibold text-ink">{{ $partRequest->request_code }}</h1>
-        <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
             {{ __('buyer.request_list.status.'.$partRequest->status->value) }}
         </span>
     </div>
