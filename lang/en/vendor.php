@@ -43,7 +43,8 @@ return [
             'unverified_body' => "You'll be able to respond to this inquiry as soon as your email is verified. Use the banner above to resend the verification link if you need a new one.",
         ],
 
-        'response_section' => 'Your quote',
+        'response_section' => 'Have this part? Submit your quote',
+        'response_help' => 'Fill in the details below, including your wholesale price.',
         'cost_price_label' => 'Wholesale cost price (¥, excl. tax)',
         'cost_price_placeholder' => 'e.g. 45000',
         'quality_rank_label' => 'Quality rank',
@@ -76,7 +77,7 @@ return [
         'submit_button' => 'Send quote to admin',
 
         'no_stock_section' => "Don't have this part?",
-        'no_stock_help' => 'Skip the form above and reply with one tap instead.',
+        'no_stock_help' => 'Reply with one tap -- no need to fill in the quote form below.',
         'no_stock_button' => 'No stock',
         'no_stock_confirm' => 'Report that you have no stock for this part?',
 
