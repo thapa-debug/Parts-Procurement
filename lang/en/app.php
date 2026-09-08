@@ -1,7 +1,7 @@
 <?php
 
 return [
-    'name' => 'Parts Procurement',
+    'name' => 'Heiwa Parts',
     'tagline' => 'Auto-parts procurement brokerage',
     'footer_rights' => 'All rights reserved.',
     'logout' => 'Log out',
