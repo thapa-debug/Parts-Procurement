@@ -121,6 +121,7 @@ class RequestForm extends Component
         ]);
 
         $this->submittedCode = $request->request_code;
+        $this->dispatch('toast', message: __('buyer.request_form.submitted', ['code' => $request->request_code]), type: 'success');
     }
 
     /**

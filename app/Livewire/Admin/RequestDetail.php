@@ -69,7 +69,9 @@ class RequestDetail extends Component
         $this->authorize('broadcast', $this->partRequest);
 
         if ($this->selectedVendorIds === []) {
-            $this->addError('selectedVendorIds', __('admin.request_detail.select_at_least_one'));
+            $message = __('admin.request_detail.select_at_least_one');
+            $this->addError('selectedVendorIds', $message);
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
@@ -78,12 +80,15 @@ class RequestDetail extends Component
             $this->partRequest = $action->execute($this->partRequest, $this->selectedVendorIds);
         } catch (RequestCannotBeBroadcastException $e) {
             report($e);
-            $this->addError('selectedVendorIds', __('admin.request_detail.broadcast_error'));
+            $message = __('admin.request_detail.broadcast_error');
+            $this->addError('selectedVendorIds', $message);
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
 
         $this->sentToCount = $this->partRequest->vendors()->count();
+        $this->dispatch('toast', message: __('admin.request_detail.sent_confirmation', ['count' => $this->sentToCount]), type: 'success');
     }
 
     /**
@@ -105,7 +110,7 @@ class RequestDetail extends Component
         if ($this->selectedResponseIdsToPresent === []) {
             $message = __('admin.request_detail.select_at_least_one_quote');
             $this->addError('presentQuote', $message);
-            $this->dispatch('admin-toast', message: $message, type: 'error');
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
@@ -127,14 +132,14 @@ class RequestDetail extends Component
         if ($presentedCount === 0) {
             $message = __('admin.request_detail.present_quote_error');
             $this->addError('presentQuote', $message);
-            $this->dispatch('admin-toast', message: $message, type: 'error');
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
 
         // Durable feedback is the "Presented" badge (see the Blade view)
         // -- this toast is just a brief, dismissable extra.
-        $this->dispatch('admin-toast', message: __('admin.request_detail.presented_toast', ['count' => $presentedCount]), type: 'success');
+        $this->dispatch('toast', message: __('admin.request_detail.presented_toast', ['count' => $presentedCount]), type: 'success');
     }
 
     /**
