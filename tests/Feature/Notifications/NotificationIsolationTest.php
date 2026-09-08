@@ -28,14 +28,15 @@ use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
-// CLAUDE.md §4 isolation, applied to Phase 3 Slice 1's database-channel
-// notifications: a vendor's notification must never reveal the buyer's
+// CLAUDE.md §4 isolation, applied to Phase 3 Slice 2's database + mail
+// channels alike: a vendor's notification must never reveal the buyer's
 // identity or another vendor's data; a buyer's notification must never
 // reveal vendor cost or identity. Every assertion below checks both that
 // the RIGHT party got notified and that the notification's own stored
-// data (toArray()) never carries the forbidden fields -- not just "no
-// secret string happens to appear today", checked via json_encode() the
-// same way the buyer Livewire wire-snapshot isolation tests do.
+// data (toArray()) AND rendered email (toMail()) never carry the
+// forbidden fields -- not just "no secret string happens to appear
+// today", checked via json_encode() the same way the buyer Livewire
+// wire-snapshot isolation tests do.
 
 it('tells only the invited vendor about a broadcast, never the buyer\'s identity or another vendor', function () {
     Notification::fake();
@@ -48,7 +49,7 @@ it('tells only the invited vendor about a broadcast, never the buyer\'s identity
     app(BroadcastRequestAction::class)->execute($request, [$invited->id]);
 
     Notification::assertSentTo($invited->user, RequestBroadcastNotification::class, function ($notification, $channels) use ($invited, $request) {
-        expect($channels)->toBe(['database']);
+        expect($channels)->toBe(['database', 'mail']);
 
         $data = $notification->toArray($invited->user);
 
@@ -60,6 +61,14 @@ it('tells only the invited vendor about a broadcast, never the buyer\'s identity
         $encoded = json_encode($data);
         expect($encoded)->not->toContain('Secret Buyer Co')
             ->and($encoded)->not->toContain('Uninvited Vendor Co');
+
+        $mail = $notification->toMail($invited->user);
+        $encodedMail = json_encode([$mail->subject, $mail->introLines, $mail->outroLines, $mail->actionText, $mail->actionUrl]);
+
+        expect($mail->actionUrl)->toBe(route('vendor.inbox.show', $request))
+            ->and($encodedMail)->toContain('Front bumper')
+            ->and($encodedMail)->not->toContain('Secret Buyer Co')
+            ->and($encodedMail)->not->toContain('Uninvited Vendor Co');
 
         return true;
     });
@@ -81,13 +90,17 @@ it('tells every admin, and only admins, when a vendor submits a quote', function
 
     foreach ([$adminA, $adminB] as $admin) {
         Notification::assertSentTo($admin, VendorResponseSubmittedNotification::class, function ($notification, $channels) use ($admin, $request) {
-            expect($channels)->toBe(['database']);
+            expect($channels)->toBe(['database', 'mail']);
 
             $data = $notification->toArray($admin);
 
             expect($data['request_id'])->toBe($request->id)
                 ->and($data['vendor_company_name'])->toBe('Yamato Auto')
                 ->and($data['url'])->toBe(route('admin.requests.show', $request));
+
+            $mail = $notification->toMail($admin);
+            expect($mail->actionUrl)->toBe(route('admin.requests.show', $request))
+                ->and($mail->subject)->toContain('Yamato Auto');
 
             return true;
         });
@@ -112,7 +125,7 @@ it('tells only the buyer about a presented quote, never the vendor\'s identity o
     app(PresentQuoteAction::class)->execute($request, $response);
 
     Notification::assertSentTo($buyer->user, QuotePresentedNotification::class, function ($notification, $channels) use ($buyer, $request) {
-        expect($channels)->toBe(['database']);
+        expect($channels)->toBe(['database', 'mail']);
 
         $data = $notification->toArray($buyer->user);
 
@@ -124,11 +137,23 @@ it('tells only the buyer about a presented quote, never the vendor\'s identity o
             ->and($data)->not->toHaveKey('vendor_response_id')
             ->and($data)->not->toHaveKey('vendor_company_name');
 
-        $encoded = json_encode($data);
-        expect($encoded)->not->toContain('Secret Vendor Co')
-            ->and($encoded)->not->toContain('Secret Contact Person')
-            ->and($encoded)->not->toContain('45000')
-            ->and($encoded)->not->toContain('45,000');
+        $encodedData = json_encode($data);
+        expect($encodedData)->not->toContain('Secret Vendor Co')
+            ->and($encodedData)->not->toContain('Secret Contact Person')
+            ->and($encodedData)->not->toContain('45000')
+            ->and($encodedData)->not->toContain('45,000');
+
+        // Same isolation discipline applies to the mail channel: the
+        // rendered email must never carry vendor identity or cost either.
+        $mail = $notification->toMail($buyer->user);
+        $encodedMail = json_encode([$mail->subject, $mail->introLines, $mail->outroLines, $mail->actionText, $mail->actionUrl]);
+
+        expect($mail->actionUrl)->toBe(route('buyer.requests.show', $request))
+            ->and($encodedMail)->toContain('54,000')
+            ->and($encodedMail)->not->toContain('Secret Vendor Co')
+            ->and($encodedMail)->not->toContain('Secret Contact Person')
+            ->and($encodedMail)->not->toContain('45000')
+            ->and($encodedMail)->not->toContain('45,000');
 
         return true;
     });
@@ -151,7 +176,7 @@ it('tells every admin, and only admins, when a buyer selects a quote', function 
 
     foreach ([$adminA, $adminB] as $admin) {
         Notification::assertSentTo($admin, QuoteSelectedNotification::class, function ($notification, $channels) use ($admin, $request) {
-            expect($channels)->toBe(['database']);
+            expect($channels)->toBe(['database', 'mail']);
 
             $data = $notification->toArray($admin);
 
@@ -159,6 +184,10 @@ it('tells every admin, and only admins, when a buyer selects a quote', function 
                 ->and($data['buyer_company_name'])->toBe('Acme Imports')
                 ->and($data['buyer_price'])->toBe(54_000)
                 ->and($data['url'])->toBe(route('admin.requests.show', $request));
+
+            $mail = $notification->toMail($admin);
+            expect($mail->actionUrl)->toBe(route('admin.requests.show', $request))
+                ->and($mail->subject)->toContain('Acme Imports');
 
             return true;
         });
@@ -186,13 +215,17 @@ it('tells every admin, and only admins, when a buyer registers', function () {
 
     foreach ([$adminA, $adminB] as $admin) {
         Notification::assertSentTo($admin, BuyerRegisteredNotification::class, function ($notification, $channels) use ($admin, $result) {
-            expect($channels)->toBe(['database']);
+            expect($channels)->toBe(['database', 'mail']);
 
             $data = $notification->toArray($admin);
 
             expect($data['buyer_profile_id'])->toBe($result['buyer_profile']->id)
                 ->and($data['buyer_company_name'])->toBe('New Buyer Co')
                 ->and($data['url'])->toBe(route('admin.buyers.show', $result['buyer_profile']));
+
+            $mail = $notification->toMail($admin);
+            expect($mail->actionUrl)->toBe(route('admin.buyers.show', $result['buyer_profile']))
+                ->and($mail->subject)->toContain('New Buyer Co');
 
             return true;
         });
@@ -210,7 +243,7 @@ it('tells only the buyer when they are approved, with no cross-party data at all
     app(ApproveBuyerAction::class)->execute($buyer, $admin);
 
     Notification::assertSentTo($buyer->user, BuyerApprovedNotification::class, function ($notification, $channels) use ($buyer) {
-        expect($channels)->toBe(['database']);
+        expect($channels)->toBe(['database', 'mail']);
 
         $data = $notification->toArray($buyer->user);
 
@@ -218,6 +251,9 @@ it('tells only the buyer when they are approved, with no cross-party data at all
             'type' => 'buyer_approved',
             'url' => route('buyer.requests.index'),
         ]);
+
+        $mail = $notification->toMail($buyer->user);
+        expect($mail->actionUrl)->toBe(route('buyer.requests.index'));
 
         return true;
     });
@@ -247,7 +283,7 @@ it('tells every admin, and only admins, when a buyer submits a new request', fun
 
     foreach ([$adminA, $adminB] as $admin) {
         Notification::assertSentTo($admin, PartRequestSubmittedNotification::class, function ($notification, $channels) use ($admin, $request) {
-            expect($channels)->toBe(['database']);
+            expect($channels)->toBe(['database', 'mail']);
 
             $data = $notification->toArray($admin);
 
@@ -255,6 +291,10 @@ it('tells every admin, and only admins, when a buyer submits a new request', fun
                 ->and($data['buyer_company_name'])->toBe('Global Parts Ltd')
                 ->and($data['part_name'])->toBe('Alternator')
                 ->and($data['url'])->toBe(route('admin.requests.show', $request));
+
+            $mail = $notification->toMail($admin);
+            expect($mail->actionUrl)->toBe(route('admin.requests.show', $request))
+                ->and($mail->subject)->toContain('Alternator');
 
             return true;
         });
