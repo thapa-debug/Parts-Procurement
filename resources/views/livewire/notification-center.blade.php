@@ -25,9 +25,12 @@
 
     <div
         x-show="open"
-        x-transition:enter="transition ease-out duration-100"
+        x-transition:enter="transition ease-out duration-150"
         x-transition:enter-start="opacity-0 scale-95"
         x-transition:enter-end="opacity-100 scale-100"
+        x-transition:leave="transition ease-in duration-100"
+        x-transition:leave-start="opacity-100 scale-100"
+        x-transition:leave-end="opacity-0 scale-95"
         x-cloak
         class="absolute right-0 z-50 mt-2 w-80 rounded-md border border-line bg-surface shadow-lg"
     >

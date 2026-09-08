@@ -20,32 +20,32 @@
                     <span class="text-lg font-semibold text-brand-700">{{ __('app.name') }}</span>
 
                     @auth
-                        <nav class="flex items-center gap-6 text-sm text-ink-muted">
+                        <nav class="flex items-center gap-1 text-sm">
                             {{-- Role-specific nav links (admin/buyer/vendor portals) are added here as each is built. --}}
                             @if (auth()->user()->isAdmin())
-                                <a href="{{ route('admin.requests.index') }}" class="hover:text-ink">
+                                <x-nav-link :href="route('admin.requests.index')" :active="request()->routeIs('admin.requests.*')">
                                     {{ __('app.nav.requests') }}
-                                </a>
-                                <a href="{{ route('admin.vendors.index') }}" class="hover:text-ink">
+                                </x-nav-link>
+                                <x-nav-link :href="route('admin.vendors.index')" :active="request()->routeIs('admin.vendors.*')">
                                     {{ __('app.nav.vendors') }}
-                                </a>
-                                <a href="{{ route('admin.buyers.index') }}" class="hover:text-ink">
+                                </x-nav-link>
+                                <x-nav-link :href="route('admin.buyers.index')" :active="request()->routeIs('admin.buyers.*')">
                                     {{ __('app.nav.buyers') }}
-                                </a>
-                                <a href="{{ route('admin.settings') }}" class="hover:text-ink">
+                                </x-nav-link>
+                                <x-nav-link :href="route('admin.settings')" :active="request()->routeIs('admin.settings')">
                                     {{ __('app.nav.settings') }}
-                                </a>
+                                </x-nav-link>
                             @elseif (auth()->user()->isBuyer())
-                                <a href="{{ route('buyer.requests.index') }}" class="hover:text-ink">
+                                <x-nav-link :href="route('buyer.requests.index')" :active="request()->routeIs('buyer.requests.index', 'buyer.requests.show')">
                                     {{ __('app.nav.my_requests') }}
-                                </a>
-                                <a href="{{ route('buyer.requests.create') }}" class="hover:text-ink">
+                                </x-nav-link>
+                                <x-nav-link :href="route('buyer.requests.create')" :active="request()->routeIs('buyer.requests.create')">
                                     {{ __('app.nav.new_request') }}
-                                </a>
+                                </x-nav-link>
                             @elseif (auth()->user()->isVendor())
-                                <a href="{{ route('vendor.inbox') }}" class="hover:text-ink">
+                                <x-nav-link :href="route('vendor.inbox')" :active="request()->routeIs('vendor.inbox*')">
                                     {{ __('app.nav.inbox') }}
-                                </a>
+                                </x-nav-link>
                             @endif
                         </nav>
                     @endauth
