@@ -345,7 +345,7 @@ it('shows a message when no country matches the search', function () {
         ->test(Settings::class)
         ->set('activeSection', 'countries')
         ->set('countrySearch', 'Nowhere')
-        ->assertSee(__('admin.settings.country_empty'))
+        ->assertSee(__('admin.settings.country_empty_search'))
         ->assertDontSee('Australia');
 });
 
@@ -542,7 +542,7 @@ it('shows a message when no maker matches the search', function () {
         ->test(Settings::class)
         ->set('activeSection', 'makers')
         ->set('makerSearch', 'Nowhere')
-        ->assertSee(__('admin.settings.maker_empty'))
+        ->assertSee(__('admin.settings.maker_empty_search'))
         ->assertDontSee('Toyota');
 });
 

@@ -248,7 +248,7 @@
                             @empty
                                 <tr>
                                     <td colspan="3" class="px-4 py-8 text-center text-ink-muted">
-                                        {{ __('admin.settings.country_empty') }}
+                                        {{ $countrySearch ? __('admin.settings.country_empty_search') : __('admin.settings.country_empty') }}
                                     </td>
                                 </tr>
                             @endforelse
@@ -362,7 +362,7 @@
                             @empty
                                 <tr>
                                     <td colspan="3" class="px-4 py-8 text-center text-ink-muted">
-                                        {{ __('admin.settings.maker_empty') }}
+                                        {{ $makerSearch ? __('admin.settings.maker_empty_search') : __('admin.settings.maker_empty') }}
                                     </td>
                                 </tr>
                             @endforelse

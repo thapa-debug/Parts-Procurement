@@ -7,7 +7,8 @@ return [
         'subheading' => 'Manage vendor accounts: create, suspend, resume, and reset temporary passwords.',
         'search_placeholder' => 'Search by company, contact, or email...',
         'create_button' => 'New vendor',
-        'empty' => 'No vendors found.',
+        'empty' => 'No vendors yet. Add one to get started.',
+        'empty_search' => 'No vendors match your search.',
 
         'table' => [
             'company' => 'Company',
@@ -63,7 +64,8 @@ return [
         'subheading' => 'Manage buyer accounts: create and reset temporary passwords.',
         'search_placeholder' => 'Search by company, member code, name, or email...',
         'create_button' => 'New buyer',
-        'empty' => 'No buyers found.',
+        'empty' => 'No buyers yet. Add one to get started.',
+        'empty_search' => 'No buyers match your search.',
 
         'table' => [
             'company' => 'Company',
@@ -198,7 +200,8 @@ return [
         'country_added' => 'Country added.',
         'country_updated' => 'Country updated.',
         'country_search_placeholder' => 'Search countries...',
-        'country_empty' => 'No countries match your search.',
+        'country_empty' => 'No countries yet. Add one above.',
+        'country_empty_search' => 'No countries match your search.',
         'country_table' => [
             'name' => 'Name',
             'status' => 'Status',
@@ -222,7 +225,8 @@ return [
         'maker_added' => 'Maker added.',
         'maker_updated' => 'Maker updated.',
         'maker_search_placeholder' => 'Search makers...',
-        'maker_empty' => 'No makers match your search.',
+        'maker_empty' => 'No makers yet. Add one above.',
+        'maker_empty_search' => 'No makers match your search.',
         'maker_table' => [
             'name' => 'Name',
             'status' => 'Status',
@@ -319,6 +323,7 @@ return [
         'compare_section' => 'Vendor quotes',
         'compare_help' => 'Check the vendor replies you want to present as priced quotes, then click "Present to buyer" to confirm.',
         'compare_locked_help' => 'This request has already been paid for -- quotes can no longer be presented.',
+        'no_vendor_responses' => 'No vendor responses yet -- check back once an invited vendor replies.',
         'no_stock_badge' => 'No stock',
         'present_checkbox_label' => 'Select to present',
         'presented_badge' => 'Presented',

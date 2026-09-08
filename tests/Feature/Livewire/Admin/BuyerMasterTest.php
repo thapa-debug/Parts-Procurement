@@ -59,6 +59,25 @@ it('lists buyers and filters them by search', function () {
         ->and($other->company_name)->toBe('Zenith Trading Co');
 });
 
+it('shows a guiding empty state when there are no buyers at all', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->assertSee(__('admin.buyer_master.empty'));
+});
+
+it('shows a distinct message when a search matches no buyers', function () {
+    $admin = User::factory()->admin()->create();
+    BuyerProfile::factory()->create(['company_name' => 'Acme Imports']);
+
+    Livewire::actingAs($admin)
+        ->test(BuyerMaster::class)
+        ->set('search', 'Nowhere')
+        ->assertSee(__('admin.buyer_master.empty_search'))
+        ->assertDontSee('Acme Imports');
+});
+
 it('shows an explicit Edit link to the detail page for every row, not just the clickable company name', function () {
     $admin = User::factory()->admin()->create();
     $profile = BuyerProfile::factory()->create();
