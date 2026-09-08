@@ -90,7 +90,26 @@
         </div>
     @else
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('vendor.request_response.no_stock_section') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted">{{ __('vendor.request_response.no_stock_help') }}</p>
+
+            <div class="mt-4">
+                <button
+                    type="button"
+                    wire:click="sendNoStock"
+                    wire:confirm="{{ __('vendor.request_response.no_stock_confirm') }}"
+                    wire:loading.attr="disabled"
+                    wire:target="sendNoStock"
+                    class="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {{ __('vendor.request_response.no_stock_button') }}
+                </button>
+            </div>
+        </div>
+
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('vendor.request_response.response_section') }}</h2>
+            <p class="mt-1 text-sm text-ink-muted">{{ __('vendor.request_response.response_help') }}</p>
 
             <form wire:submit="sendResponse" class="mt-4 space-y-5">
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -390,24 +409,6 @@
                     </button>
                 </div>
             </form>
-        </div>
-
-        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-base font-semibold text-ink">{{ __('vendor.request_response.no_stock_section') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted">{{ __('vendor.request_response.no_stock_help') }}</p>
-
-            <div class="mt-4">
-                <button
-                    type="button"
-                    wire:click="sendNoStock"
-                    wire:confirm="{{ __('vendor.request_response.no_stock_confirm') }}"
-                    wire:loading.attr="disabled"
-                    wire:target="sendNoStock"
-                    class="rounded-md border border-red-200 bg-red-50 px-4 py-2 text-sm font-semibold text-red-700 shadow-sm transition hover:bg-red-100 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                    {{ __('vendor.request_response.no_stock_button') }}
-                </button>
-            </div>
         </div>
     @endif
 </div>
