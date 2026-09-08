@@ -60,6 +60,25 @@ it('lists vendors and filters them by search', function () {
         ->and($other->company_name)->toBe('Zenith Auto Parts');
 });
 
+it('shows a guiding empty state when there are no vendors at all', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->assertSee(__('admin.vendor_master.empty'));
+});
+
+it('shows a distinct message when a search matches no vendors', function () {
+    $admin = User::factory()->admin()->create();
+    VendorProfile::factory()->create(['company_name' => 'Acme Dismantlers']);
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->set('search', 'Nowhere')
+        ->assertSee(__('admin.vendor_master.empty_search'))
+        ->assertDontSee('Acme Dismantlers');
+});
+
 it('shows an explicit Edit link to the detail page for every row, not just the clickable company name', function () {
     $admin = User::factory()->admin()->create();
     $profile = VendorProfile::factory()->create();

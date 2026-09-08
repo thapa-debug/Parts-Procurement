@@ -162,7 +162,7 @@
         </div>
     @endif
 
-    @if ($vendorResponses->isNotEmpty())
+    @if ($partRequest->status !== \App\Enums\RequestStatus::New)
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
             <p class="mt-1 text-sm text-ink-muted">
@@ -175,6 +175,11 @@
                 <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
             @enderror
 
+            @if ($vendorResponses->isEmpty())
+                <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                    {{ __('admin.request_detail.no_vendor_responses') }}
+                </p>
+            @else
             <div class="mt-4 space-y-4">
                 @foreach ($vendorResponses as $response)
                     @php
@@ -288,6 +293,7 @@
                     </div>
                 @endif
             @endunless
+            @endif
         </div>
     @endif
 </div>

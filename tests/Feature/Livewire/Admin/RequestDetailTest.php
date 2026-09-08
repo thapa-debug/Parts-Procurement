@@ -136,9 +136,19 @@ it('rejects sending with no vendors selected', function () {
 
 // --- comparing and presenting quotes ---------------------------------------
 
-it('does not show the compare section until at least one vendor has responded', function () {
+it('shows a waiting message in the compare section until at least one vendor has responded', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.compare_section'))
+        ->assertSee(__('admin.request_detail.no_vendor_responses'));
+});
+
+it('never shows the compare section before the request has been broadcast', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::New]);
 
     Livewire::actingAs($admin)
         ->test(RequestDetail::class, ['partRequest' => $request])

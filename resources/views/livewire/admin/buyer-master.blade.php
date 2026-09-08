@@ -128,7 +128,7 @@
                 @empty
                     <tr>
                         <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
-                            {{ __('admin.buyer_master.empty') }}
+                            {{ $search ? __('admin.buyer_master.empty_search') : __('admin.buyer_master.empty') }}
                         </td>
                     </tr>
                 @endforelse
