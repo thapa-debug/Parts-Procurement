@@ -98,7 +98,8 @@ it('sends the inquiry, transitions the request, and shows a confirmation', funct
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->call('sendInquiry')
         ->assertSet('sentToCount', 2)
-        ->assertSee(__('admin.request_detail.sent_confirmation', ['count' => 2]));
+        ->assertSee(__('admin.request_detail.sent_confirmation', ['count' => 2]))
+        ->assertDispatched('toast', message: __('admin.request_detail.sent_confirmation', ['count' => 2]), type: 'success');
 
     expect($request->fresh()->status)->toBe(RequestStatus::VendorInquiry)
         ->and($request->fresh()->vendors()->pluck('vendor_profiles.id')->sort()->values()->all())
@@ -127,7 +128,8 @@ it('rejects sending with no vendors selected', function () {
         ->set('selectedVendorIds', [])
         ->call('sendInquiry')
         ->assertHasErrors(['selectedVendorIds'])
-        ->assertSet('sentToCount', null);
+        ->assertSet('sentToCount', null)
+        ->assertDispatched('toast', message: __('admin.request_detail.select_at_least_one'), type: 'error');
 
     expect($request->fresh()->status)->toBe(RequestStatus::New);
 });
@@ -201,7 +203,7 @@ it('presents every checked quote in one deliberate batch action, each snapshotti
         ->assertHasNoErrors()
         ->assertSet('selectedResponseIdsToPresent', [])
         ->assertSee(__('admin.request_detail.presented_badge'))
-        ->assertDispatched('admin-toast', message: __('admin.request_detail.presented_toast', ['count' => 2]), type: 'success');
+        ->assertDispatched('toast', message: __('admin.request_detail.presented_toast', ['count' => 2]), type: 'success');
 
     $fresh = $request->fresh();
     // Presenting alone never selects anything (client revision --
@@ -223,7 +225,7 @@ it('rejects presenting when nothing is checked', function () {
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->call('presentSelectedQuotes')
         ->assertHasErrors(['presentQuote'])
-        ->assertDispatched('admin-toast', message: __('admin.request_detail.select_at_least_one_quote'), type: 'error');
+        ->assertDispatched('toast', message: __('admin.request_detail.select_at_least_one_quote'), type: 'error');
 
     expect(PresentedQuote::count())->toBe(0);
 });

@@ -173,7 +173,9 @@ class RequestResponse extends Component
             ], $validated['photos']);
         } catch (VendorResponseNotAllowedException $e) {
             report($e);
-            $this->addError('cost_price', __('vendor.request_response.submit_error'));
+            $message = __('vendor.request_response.submit_error');
+            $this->addError('cost_price', $message);
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
@@ -183,6 +185,12 @@ class RequestResponse extends Component
             'cost_price', 'quality_rank', 'lead_time', 'comment',
             'weight_kg', 'length_cm', 'width_cm', 'height_cm', 'photos',
         ]);
+
+        $this->dispatch('toast', message: __('vendor.request_response.submitted_quote', [
+            'price' => number_format((int) $validated['cost_price']),
+            'rank' => strtoupper($validated['quality_rank']),
+            'lead_time' => __('enums.lead_time.'.$validated['lead_time']),
+        ]), type: 'success');
     }
 
     public function sendNoStock(SubmitVendorResponseAction $action): void
@@ -196,12 +204,15 @@ class RequestResponse extends Component
             $action->execute($partRequest, $this->vendorProfile(), ['is_no_stock' => true]);
         } catch (VendorResponseNotAllowedException $e) {
             report($e);
-            $this->addError('cost_price', __('vendor.request_response.submit_error'));
+            $message = __('vendor.request_response.submit_error');
+            $this->addError('cost_price', $message);
+            $this->dispatch('toast', message: $message, type: 'error');
 
             return;
         }
 
         $this->submitted = true;
+        $this->dispatch('toast', message: __('vendor.request_response.submitted_no_stock'), type: 'success');
     }
 
     protected function vendorProfile(): VendorProfile

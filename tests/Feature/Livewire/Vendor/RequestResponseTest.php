@@ -96,7 +96,12 @@ it('submits a quote with multiple photos, added one at a time, and shows a confi
         ->assertSet('photos', fn ($photos) => count($photos) === 2)
         ->call('sendResponse')
         ->assertSet('submitted', true)
-        ->assertHasNoErrors();
+        ->assertHasNoErrors()
+        ->assertDispatched('toast', message: __('vendor.request_response.submitted_quote', [
+            'price' => '45,000',
+            'rank' => 'A',
+            'lead_time' => __('enums.lead_time.'.LeadTime::Within1Week->value),
+        ]), type: 'success');
 
     $response = VendorResponse::sole();
 
@@ -257,7 +262,8 @@ it('submits a one-tap no-stock reply and shows a confirmation', function () {
         ->test(RequestResponse::class, ['partRequest' => $request])
         ->call('sendNoStock')
         ->assertSet('submitted', true)
-        ->assertSee(__('vendor.request_response.submitted_no_stock'));
+        ->assertSee(__('vendor.request_response.submitted_no_stock'))
+        ->assertDispatched('toast', message: __('vendor.request_response.submitted_no_stock'), type: 'success');
 
     $response = VendorResponse::sole();
 

@@ -1,42 +1,4 @@
 <div class="max-w-3xl">
-    {{-- Brief, dismissable toast for presenting -- deliberately not a
-         persistent banner (see RequestDetail::presentSelectedQuotes()),
-         since the admin may present in quick succession across requests.
-         The durable feedback is each row's own "Presented" badge below.
-         Color-coded by outcome: green for success, red for error -- see
-         the 'type' passed to dispatch(). --}}
-    <div
-        x-data="{ show: false, message: '', type: 'success' }"
-        x-on:admin-toast.window="
-            message = $event.detail.message;
-            type = $event.detail.type ?? 'success';
-            show = true;
-            clearTimeout(window.__adminToastTimer);
-            window.__adminToastTimer = setTimeout(() => (show = false), 4500);
-        "
-        x-show="show"
-        x-transition:enter="transition ease-out duration-200"
-        x-transition:enter-start="opacity-0 translate-y-2"
-        x-transition:enter-end="opacity-100 translate-y-0"
-        x-transition:leave="transition ease-in duration-150"
-        x-transition:leave-start="opacity-100 translate-y-0"
-        x-transition:leave-end="opacity-0 translate-y-2"
-        x-cloak
-        class="fixed bottom-6 right-6 z-50 flex items-center gap-3 rounded-lg border-l-4 px-4 py-3.5 text-sm font-medium shadow-xl"
-        :class="{
-            'border-green-500 bg-green-50 text-green-800': type === 'success',
-            'border-red-500 bg-red-50 text-red-800': type === 'error',
-        }"
-    >
-        <svg x-show="type === 'success'" class="h-5 w-5 shrink-0 text-green-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-        </svg>
-        <svg x-show="type === 'error'" class="h-5 w-5 shrink-0 text-red-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd" />
-        </svg>
-        <span x-text="message"></span>
-    </div>
-
     <a href="{{ route('admin.requests.index') }}" class="text-sm text-ink-muted hover:text-ink">
         &larr; {{ __('admin.request_detail.back_link') }}
     </a>

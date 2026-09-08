@@ -12,6 +12,8 @@
         @livewireStyles
     </head>
     <body class="min-h-screen bg-surface-muted text-ink antialiased">
+        <x-toast-container />
+
         <header class="border-b border-line bg-surface">
             <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-8">

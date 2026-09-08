@@ -143,7 +143,8 @@ it('resets the form and shows an inline confirmation after submitting', function
 
     $component
         ->assertSet('submittedCode', $request->request_code)
-        ->assertSee(__('buyer.request_form.submitted', ['code' => $request->request_code]));
+        ->assertSee(__('buyer.request_form.submitted', ['code' => $request->request_code]))
+        ->assertDispatched('toast', message: __('buyer.request_form.submitted', ['code' => $request->request_code]), type: 'success');
 });
 
 it('clears the confirmation as soon as the buyer starts a new request', function () {
