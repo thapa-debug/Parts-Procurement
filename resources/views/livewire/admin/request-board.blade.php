@@ -10,13 +10,14 @@
                 type="button"
                 wire:click="$set('tab', '{{ $key }}')"
                 @class([
-                    'flex items-center gap-2 rounded-lg border px-3 py-1.5 transition',
-                    'border-brand-500 bg-brand-50 text-brand-700' => $tab === $key,
-                    'border-line text-ink-muted hover:text-ink' => $tab !== $key,
+                    'flex items-center gap-2 rounded-lg border px-3 py-1.5 transition duration-150',
+                    $tabBadgeClasses[$key],
+                    'border-current font-semibold' => $tab === $key,
+                    'border-transparent hover:border-line' => $tab !== $key,
                 ])
             >
                 {{ __('admin.request_board.tabs.'.$key) }}
-                <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs">{{ $tabCounts[$key] ?? 0 }}</span>
+                <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">{{ $tabCounts[$key] ?? 0 }}</span>
             </button>
         @endforeach
     </div>
@@ -60,7 +61,7 @@
                         <td class="px-4 py-3 text-ink-muted">{{ $request->car_model }} / {{ $request->part_name }}</td>
                         <td class="px-4 py-3 text-ink-muted">{{ $request->created_at->format('Y-m-d') }}</td>
                         <td class="px-4 py-3">
-                            <span class="inline-flex rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">
+                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $request->status->badgeClasses() }}">
                                 {{ __('admin.request_board.status.'.$request->status->value) }}
                             </span>
                         </td>
