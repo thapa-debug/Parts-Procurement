@@ -9,7 +9,8 @@
                     <button
                         type="button"
                         wire:click="showSection('{{ $key }}')"
-                        class="block w-full rounded-md px-3 py-2 text-left text-sm font-medium transition {{ $activeSection === $key ? 'bg-brand-50 text-brand-700' : 'text-ink-muted hover:bg-surface-muted hover:text-ink' }}"
+                        @if ($activeSection === $key) aria-current="page" @endif
+                        class="block w-full rounded-md px-3 py-2 text-left text-sm transition duration-150 {{ $activeSection === $key ? 'bg-brand-50 font-semibold text-brand-700' : 'font-medium text-ink-muted hover:bg-surface-muted hover:text-ink' }}"
                     >
                         {{ $label }}
                     </button>
