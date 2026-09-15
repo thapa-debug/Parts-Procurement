@@ -153,6 +153,30 @@ class PartRequestPolicy
     }
 
     /**
+     * The buyer paying for their own request's selected quote (CLAUDE.md
+     * §14 Phase 4 slice 3) -- buyer AND owner, no admin bypass, same shape
+     * as viewOwn()/selectQuote(). Whether the request is actually eligible
+     * (status quoted, a quote selected, not DHL) is a business rule
+     * CheckoutAction enforces itself, not a role check.
+     */
+    public function checkout(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isBuyer() && $user->buyerProfile?->id === $partRequest->buyer_id;
+    }
+
+    /**
+     * Confirming the vendor purchase (CLAUDE.md §6.3/§14 Phase 4) is
+     * operational admin work -- today just `isAdmin()`, the same
+     * owner/staff permission slot as broadcast()/presentQuote()/viewBoard().
+     * The hard payment gate itself (§6.3) is a business rule
+     * ConfirmOrderToVendorAction enforces itself, not a role check.
+     */
+    public function confirmOrderToVendor(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies

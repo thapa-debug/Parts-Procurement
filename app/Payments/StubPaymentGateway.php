@@ -23,12 +23,17 @@ final class StubPaymentGateway implements PaymentGateway
 
         $payment->update([
             'status' => PaymentStatus::Confirmed,
-            'gateway' => 'stub',
+            'gateway' => $this->name(),
             'gateway_reference' => $reference,
             'raw_response' => $rawResponse,
             'paid_at' => now(),
         ]);
 
         return PaymentResult::success(gatewayReference: $reference, rawResponse: $rawResponse);
+    }
+
+    public function name(): string
+    {
+        return 'stub';
     }
 }

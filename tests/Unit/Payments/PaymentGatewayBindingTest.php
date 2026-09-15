@@ -52,6 +52,11 @@ it('lets calling code depend on the PaymentGateway interface only, not the concr
         {
             return PaymentResult::success(gatewayReference: 'fake-ref');
         }
+
+        public function name(): string
+        {
+            return 'fake';
+        }
     };
 
     app()->instance(PaymentGateway::class, $fake);
