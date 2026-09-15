@@ -7,6 +7,8 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
@@ -48,6 +50,26 @@ class BuyerProfile extends Model
     public function approvedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    /**
+     * @return HasMany<BuyerAddress, $this>
+     */
+    public function addresses(): HasMany
+    {
+        return $this->hasMany(BuyerAddress::class, 'buyer_id');
+    }
+
+    /**
+     * The one BuyerAddress the Buyer*Address Actions keep marked default
+     * (CLAUDE.md §14 Phase 4 slice 2) -- null only for a buyer with no
+     * saved addresses at all.
+     *
+     * @return HasOne<BuyerAddress, $this>
+     */
+    public function defaultAddress(): HasOne
+    {
+        return $this->hasOne(BuyerAddress::class, 'buyer_id')->where('is_default', true);
     }
 
     /**

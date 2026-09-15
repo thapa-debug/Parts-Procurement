@@ -19,6 +19,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'oem_part_number', 'part_name', 'reference_url', 'memo',
     'status', 'cost_price', 'applied_rate', 'applied_min_fee', 'buyer_price',
     'selected_response_id', 'shipping_method', 'shipping_fee',
+    'shipping_address_id', 'shipping_recipient_name', 'shipping_phone',
+    'shipping_postal_code', 'shipping_country', 'shipping_state',
+    'shipping_city', 'shipping_address_line1', 'shipping_address_line2',
 ])]
 class PartRequest extends Model
 {
@@ -77,6 +80,21 @@ class PartRequest extends Model
     public function payments(): HasMany
     {
         return $this->hasMany(Payment::class);
+    }
+
+    /**
+     * The live BuyerAddress this request's shipping_* snapshot columns were
+     * copied from (CLAUDE.md §14 Phase 4 slice 2), kept only for
+     * traceability while that row still exists -- null once it's deleted
+     * (nullOnDelete), even though the snapshot columns themselves are
+     * untouched. Never the source of truth for an already-placed order;
+     * read the shipping_* columns directly for that.
+     *
+     * @return BelongsTo<BuyerAddress, $this>
+     */
+    public function shippingAddress(): BelongsTo
+    {
+        return $this->belongsTo(BuyerAddress::class, 'shipping_address_id');
     }
 
     /**
