@@ -72,6 +72,14 @@ class PartRequest extends Model
     }
 
     /**
+     * @return HasMany<Payment, $this>
+     */
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
+    }
+
+    /**
      * Every vendor response currently on offer to the buyer (client
      * revision: multiple quotes may be presented at once). Presenting is
      * final -- there is no admin action that ever removes a row -- so this

@@ -142,7 +142,7 @@ Relevant case from the multi-quote-presentation slice (client revision): a buyer
 - **messages**: part_request_id(fk), channel(enum buyer|vendor), vendor_id(fk nullable — vendor channel only), sender_role(enum admin|buyer|vendor), body(text), is_broadcast(bool), read_by_admin(bool), read_by_recipient(bool), created_at
 - **invoices** (admin→buyer): part_request_id(fk), invoice_no(unique), buyer_id(fk), parts_price, shipping_fee, tax(nullable), total, status(enum issued|paid), issued_at
 - **vendor_invoices** (vendor→admin): part_request_id(fk), vendor_id(fk), amount, issued_at
-- **payments**: part_request_id(fk), invoice_id(fk nullable), gateway(enum), gateway_payment_id, amount, currency(char3), status(enum pending|confirmed|failed), paid_at(nullable), raw_response(json), timestamps
+- **payments**: part_request_id(fk), amount(int, yen), currency(char3, default JPY), status(enum pending|confirmed|failed — never a boolean, so `refunded` can be added later without migration pain), gateway(string — active gateway's identifier, e.g. `stub`/`stripe`), gateway_reference(nullable — the gateway's own id for this payment, once one exists), raw_response(json nullable), paid_at(nullable), timestamps. `invoice_id`(fk nullable) is added in Phase 4 slice 6 once the `invoices` table exists — no fk can target a table that isn't built yet.
 - **settings**: key, value, type  (holds margin_rate, margin_min_fee, shipping_fee_vehicle, shipping_fee_container, admin_sender_email — vehicle/container are provisional fixed fees pending client confirmation; DHL is deliberately **not** a settings key, see §14 Phase 4)
 - Plus Laravel's `notifications`, `jobs`, `failed_jobs`, and spatie's `activity_log` + permission tables.
 
@@ -230,7 +230,22 @@ All money stored as integers (yen, no decimals).
   - Email delivery: log driver in Phase 1, SES from Phase 3.
 - **Phase 2 — Core lifecycle**: buyer request form → admin board with status tabs → broadcast to vendors → vendor response with S3 photo upload → admin presents priced quote (pricing snapshot). **Also where owner/manager-vs-staff admin permissions get built** (§4) — every admin screen in this phase needs its Policy shaped for that from the start, not retrofitted after.
 - **Phase 3 — Messaging**: two chat channels (buyer/vendor, single-target + broadcast), read/unread badges, SES notifications via events/listeners.
-- **Phase 4 — Payments & ordering**: buyer checkout (shipping selection) → Stripe PaymentIntents → payment gate → `ordered_to_vendor` + `procurement_failed` path → buyer invoice + vendor invoice. **This is also where the shipping model gets finalized, not before**: `shipping_fee_vehicle`/`shipping_fee_container` (§7 `settings`) are provisional fixed fees pending client confirmation. DHL is realistically per-request — the admin enters the actual fee at quote time (`part_requests.shipping_fee`, already nullable for this) — not a global fixed number. A DHL Express (MyDHL) Rating-API auto-calculation is a plausible later enhancement, but it requires the *client's own* DHL Express business account; whether they have one is an open question to confirm with the client before scoping any DHL API work.
+- **Phase 4 — Payments & ordering**: buyer checkout (shipping selection) → payment → payment gate → `ordered_to_vendor` + `procurement_failed` path → buyer invoice + vendor invoice. Built as six slices, each shipped and fully tested before the next starts:
+  1. **Payment abstraction** — gateway-agnostic `PaymentGateway` interface (shaped loosely around Stripe PaymentIntents, generic enough to swap providers) + a `StubPaymentGateway` that assumes success, clearly marked dev-only. Active gateway chosen via config (`PAYMENT_GATEWAY`) — the stub must never be the production default. `payments` table. Calling code depends on the interface only; swapping in a real gateway later must require zero changes to callers.
+  2. **Shipping addresses.**
+  3. **Checkout — 有償 (paid) flow.**
+  4. **無償 (free) flow** — confirmed spec: admin sets a free flag when *presenting* the quote (not at checkout); buyer price is ¥0 and buyer checkout skips payment entirely for that request; vendor cost is still recorded (margin/reporting integrity holds even at ¥0 to the buyer); no mixing paid and free line items on the same request; no integration with any old/legacy system for this flow.
+  5. **Order-confirm to vendor** — delivery method + company address.
+  6. **Invoicing** — buyer invoice + vendor invoice.
+
+  Key decisions spanning the phase:
+  - **Gateway**: still TBD with the client (likely Stripe, currency JPY) — hence slice 1 is stub-first behind config rather than a hard Stripe integration up front.
+  - **Currency**: JPY only, integer yen throughout (§6.1/§7 money convention extends to payments).
+  - **Non-refundable for launch** (§6.4) — `payments.status` stays an enum, never a boolean, for this exact reason.
+  - **Consumption tax**: schema/structure accounts for it now so it can be turned on later without migration pain, but the tax itself is deferred — not calculated or charged in this phase.
+  - **Deferred out of Phase 4 entirely** (not yet scoped): Yahoo-sourcing, cost-splitting across multiple vendors/parts, バクラク (Bakuraku) integration.
+
+  **This is also where the shipping model gets finalized, not before**: `shipping_fee_vehicle`/`shipping_fee_container` (§7 `settings`) are provisional fixed fees pending client confirmation. DHL is realistically per-request — the admin enters the actual fee at quote time (`part_requests.shipping_fee`, already nullable for this) — not a global fixed number. A DHL Express (MyDHL) Rating-API auto-calculation is a plausible later enhancement, but it requires the *client's own* DHL Express business account; whether they have one is an open question to confirm with the client before scoping any DHL API work.
 - **Phase 5 — Fulfilment & ops**: shipped/received, KPI dashboard, real-time via Reverb/Horizon, audit log wired in.
 - **Phase 6 — Hardening**: coverage pass, Larastan level-up, isolation security review, deployment to the client's environment.
 
