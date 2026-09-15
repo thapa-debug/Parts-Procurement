@@ -13,6 +13,8 @@ use App\Livewire\Admin\VendorMaster;
 use App\Livewire\Auth\Login;
 use App\Livewire\Auth\PasswordChange;
 use App\Livewire\Auth\Register;
+use App\Livewire\Buyer\AddressBook;
+use App\Livewire\Buyer\Checkout;
 use App\Livewire\Buyer\RequestDetail as BuyerRequestDetail;
 use App\Livewire\Buyer\RequestForm;
 use App\Livewire\Buyer\RequestList as BuyerRequestList;
@@ -72,6 +74,8 @@ Route::prefix('buyer')->name('buyer.')->middleware(['auth', 'buyer'])->group(fun
     Route::get('/requests/new', RequestForm::class)->name('requests.create');
     Route::get('/requests', BuyerRequestList::class)->name('requests.index');
     Route::get('/requests/{partRequest}', BuyerRequestDetail::class)->name('requests.show');
+    Route::get('/requests/{partRequest}/checkout', Checkout::class)->name('requests.checkout');
+    Route::get('/addresses', AddressBook::class)->name('addresses.index');
 });
 
 Route::prefix('vendor')->name('vendor.')->middleware(['auth', 'vendor'])->group(function () {

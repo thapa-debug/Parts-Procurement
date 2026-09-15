@@ -36,11 +36,14 @@
                                     {{ __('app.nav.settings') }}
                                 </x-nav-link>
                             @elseif (auth()->user()->isBuyer())
-                                <x-nav-link :href="route('buyer.requests.index')" :active="request()->routeIs('buyer.requests.index', 'buyer.requests.show')">
+                                <x-nav-link :href="route('buyer.requests.index')" :active="request()->routeIs('buyer.requests.index', 'buyer.requests.show', 'buyer.requests.checkout')">
                                     {{ __('app.nav.my_requests') }}
                                 </x-nav-link>
                                 <x-nav-link :href="route('buyer.requests.create')" :active="request()->routeIs('buyer.requests.create')">
                                     {{ __('app.nav.new_request') }}
+                                </x-nav-link>
+                                <x-nav-link :href="route('buyer.addresses.index')" :active="request()->routeIs('buyer.addresses.index')">
+                                    {{ __('app.nav.my_addresses') }}
                                 </x-nav-link>
                             @elseif (auth()->user()->isVendor())
                                 <x-nav-link :href="route('vendor.inbox')" :active="request()->routeIs('vendor.inbox*')">
