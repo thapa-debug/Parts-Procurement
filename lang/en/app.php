@@ -13,6 +13,7 @@ return [
         'settings' => 'Settings',
         'new_request' => 'New Request',
         'my_requests' => 'My Requests',
+        'my_addresses' => 'My Addresses',
         'inbox' => 'Inbox',
     ],
 

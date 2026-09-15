@@ -118,6 +118,17 @@
             </div>
 
             <p class="mt-4 max-w-md text-xs text-ink-muted">{{ __('buyer.request_detail.quote_price_excludes_shipping') }}</p>
+
+            @if ($partRequest->status === \App\Enums\RequestStatus::Quoted && collect($options)->contains('is_selected', true))
+                <div class="mt-4">
+                    <a
+                        href="{{ route('buyer.requests.checkout', $partRequest->id) }}"
+                        class="inline-flex rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                    >
+                        {{ __('buyer.request_detail.checkout_button') }}
+                    </a>
+                </div>
+            @endif
         @else
             <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                 {{ __('buyer.request_detail.awaiting_quote') }}

@@ -98,6 +98,74 @@ return [
         'select_quote_confirm' => 'Select this quote (¥:price)? You can change your selection any time before you pay.',
         'select_quote_error' => 'Something went wrong selecting this quote. Please refresh the page and try again.',
         'awaiting_quote' => 'No quotes are currently available for this request. Our team is sourcing options and will notify you when they\'re ready.',
+        'checkout_button' => 'Proceed to checkout',
+    ],
+
+    'address_book' => [
+        'title' => 'My Addresses',
+        'heading' => 'My addresses',
+        'subheading' => 'Save delivery addresses to choose from at checkout.',
+        'add_button' => 'Add address',
+        'add_first_button' => 'Add your first address',
+        'add_heading' => 'Add an address',
+        'edit_heading' => 'Edit address',
+        'empty' => "You haven't saved any addresses yet.",
+
+        'recipient_name_label' => 'Recipient name',
+        'phone_label' => 'Phone',
+        'postal_code_label' => 'Postal code',
+        'country_label' => 'Country',
+        'country_placeholder_option' => '-- Select a country --',
+        'state_label' => 'State / Province',
+        'city_label' => 'City',
+        'address_line1_label' => 'Address line 1',
+        'address_line2_label' => 'Address line 2',
+        'is_default_label' => 'Set as my default address',
+
+        'save_button' => 'Save address',
+        'cancel_button' => 'Cancel',
+        'edit_button' => 'Edit',
+        'delete_button' => 'Delete',
+        'delete_confirm' => 'Delete this address? This cannot be undone.',
+        'set_default_button' => 'Set as default',
+        'default_badge' => 'Default',
+
+        'created' => 'Address saved.',
+        'updated' => 'Address updated.',
+        'deleted' => 'Address deleted.',
+        'default_updated' => 'Default address updated.',
+    ],
+
+    'checkout' => [
+        'title' => 'Checkout -- :code',
+        'heading' => 'Checkout -- :code',
+        'back_link' => 'Back to request',
+        'not_eligible' => 'This request is not ready for checkout -- make sure you have selected one of your presented quotes first.',
+
+        'address_section' => 'Shipping address',
+        'no_addresses' => "You haven't saved any addresses yet. Add one below to continue.",
+        'add_new_address_button' => '+ Add a new address',
+        'cancel_new_address_button' => 'Cancel new address',
+        'save_new_address_button' => 'Save address',
+        'address_added' => 'Address saved.',
+
+        'method_section' => 'Shipping method',
+        'method' => [
+            'vehicle' => 'Vehicle shipment',
+            'container' => 'Container shipment',
+        ],
+        'dhl_note' => 'DHL / express shipping is not yet available for online checkout -- contact us if you need this option.',
+
+        'summary_section' => 'Order summary',
+        'summary_part_price' => 'Part price',
+        'summary_shipping_fee' => 'Shipping fee',
+        'summary_total' => 'Total',
+
+        'pay_button' => 'Pay now',
+        'paid' => 'Payment confirmed for :code. Our team will now place your order with the vendor.',
+        'error_not_allowed' => 'This request cannot be checked out right now. Please refresh the page and try again.',
+        'error_payment_failed' => 'Your payment could not be processed. Please try again or use a different payment method.',
+        'error_generic' => 'Something went wrong during checkout. Please try again.',
     ],
 
 ];
