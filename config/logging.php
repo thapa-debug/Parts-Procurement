@@ -126,6 +126,17 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Dedicated channel for money-critical events (CLAUDE.md §11) --
+        // kept separate from the default app log so payment activity is
+        // never a needle-in-a-haystack query. First real user: CheckoutAction.
+        'payments' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/payments.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'max_files' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'null' => [
             'driver' => 'monolog',
             'handler' => NullHandler::class,

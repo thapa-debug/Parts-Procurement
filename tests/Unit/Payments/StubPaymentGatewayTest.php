@@ -25,6 +25,10 @@ it('assumes success, marking the payment confirmed with a gateway reference', fu
         ->and($payment->paid_at)->not->toBeNull();
 });
 
+it('reports its own name as "stub"', function () {
+    expect((new StubPaymentGateway)->name())->toBe('stub');
+});
+
 it('records the payment as still pending until charge() is called', function () {
     $payment = Payment::factory()->create();
 

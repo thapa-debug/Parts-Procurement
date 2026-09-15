@@ -18,7 +18,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'buyer_id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
     'oem_part_number', 'part_name', 'reference_url', 'memo',
     'status', 'cost_price', 'applied_rate', 'applied_min_fee', 'buyer_price',
-    'selected_response_id', 'shipping_method', 'shipping_fee',
+    'selected_response_id', 'confirmed_vendor_id', 'shipping_method', 'shipping_fee',
     'shipping_address_id', 'shipping_recipient_name', 'shipping_phone',
     'shipping_postal_code', 'shipping_country', 'shipping_state',
     'shipping_city', 'shipping_address_line1', 'shipping_address_line2',

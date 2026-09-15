@@ -22,4 +22,11 @@ interface PaymentGateway
      * gateway-specific data directly.
      */
     public function charge(Payment $payment): PaymentResult;
+
+    /**
+     * This gateway's own identifier (e.g. "stub", "stripe") -- what gets
+     * written to payments.gateway. Lets a caller (CheckoutAction) populate
+     * that NOT NULL column without knowing which concrete gateway is bound.
+     */
+    public function name(): string;
 }
