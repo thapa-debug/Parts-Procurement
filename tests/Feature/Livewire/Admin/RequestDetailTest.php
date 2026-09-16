@@ -4,8 +4,10 @@ use App\Actions\PresentQuoteAction;
 use App\Enums\LeadTime;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Livewire\Admin\RequestDetail;
 use App\Models\PartRequest;
+use App\Models\Payment;
 use App\Models\PresentedQuote;
 use App\Models\Setting;
 use App\Models\User;
@@ -289,4 +291,39 @@ it('locks out presenting entirely and shows the locked help text once the reques
         // disabled -- and the batch "Present to buyer" button is gone.
         ->assertSeeHtml('disabled')
         ->assertDontSee(__('admin.request_detail.present_selected_button'));
+});
+
+it('shows the payment summary -- amount, gateway, shipping method and address -- once paid', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create([
+        'status' => RequestStatus::Paid,
+        'buyer_price' => 54_000,
+        'shipping_method' => ShippingMethod::Vehicle,
+        'shipping_fee' => 8_000,
+        'shipping_recipient_name' => 'Jane Doe',
+        'shipping_phone' => '555-0100',
+        'shipping_postal_code' => '90001',
+        'shipping_country' => 'United States',
+        'shipping_city' => 'Los Angeles',
+        'shipping_address_line1' => '123 Main St',
+    ]);
+    Payment::factory()->confirmed()->create(['part_request_id' => $request->id, 'amount' => 62_000, 'gateway' => 'stub']);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('admin.request_detail.paid_banner_heading'))
+        ->assertSee('62,000')
+        ->assertSee('stub')
+        ->assertSee(__('enums.shipping_method.vehicle'))
+        ->assertSee('Jane Doe')
+        ->assertSee('123 Main St');
+});
+
+it('does not show a payment summary before the request has been paid', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Quoted]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('admin.request_detail.payment_summary_section'));
 });

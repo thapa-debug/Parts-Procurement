@@ -110,7 +110,10 @@ it('pays successfully: confirms the payment, snapshots the address, and redirect
         ->set('shippingMethod', 'vehicle')
         ->call('pay')
         ->assertHasNoErrors()
-        ->assertRedirect(route('buyer.requests.show', $request->id));
+        ->assertRedirect(route('buyer.requests.show', $request->id))
+        // A durable, server-rendered confirmation on the destination page
+        // -- not just a toast a redirect could wipe before it's seen.
+        ->assertSessionHas('status', __('buyer.checkout.paid', ['code' => $request->request_code]));
 
     $fresh = $request->fresh();
     expect($fresh->status)->toBe(RequestStatus::Paid)

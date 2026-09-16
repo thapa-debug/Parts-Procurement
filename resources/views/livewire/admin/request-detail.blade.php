@@ -10,6 +10,54 @@
         </span>
     </div>
 
+    {{-- shipping_method is only set once CheckoutAction has actually run --
+    a confirmed payment alone isn't enough (e.g. a future free/無償 request
+    may reach `paid` without ever going through checkout). --}}
+    @if ($confirmedPayment && $partRequest->shipping_method)
+        <div class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
+            <p class="text-sm font-semibold text-indigo-800">{{ __('admin.request_detail.paid_banner_heading') }}</p>
+            <p class="mt-0.5 text-sm text-indigo-700">{{ __('admin.request_detail.paid_banner_body', ['date' => $confirmedPayment->paid_at->format('Y-m-d H:i')]) }}</p>
+        </div>
+
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.payment_summary_section') }}</h2>
+
+            <dl class="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.payment_summary_amount') }}</dt>
+                    <dd class="mt-0.5 font-mono text-lg font-semibold text-ink">¥{{ number_format($confirmedPayment->amount) }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.payment_summary_gateway') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">{{ $confirmedPayment->gateway }}</dd>
+                </div>
+
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.payment_summary_shipping_method') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">{{ __('enums.shipping_method.'.$partRequest->shipping_method->value) }} (¥{{ number_format($partRequest->shipping_fee) }})</dd>
+                </div>
+
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.payment_summary_paid_at') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">{{ $confirmedPayment->paid_at->format('Y-m-d H:i') }}</dd>
+                </div>
+
+                <div class="sm:col-span-2">
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.payment_summary_shipping_to') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">
+                        {{ $partRequest->shipping_recipient_name }} ({{ $partRequest->shipping_phone }})<br>
+                        {{ $partRequest->shipping_postal_code }}, {{ $partRequest->shipping_country }}@if ($partRequest->shipping_state), {{ $partRequest->shipping_state }}@endif, {{ $partRequest->shipping_city }}<br>
+                        {{ $partRequest->shipping_address_line1 }}
+                        @if ($partRequest->shipping_address_line2)
+                            <br>{{ $partRequest->shipping_address_line2 }}
+                        @endif
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    @endif
+
     <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
         <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.details_section') }}</h2>
 

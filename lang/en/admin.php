@@ -305,6 +305,16 @@ return [
         'requested_at_label' => 'Requested',
         'not_provided' => '—',
 
+        'paid_banner_heading' => 'Payment confirmed',
+        'paid_banner_body' => 'Paid :date. The vendor purchase can now be confirmed.',
+
+        'payment_summary_section' => 'Payment summary',
+        'payment_summary_amount' => 'Amount charged',
+        'payment_summary_gateway' => 'Gateway',
+        'payment_summary_shipping_method' => 'Shipping method',
+        'payment_summary_paid_at' => 'Paid at',
+        'payment_summary_shipping_to' => 'Shipping to',
+
         'broadcast_section' => 'Send to vendors (打診)',
         'broadcast_help' => 'Select which active vendors should receive this inquiry. Suspended vendors are never shown here and can\'t be selected.',
         'select_all_button' => 'Select all',

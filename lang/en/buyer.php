@@ -100,6 +100,16 @@ return [
         'select_quote_error' => 'Something went wrong selecting this quote. Please refresh the page and try again.',
         'awaiting_quote' => 'No quotes are currently available for this request. Our team is sourcing options and will notify you when they\'re ready.',
         'checkout_button' => 'Proceed to checkout',
+
+        'paid_banner_heading' => 'Payment confirmed',
+        'paid_banner_body' => 'Your order is being processed -- we\'ll notify you when it ships.',
+
+        'payment_summary_section' => 'Payment summary',
+        'payment_summary_part_price' => 'Part price',
+        'payment_summary_shipping_fee' => 'Shipping fee',
+        'payment_summary_shipping_method' => 'Shipping method',
+        'payment_summary_total' => 'Total paid',
+        'payment_summary_shipping_to' => 'Shipping to',
     ],
 
     'address_book' => [
@@ -163,7 +173,7 @@ return [
         'summary_total' => 'Total',
 
         'pay_button' => 'Pay now',
-        'paid' => 'Payment confirmed for :code. Our team will now place your order with the vendor.',
+        'paid' => 'Your payment for :code is confirmed. Your order is being processed -- we\'ll notify you when it ships.',
         'error_not_allowed' => 'This request cannot be checked out right now. Please refresh the page and try again.',
         'error_payment_failed' => 'Your payment could not be processed. Please try again or use a different payment method.',
         'error_generic' => 'Something went wrong during checkout. Please try again.',
