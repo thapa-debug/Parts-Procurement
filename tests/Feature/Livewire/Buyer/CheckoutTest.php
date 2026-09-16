@@ -121,6 +121,24 @@ it('pays successfully: confirms the payment, snapshots the address, and redirect
         ->and($payment->amount)->toBe(54_000 + 8_000);
 });
 
+it('charges the container fee, not the vehicle fee, when container is chosen', function () {
+    Setting::set('shipping_fee_vehicle', 8_000, 'integer');
+    Setting::set('shipping_fee_container', 25_000, 'integer');
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', 'container')
+        ->call('pay')
+        ->assertHasNoErrors();
+
+    expect($request->fresh()->shipping_fee)->toBe(25_000);
+
+    $payment = Payment::where('part_request_id', $request->id)->sole();
+    expect($payment->amount)->toBe(54_000 + 25_000);
+});
+
 it('rejects paying with an address that belongs to a different buyer', function () {
     [$owner, , $request] = checkoutEligibleRequest();
     $othersAddress = BuyerAddress::factory()->create(); // a different buyer entirely

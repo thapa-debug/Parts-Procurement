@@ -21,7 +21,7 @@
                     <div class="mt-4 space-y-2">
                         @foreach ($addresses as $address)
                             <label wire:key="address-{{ $address->id }}" class="flex cursor-pointer items-start gap-3 rounded-md border p-3 text-sm {{ (string) $selectedAddressId === (string) $address->id ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
-                                <input type="radio" wire:model="selectedAddressId" value="{{ $address->id }}" class="mt-0.5 text-brand-600 focus:ring-brand-500">
+                                <input type="radio" wire:model.live="selectedAddressId" value="{{ $address->id }}" class="mt-0.5 text-brand-600 focus:ring-brand-500">
                                 <span>
                                     <span class="font-medium text-ink">{{ $address->recipient_name }}</span>
                                     @if ($address->is_default)
@@ -132,7 +132,7 @@
                 <div class="mt-4 space-y-2">
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-md border p-3 text-sm {{ $shippingMethod === 'vehicle' ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
                         <span class="flex items-center gap-3">
-                            <input type="radio" wire:model="shippingMethod" value="vehicle" class="text-brand-600 focus:ring-brand-500">
+                            <input type="radio" wire:model.live="shippingMethod" value="vehicle" class="text-brand-600 focus:ring-brand-500">
                             <span class="font-medium text-ink">{{ __('buyer.checkout.method.vehicle') }}</span>
                         </span>
                         <span class="font-mono text-ink">¥{{ number_format($shippingFees['vehicle']) }}</span>
@@ -140,7 +140,7 @@
 
                     <label class="flex cursor-pointer items-center justify-between gap-3 rounded-md border p-3 text-sm {{ $shippingMethod === 'container' ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
                         <span class="flex items-center gap-3">
-                            <input type="radio" wire:model="shippingMethod" value="container" class="text-brand-600 focus:ring-brand-500">
+                            <input type="radio" wire:model.live="shippingMethod" value="container" class="text-brand-600 focus:ring-brand-500">
                             <span class="font-medium text-ink">{{ __('buyer.checkout.method.container') }}</span>
                         </span>
                         <span class="font-mono text-ink">¥{{ number_format($shippingFees['container']) }}</span>
