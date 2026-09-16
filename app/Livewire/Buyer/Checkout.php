@@ -139,7 +139,14 @@ class Checkout extends Component
             return;
         }
 
-        $this->dispatch('toast', message: __('buyer.checkout.paid', ['code' => $result->request_code]), type: 'success');
+        // A toast alone is unreliable here: $this->redirect() below is a
+        // full browser navigation, which can wipe an Alpine-side toast
+        // before the buyer ever sees it. A flashed session('status') banner
+        // (same mechanism as PasswordChange) survives the navigation and
+        // renders on the destination page instead -- durable confirmation,
+        // not a transient one, for the money-critical "did my payment go
+        // through" moment.
+        session()->flash('status', __('buyer.checkout.paid', ['code' => $result->request_code]));
         $this->redirect(route('buyer.requests.show', $result->id));
     }
 

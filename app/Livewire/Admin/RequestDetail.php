@@ -4,6 +4,7 @@ namespace App\Livewire\Admin;
 
 use App\Actions\BroadcastRequestAction;
 use App\Actions\PresentQuoteAction;
+use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\VendorStatus;
 use App\Exceptions\PresentQuoteNotAllowedException;
@@ -174,6 +175,12 @@ class RequestDetail extends Component
             'vendorResponses' => $vendorResponses,
             'vendorResponsePricing' => $vendorResponsePricing,
             'presentedResponseIds' => $this->partRequest->presentedQuotes()->pluck('vendor_response_id')->all(),
+            // The confirmed payment, if any (CLAUDE.md §6.3 gate) -- admin
+            // has had no visibility into this at all until now, even though
+            // confirming a vendor purchase depends entirely on it existing.
+            'confirmedPayment' => $this->partRequest->hasBeenPaid()
+                ? $this->partRequest->payments()->where('status', PaymentStatus::Confirmed)->latest('paid_at')->first()
+                : null,
         ])->title($this->partRequest->request_code);
     }
 }

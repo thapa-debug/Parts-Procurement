@@ -68,12 +68,19 @@ class RequestDetail extends Component
 
         // Explicit column allowlist -- cost_price, applied_rate,
         // applied_min_fee, and selected_response_id are deliberately absent.
-        // buyer_price is the one price column a buyer is ever allowed to see.
+        // buyer_price is the one price column a buyer is ever allowed to
+        // see. shipping_* columns are the buyer's own snapshot (CLAUDE.md
+        // §14 Phase 4 slice 2/3) -- safe to show once set, which only
+        // happens once the request has actually been paid for.
         $partRequest = PartRequest::query()
             ->select([
                 'id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
                 'oem_part_number', 'part_name', 'reference_url', 'memo',
                 'status', 'buyer_price', 'created_at',
+                'shipping_method', 'shipping_fee', 'shipping_recipient_name',
+                'shipping_phone', 'shipping_postal_code', 'shipping_country',
+                'shipping_state', 'shipping_city', 'shipping_address_line1',
+                'shipping_address_line2',
             ])
             ->with('maker')
             ->findOrFail($this->partRequestId);
