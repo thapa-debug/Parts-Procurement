@@ -90,6 +90,7 @@ return [
 
         'quote_section' => 'Your quote',
         'quote_options_help' => "Compare the options below and select the one you'd like to purchase. You can change your selection any time before you pay.",
+        'quote_locked_help' => 'You\'ve paid for the option below -- it can no longer be changed.',
         'quote_price_label' => 'Price',
         'quote_price_excludes_shipping' => 'Price excludes shipping -- shipping is calculated at checkout based on your delivery address.',
         'quote_quality_label' => 'Quality rank',

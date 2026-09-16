@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\PresentQuoteAction;
+use App\Actions\SelectQuoteAction;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Livewire\Buyer\RequestDetail;
@@ -144,6 +145,31 @@ it('shows every currently presented quote side by side', function () {
         ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
         ->assertSee('36,000')
         ->assertSee('60,000');
+});
+
+// --- once paid: the selection is locked -----------------------------------
+
+it('shows locked copy and hides the select button for other options once the request has been paid', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
+
+    $presentedA = app(PresentQuoteAction::class)->execute($request, $responseA);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    app(SelectQuoteAction::class)->execute($request->fresh(), $presentedA);
+    $request->fresh()->update(['status' => RequestStatus::Paid]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('buyer.request_detail.quote_locked_help'))
+        ->assertDontSee(__('buyer.request_detail.quote_options_help'))
+        ->assertDontSee(__('buyer.request_detail.select_quote_button'))
+        ->assertSee(__('buyer.request_detail.quote_selected_badge'));
 });
 
 it('never sends the PartRequest\'s cost fields to the browser, even for a Livewire component with a "PartRequest $partRequest" method parameter name', function () {

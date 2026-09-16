@@ -77,7 +77,9 @@
         @enderror
 
         @if (count($options) > 0)
-            <p class="mt-1 text-sm text-ink-muted">{{ __('buyer.request_detail.quote_options_help') }}</p>
+            <p class="mt-1 text-sm text-ink-muted">
+                {{ $partRequest->hasBeenPaid() ? __('buyer.request_detail.quote_locked_help') : __('buyer.request_detail.quote_options_help') }}
+            </p>
 
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 @foreach ($options as $option)
@@ -100,7 +102,7 @@
                                 <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                     {{ __('buyer.request_detail.quote_selected_badge') }}
                                 </span>
-                            @else
+                            @elseif (! $partRequest->hasBeenPaid())
                                 <button
                                     type="button"
                                     wire:click="selectQuote({{ $option['presented_quote_id'] }})"
