@@ -14,10 +14,10 @@
     a confirmed payment alone isn't enough (e.g. a future free/無償 request
     may reach `paid` without ever going through checkout). --}}
     @if ($confirmedPayment && $partRequest->shipping_method)
-        <div class="mt-4 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <p class="text-sm font-semibold text-indigo-800">{{ __('admin.request_detail.paid_banner_heading') }}</p>
-            <p class="mt-0.5 text-sm text-indigo-700">{{ __('admin.request_detail.paid_banner_body', ['date' => $confirmedPayment->paid_at->format('Y-m-d H:i')]) }}</p>
-        </div>
+        <x-paid-status-banner
+            :heading="__('admin.request_detail.paid_banner_heading')"
+            :body="__('admin.request_detail.paid_banner_body', ['date' => $confirmedPayment->paid_at->format('Y-m-d H:i')])"
+        />
 
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.payment_summary_section') }}</h2>

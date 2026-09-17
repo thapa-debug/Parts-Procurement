@@ -15,19 +15,10 @@
     alike, so this guard is really just hasBeenPaid() with a defensive
     null-check against a request paid for before that column existed. --}}
     @if ($partRequest->hasBeenPaid() && $partRequest->shipping_method)
-        <div class="mt-4 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
-            <svg class="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
-            </svg>
-            <div>
-                <p class="text-sm font-semibold text-indigo-800">
-                    {{ $partRequest->is_free ? __('buyer.request_detail.paid_banner_heading_free') : __('buyer.request_detail.paid_banner_heading') }}
-                </p>
-                <p class="mt-0.5 text-sm text-indigo-700">
-                    {{ $partRequest->is_free ? __('buyer.request_detail.paid_banner_body_free') : __('buyer.request_detail.paid_banner_body') }}
-                </p>
-            </div>
-        </div>
+        <x-paid-status-banner
+            :heading="$partRequest->is_free ? __('buyer.request_detail.paid_banner_heading_free') : __('buyer.request_detail.paid_banner_heading')"
+            :body="$partRequest->is_free ? __('buyer.request_detail.paid_banner_body_free') : __('buyer.request_detail.paid_banner_body')"
+        />
 
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">
