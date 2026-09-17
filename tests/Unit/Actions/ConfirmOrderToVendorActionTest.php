@@ -6,7 +6,6 @@ use App\Actions\PresentQuoteAction;
 use App\Actions\SelectQuoteAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
-use App\Enums\ShippingMethod;
 use App\Exceptions\PaymentNotConfirmedException;
 use App\Models\BuyerAddress;
 use App\Models\PartRequest;
@@ -34,13 +33,14 @@ function paidRequestViaCheckout(int $costPrice = 45_000): array
         'part_request_id' => $request->id,
         'vendor_id' => $vendor->id,
         'cost_price' => $costPrice,
+        'weight_kg' => 12,
     ]);
 
     $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
     app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
 
     $address = BuyerAddress::factory()->create(['buyer_id' => $request->buyer_id]);
-    app(CheckoutAction::class)->execute($request->fresh(), $address, ShippingMethod::Vehicle);
+    app(CheckoutAction::class)->execute($request->fresh(), $address);
 
     return [$request->fresh(), $vendor->id];
 }

@@ -125,32 +125,6 @@
                 @endif
             </div>
 
-            {{-- Shipping method --}}
-            <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.method_section') }}</h2>
-
-                <div class="mt-4 space-y-2">
-                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded-md border p-3 text-sm {{ $shippingMethod === 'vehicle' ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
-                        <span class="flex items-center gap-3">
-                            <input type="radio" wire:model.live="shippingMethod" value="vehicle" class="text-brand-600 focus:ring-brand-500">
-                            <span class="font-medium text-ink">{{ __('buyer.checkout.method.vehicle') }}</span>
-                        </span>
-                        <span class="font-mono text-ink">¥{{ number_format($shippingFees['vehicle']) }}</span>
-                    </label>
-
-                    <label class="flex cursor-pointer items-center justify-between gap-3 rounded-md border p-3 text-sm {{ $shippingMethod === 'container' ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
-                        <span class="flex items-center gap-3">
-                            <input type="radio" wire:model.live="shippingMethod" value="container" class="text-brand-600 focus:ring-brand-500">
-                            <span class="font-medium text-ink">{{ __('buyer.checkout.method.container') }}</span>
-                        </span>
-                        <span class="font-mono text-ink">¥{{ number_format($shippingFees['container']) }}</span>
-                    </label>
-                </div>
-                @error('shippingMethod') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
-
-                <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.dhl_note') }}</p>
-            </div>
-
             {{-- Fee breakdown --}}
             <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
                 <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.summary_section') }}</h2>
@@ -162,17 +136,14 @@
                     </div>
                     <div class="flex items-center justify-between">
                         <dt class="text-ink-muted">{{ __('buyer.checkout.summary_shipping_fee') }}</dt>
-                        <dd class="font-mono text-ink">
-                            ¥{{ number_format($shippingMethod ? ($shippingFees[$shippingMethod] ?? 0) : 0) }}
-                        </dd>
+                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->shipping_fee) }}</dd>
                     </div>
                     <div class="flex items-center justify-between border-t border-line pt-2 text-base font-semibold">
                         <dt class="text-ink">{{ __('buyer.checkout.summary_total') }}</dt>
-                        <dd class="font-mono text-ink">
-                            ¥{{ number_format($partRequest->buyer_price + ($shippingMethod ? ($shippingFees[$shippingMethod] ?? 0) : 0)) }}
-                        </dd>
+                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
                     </div>
                 </dl>
+                <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.shipping_fee_note') }}</p>
             </div>
 
             @error('pay') <p class="text-sm text-red-600">{{ $message }}</p> @enderror

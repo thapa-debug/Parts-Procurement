@@ -65,48 +65,6 @@
                 </div>
 
                 <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
-                    <h2 class="text-base font-semibold text-ink">{{ __('admin.settings.shipping_section') }}</h2>
-
-                    <div class="mt-4 grid grid-cols-2 gap-4">
-                        <div>
-                            <label for="shipping_fee_vehicle" class="block text-sm font-medium text-ink">
-                                {{ __('admin.settings.shipping_fee_vehicle_label') }} <x-required-mark />
-                            </label>
-                            <input
-                                id="shipping_fee_vehicle"
-                                type="number"
-                                min="0"
-                                wire:model="shipping_fee_vehicle"
-                                placeholder="{{ __('admin.settings.shipping_fee_vehicle_placeholder') }}"
-                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            >
-                            @error('shipping_fee_vehicle')
-                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div>
-                            <label for="shipping_fee_container" class="block text-sm font-medium text-ink">
-                                {{ __('admin.settings.shipping_fee_container_label') }} <x-required-mark />
-                            </label>
-                            <input
-                                id="shipping_fee_container"
-                                type="number"
-                                min="0"
-                                wire:model="shipping_fee_container"
-                                placeholder="{{ __('admin.settings.shipping_fee_container_placeholder') }}"
-                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                            >
-                            @error('shipping_fee_container')
-                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
-                            @enderror
-                        </div>
-                    </div>
-
-                    <p class="mt-3 text-xs text-ink-muted">{{ __('admin.settings.shipping_help') }}</p>
-                </div>
-
-                <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
                     <h2 class="text-base font-semibold text-ink">{{ __('admin.settings.sender_section') }}</h2>
 
                     <div class="mt-4">
@@ -363,6 +321,143 @@
                                 <tr>
                                     <td colspan="3" class="px-4 py-8 text-center text-ink-muted">
                                         {{ $makerSearch ? __('admin.settings.maker_empty_search') : __('admin.settings.maker_empty') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        @endif
+
+        @if ($activeSection === 'shipping_brackets')
+            <div class="max-w-2xl rounded-lg border border-line bg-surface p-6 shadow-sm">
+                <h2 class="text-base font-semibold text-ink">{{ __('admin.settings.shipping_brackets_section') }}</h2>
+                <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.shipping_brackets_help') }}</p>
+
+                <div class="mt-4 flex items-end gap-3">
+                    <div>
+                        <label for="new_bracket_upper_kg" class="block text-sm font-medium text-ink">
+                            {{ __('admin.settings.bracket_upper_kg_label') }}
+                        </label>
+                        <input
+                            id="new_bracket_upper_kg"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            wire:model="new_bracket_upper_kg"
+                            placeholder="{{ __('admin.settings.bracket_upper_kg_placeholder') }}"
+                            class="mt-1.5 block w-40 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.bracket_upper_kg_help') }}</p>
+                    </div>
+                    <div class="flex-1">
+                        <label for="new_bracket_fee" class="block text-sm font-medium text-ink">
+                            {{ __('admin.settings.bracket_fee_label') }} <x-required-mark />
+                        </label>
+                        <input
+                            id="new_bracket_fee"
+                            type="number"
+                            min="0"
+                            wire:model="new_bracket_fee"
+                            placeholder="{{ __('admin.settings.bracket_fee_placeholder') }}"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                    </div>
+                    <button
+                        type="button"
+                        wire:click="addBracket"
+                        wire:loading.attr="disabled"
+                        wire:target="addBracket"
+                        class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {{ __('admin.settings.add_bracket_button') }}
+                    </button>
+                </div>
+                @error('new_bracket_upper_kg')
+                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+                @error('new_bracket_fee')
+                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+
+                <div class="mt-4 overflow-x-auto rounded-md border border-line">
+                    <table class="min-w-full divide-y divide-line text-sm">
+                        <thead class="bg-surface-muted">
+                            <tr class="text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                                <th class="px-4 py-2.5">{{ __('admin.settings.bracket_table.range') }}</th>
+                                <th class="px-4 py-2.5">{{ __('admin.settings.bracket_table.fee') }}</th>
+                                <th class="px-4 py-2.5">{{ __('admin.settings.bracket_table.actions') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-line">
+                            @php $previousUpperKg = 0; @endphp
+                            @forelse ($brackets as $bracket)
+                                <tr wire:key="bracket-{{ $bracket->id }}">
+                                    @if ($editingBracketId === $bracket->id)
+                                        <td class="px-4 py-2.5" colspan="2">
+                                            <div class="flex gap-3">
+                                                <input
+                                                    type="number"
+                                                    step="0.01"
+                                                    min="0.01"
+                                                    wire:model="editing_bracket_upper_kg"
+                                                    placeholder="{{ __('admin.settings.bracket_upper_kg_placeholder') }}"
+                                                    class="block w-32 rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                >
+                                                <input
+                                                    type="number"
+                                                    min="0"
+                                                    wire:model="editing_bracket_fee"
+                                                    class="block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                >
+                                            </div>
+                                            @error('editing_bracket_upper_kg')
+                                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                            @enderror
+                                            @error('editing_bracket_fee')
+                                                <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                            @enderror
+                                        </td>
+                                        <td class="px-4 py-2.5 text-right">
+                                            <button type="button" wire:click="saveBracket" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+                                                {{ __('admin.settings.save_bracket_button') }}
+                                            </button>
+                                            <button type="button" wire:click="cancelEditingBracket" class="ml-3 text-sm font-medium text-ink-muted hover:text-ink">
+                                                {{ __('admin.settings.cancel_button') }}
+                                            </button>
+                                        </td>
+                                    @else
+                                        <td class="px-4 py-2.5 font-medium text-ink">
+                                            @if ($bracket->upper_kg === null)
+                                                {{ __('admin.settings.bracket_range_and_above', ['from' => $previousUpperKg]) }}
+                                            @elseif ($previousUpperKg == 0)
+                                                {{ __('admin.settings.bracket_range_from_zero', ['to' => $bracket->upper_kg]) }}
+                                            @else
+                                                {{ __('admin.settings.bracket_range', ['from' => $previousUpperKg, 'to' => $bracket->upper_kg]) }}
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-2.5 text-ink">¥{{ number_format($bracket->fee) }}</td>
+                                        <td class="px-4 py-2.5 text-right">
+                                            <button type="button" wire:click="startEditingBracket({{ $bracket->id }})" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+                                                {{ __('admin.settings.edit_bracket_button') }}
+                                            </button>
+                                            <button
+                                                type="button"
+                                                wire:click="deleteBracket({{ $bracket->id }})"
+                                                wire:confirm="{{ __('admin.settings.delete_bracket_confirm') }}"
+                                                class="ml-3 text-sm font-medium text-red-600 hover:text-red-700"
+                                            >
+                                                {{ __('admin.settings.delete_bracket_button') }}
+                                            </button>
+                                        </td>
+                                    @endif
+                                </tr>
+                                @php $previousUpperKg = $bracket->upper_kg ?? $previousUpperKg; @endphp
+                            @empty
+                                <tr>
+                                    <td colspan="3" class="px-4 py-8 text-center text-ink-muted">
+                                        {{ __('admin.settings.bracket_empty') }}
                                     </td>
                                 </tr>
                             @endforelse

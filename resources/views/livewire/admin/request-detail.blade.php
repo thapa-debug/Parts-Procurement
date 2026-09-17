@@ -281,6 +281,13 @@
                                     <dt class="text-ink-muted">{{ __('admin.request_detail.lead_time_column') }}</dt>
                                     <dd class="mt-0.5 font-medium text-ink">{{ __('enums.lead_time.'.$response->lead_time->value) }}</dd>
                                 </div>
+                                <div>
+                                    <dt class="text-ink-muted">{{ __('admin.request_detail.shipping_fee_column') }}</dt>
+                                    <dd class="mt-0.5 font-mono font-medium text-ink">
+                                        @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
+                                        {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
+                                    </dd>
+                                </div>
                             </dl>
 
                             @if ($response->comment)
@@ -313,6 +320,42 @@
                                         >
                                         {{ __('admin.request_detail.present_checkbox_label') }}
                                     </label>
+
+                                    @unless ($partRequest->hasBeenPaid())
+                                        <div class="mt-3 flex flex-wrap items-end gap-3">
+                                            <div>
+                                                <label for="shipping-override-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
+                                                    {{ __('admin.request_detail.shipping_override_label') }}
+                                                </label>
+                                                <input
+                                                    id="shipping-override-{{ $response->id }}"
+                                                    type="number"
+                                                    min="0"
+                                                    wire:model="shippingFeeOverrides.{{ $response->id }}"
+                                                    placeholder="{{ $calculatedShipping !== null ? number_format($calculatedShipping) : '' }}"
+                                                    class="mt-1 block w-36 rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                >
+                                            </div>
+                                            <div class="min-w-[16rem] flex-1">
+                                                <label for="shipping-override-reason-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
+                                                    {{ __('admin.request_detail.shipping_override_reason_label') }}
+                                                </label>
+                                                <input
+                                                    id="shipping-override-reason-{{ $response->id }}"
+                                                    type="text"
+                                                    wire:model="shippingFeeOverrideReasons.{{ $response->id }}"
+                                                    placeholder="{{ __('admin.request_detail.shipping_override_reason_placeholder') }}"
+                                                    class="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                >
+                                            </div>
+                                        </div>
+                                        @error("shippingFeeOverrides.{$response->id}")
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                        @error("shippingFeeOverrideReasons.{$response->id}")
+                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
+                                        @enderror
+                                    @endunless
                                 @endif
                             </div>
                         @endif

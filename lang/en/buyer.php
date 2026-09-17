@@ -92,7 +92,7 @@ return [
         'quote_options_help' => "Compare the options below and select the one you'd like to purchase. You can change your selection any time before you pay.",
         'quote_locked_help' => 'You\'ve paid for the option below -- it can no longer be changed.',
         'quote_price_label' => 'Price',
-        'quote_price_excludes_shipping' => 'Price excludes shipping -- shipping is calculated at checkout based on your delivery address.',
+        'quote_price_excludes_shipping' => 'Price excludes shipping -- your shipping fee has already been calculated and will be shown, along with the total, before you pay.',
         'quote_quality_label' => 'Quality rank',
         'quote_selected_badge' => 'Selected',
         'select_quote_button' => 'Select this quote',
@@ -160,17 +160,11 @@ return [
         'save_new_address_button' => 'Save address',
         'address_added' => 'Address saved.',
 
-        'method_section' => 'Shipping method',
-        'method' => [
-            'vehicle' => 'Vehicle shipment',
-            'container' => 'Container shipment',
-        ],
-        'dhl_note' => 'DHL / express shipping is not yet available for online checkout -- contact us if you need this option.',
-
         'summary_section' => 'Order summary',
         'summary_part_price' => 'Part price',
         'summary_shipping_fee' => 'Shipping fee',
         'summary_total' => 'Total',
+        'shipping_fee_note' => 'Your shipping fee was calculated when your quote was presented and is already included above.',
 
         'pay_button' => 'Pay now',
         'paid' => 'Your payment for :code is confirmed. Your order is being processed -- we\'ll notify you when it ships.',

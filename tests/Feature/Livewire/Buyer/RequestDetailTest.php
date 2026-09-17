@@ -179,7 +179,7 @@ it('shows a prominent payment-confirmed banner and a payment summary once paid',
     $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create([
         'status' => RequestStatus::Paid,
         'buyer_price' => 54_000,
-        'shipping_method' => ShippingMethod::Vehicle,
+        'shipping_method' => ShippingMethod::Standard,
         'shipping_fee' => 8_000,
         'shipping_recipient_name' => 'Jane Doe',
         'shipping_phone' => '555-0100',
@@ -196,7 +196,7 @@ it('shows a prominent payment-confirmed banner and a payment summary once paid',
         ->assertSee('54,000')
         ->assertSee('8,000')
         ->assertSee('62,000') // total paid
-        ->assertSee(__('enums.shipping_method.vehicle'))
+        ->assertSee(__('enums.shipping_method.standard'))
         ->assertSee('Jane Doe')
         ->assertSee('123 Main St');
 });

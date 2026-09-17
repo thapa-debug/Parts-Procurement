@@ -162,12 +162,13 @@ return [
     'settings' => [
         'title' => 'Settings',
         'heading' => 'Settings',
-        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping fees shown to buyers, the address the system sends mail from, and the reference data (countries, makers) offered on buyer-facing forms.',
+        'subheading' => 'Controls the live margin PricingService applies to every quote, the shipping weight brackets used to calculate shipping fees, the address the system sends mail from, and the reference data (countries, makers) offered on buyer-facing forms.',
 
         'nav' => [
             'general' => 'General',
             'countries' => 'Countries',
             'makers' => 'Makers',
+            'shipping_brackets' => 'Shipping',
         ],
 
         'margin_section' => 'Margin',
@@ -176,13 +177,6 @@ return [
         'margin_min_fee_label' => 'Minimum margin fee (¥)',
         'margin_min_fee_placeholder' => 'e.g. 2000',
         'margin_help' => 'Applied margin is whichever is larger: the percentage of cost price, or the minimum fee floor.',
-
-        'shipping_section' => 'Shipping fees',
-        'shipping_fee_vehicle_label' => 'Vehicle (¥)',
-        'shipping_fee_vehicle_placeholder' => 'e.g. 150000',
-        'shipping_fee_container_label' => 'Container (¥)',
-        'shipping_fee_container_placeholder' => 'e.g. 400000',
-        'shipping_help' => 'Provisional fixed fees, pending client confirmation. DHL is not configured here -- it varies per request and is entered by the admin at quote time.',
 
         'sender_section' => 'Notifications',
         'admin_sender_email_label' => 'Admin sender email',
@@ -240,6 +234,29 @@ return [
         'save_maker_button' => 'Save',
         'activate_maker_button' => 'Activate',
         'deactivate_maker_button' => 'Deactivate',
+
+        'shipping_brackets_section' => 'Shipping weight brackets',
+        'shipping_brackets_help' => 'The shipping fee for a request is calculated automatically from the weight the vendor reports, using these brackets, at the moment the admin presents the quote -- not at checkout. Leave "Up to (kg)" blank for the top bracket ("and above", for very heavy items) -- only one bracket may be left blank at a time.',
+        'bracket_upper_kg_label' => 'Up to (kg)',
+        'bracket_upper_kg_placeholder' => 'e.g. 20, blank = and above',
+        'bracket_upper_kg_help' => 'Blank means "and above" -- the catch-all bracket for anything heavier than every other bracket.',
+        'bracket_fee_label' => 'Fee (¥)',
+        'bracket_fee_placeholder' => 'e.g. 8000',
+        'add_bracket_button' => 'Add bracket',
+        'bracket_catch_all_exists' => 'Only one bracket can be left blank ("and above") at a time -- edit or delete the existing one first.',
+        'bracket_table' => [
+            'range' => 'Weight range',
+            'fee' => 'Fee',
+            'actions' => 'Actions',
+        ],
+        'bracket_range_from_zero' => 'Up to :to kg',
+        'bracket_range' => 'Over :from kg, up to :to kg',
+        'bracket_range_and_above' => 'Over :from kg (and above)',
+        'bracket_empty' => 'No shipping weight brackets configured yet -- add one above.',
+        'edit_bracket_button' => 'Edit',
+        'save_bracket_button' => 'Save',
+        'delete_bracket_button' => 'Delete',
+        'delete_bracket_confirm' => 'Delete this shipping bracket? This cannot be undone.',
     ],
 
     'request_board' => [
@@ -342,6 +359,10 @@ return [
         'buyer_price_column' => 'Buyer price',
         'quality_rank_column' => 'Quality',
         'lead_time_column' => 'Lead time',
+        'shipping_fee_column' => 'Shipping (calculated)',
+        'shipping_override_label' => 'Override shipping fee (¥)',
+        'shipping_override_reason_label' => 'Reason for override',
+        'shipping_override_reason_placeholder' => 'Required if overriding -- e.g. oversized crate needed',
         'select_at_least_one_quote' => 'Check at least one quote to present before continuing.',
         'present_selected_button' => 'Present to buyer',
         'present_selected_confirm' => 'Present the selected quote(s) to the buyer?',

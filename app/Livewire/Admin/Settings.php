@@ -5,6 +5,7 @@ namespace App\Livewire\Admin;
 use App\Models\Country;
 use App\Models\Maker;
 use App\Models\Setting;
+use App\Models\ShippingWeightBracket;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Validation\Rule;
@@ -15,17 +16,6 @@ class Settings extends Component
     public int $margin_rate;
 
     public int $margin_min_fee;
-
-    /**
-     * Vehicle/container are provisional fixed fees pending client
-     * confirmation. DHL is deliberately NOT here -- it's per-request
-     * (admin-entered at quote time, part_requests.shipping_fee), not a
-     * single global number. See CONVENTIONS.md "Shipping fees are
-     * provisional" and CLAUDE.md §14 Phase 4.
-     */
-    public int $shipping_fee_vehicle;
-
-    public int $shipping_fee_container;
 
     public string $admin_sender_email;
 
@@ -49,6 +39,7 @@ class Settings extends Component
             'general' => __('admin.settings.nav.general'),
             'countries' => __('admin.settings.nav.countries'),
             'makers' => __('admin.settings.nav.makers'),
+            'shipping_brackets' => __('admin.settings.nav.shipping_brackets'),
         ];
     }
 
@@ -94,14 +85,35 @@ class Settings extends Component
 
     public string $makerSearch = '';
 
+    /**
+     * Shipping weight brackets (CLAUDE.md §14 Phase 4, rule-based shipping
+     * v1): same immediately-applied-actions shape as countries/makers
+     * above, reusing SettingPolicy rather than a dedicated policy. Unlike
+     * countries/makers, a bracket is never soft-deactivated -- nothing
+     * references one by id (ShippingCalculator reads the table fresh every
+     * time and PresentQuoteAction only ever copies the resulting fee, not
+     * a bracket id, onto presented_quotes), so a real delete is safe.
+     *
+     * upper_kg is entered blank for the top/catch-all "and above" bracket
+     * -- at most one may exist at a time, enforced in addBracket()/
+     * saveBracket(), not by a DB constraint.
+     */
+    public string $new_bracket_upper_kg = '';
+
+    public string $new_bracket_fee = '';
+
+    public ?int $editingBracketId = null;
+
+    public string $editing_bracket_upper_kg = '';
+
+    public string $editing_bracket_fee = '';
+
     public function mount(): void
     {
         $this->authorize('viewAny', Setting::class);
 
         $this->margin_rate = (int) Setting::get('margin_rate', 20);
         $this->margin_min_fee = (int) Setting::get('margin_min_fee', 2000);
-        $this->shipping_fee_vehicle = (int) Setting::get('shipping_fee_vehicle', 0);
-        $this->shipping_fee_container = (int) Setting::get('shipping_fee_container', 0);
         $this->admin_sender_email = (string) Setting::get('admin_sender_email', '');
     }
 
@@ -113,8 +125,6 @@ class Settings extends Component
         return [
             'margin_rate' => ['required', 'integer', 'min:0'],
             'margin_min_fee' => ['required', 'integer', 'min:0'],
-            'shipping_fee_vehicle' => ['required', 'integer', 'min:0'],
-            'shipping_fee_container' => ['required', 'integer', 'min:0'],
             'admin_sender_email' => ['required', 'string', 'email', 'max:255'],
         ];
     }
@@ -138,8 +148,6 @@ class Settings extends Component
 
         Setting::set('margin_rate', $validated['margin_rate'], 'integer');
         Setting::set('margin_min_fee', $validated['margin_min_fee'], 'integer');
-        Setting::set('shipping_fee_vehicle', $validated['shipping_fee_vehicle'], 'integer');
-        Setting::set('shipping_fee_container', $validated['shipping_fee_container'], 'integer');
         Setting::set('admin_sender_email', $validated['admin_sender_email'], 'string');
 
         $this->justSaved = true;
@@ -287,11 +295,138 @@ class Settings extends Component
             ->get();
     }
 
+    public function addBracket(): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $validated = $this->validate([
+            'new_bracket_upper_kg' => ['nullable', 'numeric', 'min:0.01', Rule::unique('shipping_weight_brackets', 'upper_kg')],
+            'new_bracket_fee' => ['required', 'integer', 'min:0'],
+        ], [], [
+            'new_bracket_upper_kg' => __('admin.settings.bracket_upper_kg_label'),
+        ]);
+
+        $upperKg = $validated['new_bracket_upper_kg'] !== '' ? $validated['new_bracket_upper_kg'] : null;
+
+        if ($upperKg === null && $this->hasCatchAllBracket()) {
+            $this->addError('new_bracket_upper_kg', __('admin.settings.bracket_catch_all_exists'));
+
+            return;
+        }
+
+        ShippingWeightBracket::create(['upper_kg' => $upperKg, 'fee' => $validated['new_bracket_fee'], 'order' => 0]);
+        $this->renormalizeBracketOrder();
+
+        $this->reset('new_bracket_upper_kg', 'new_bracket_fee');
+        $this->resetErrorBag(['new_bracket_upper_kg', 'new_bracket_fee']);
+    }
+
+    public function startEditingBracket(int $bracketId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $bracket = ShippingWeightBracket::findOrFail($bracketId);
+
+        $this->editingBracketId = $bracketId;
+        $this->editing_bracket_upper_kg = $bracket->upper_kg === null ? '' : (string) $bracket->upper_kg;
+        $this->editing_bracket_fee = (string) $bracket->fee;
+    }
+
+    public function cancelEditingBracket(): void
+    {
+        $this->editingBracketId = null;
+        $this->editing_bracket_upper_kg = '';
+        $this->editing_bracket_fee = '';
+        $this->resetErrorBag(['editing_bracket_upper_kg', 'editing_bracket_fee']);
+    }
+
+    public function saveBracket(): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $validated = $this->validate([
+            'editing_bracket_upper_kg' => [
+                'nullable', 'numeric', 'min:0.01',
+                Rule::unique('shipping_weight_brackets', 'upper_kg')->ignore($this->editingBracketId),
+            ],
+            'editing_bracket_fee' => ['required', 'integer', 'min:0'],
+        ], [], [
+            'editing_bracket_upper_kg' => __('admin.settings.bracket_upper_kg_label'),
+        ]);
+
+        $upperKg = $validated['editing_bracket_upper_kg'] !== '' ? $validated['editing_bracket_upper_kg'] : null;
+
+        if ($upperKg === null && $this->hasCatchAllBracket($this->editingBracketId)) {
+            $this->addError('editing_bracket_upper_kg', __('admin.settings.bracket_catch_all_exists'));
+
+            return;
+        }
+
+        ShippingWeightBracket::findOrFail($this->editingBracketId)->update([
+            'upper_kg' => $upperKg,
+            'fee' => $validated['editing_bracket_fee'],
+        ]);
+        $this->renormalizeBracketOrder();
+
+        $this->editingBracketId = null;
+        $this->editing_bracket_upper_kg = '';
+        $this->editing_bracket_fee = '';
+    }
+
+    public function deleteBracket(int $bracketId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        ShippingWeightBracket::findOrFail($bracketId)->delete();
+        $this->renormalizeBracketOrder();
+    }
+
+    /**
+     * Whether a catch-all (null upper_kg) bracket already exists, other
+     * than the one currently being edited (if any) -- at most one may
+     * exist at a time.
+     */
+    protected function hasCatchAllBracket(?int $exceptId = null): bool
+    {
+        return ShippingWeightBracket::query()
+            ->whereNull('upper_kg')
+            ->when($exceptId, fn ($query) => $query->where('id', '!=', $exceptId))
+            ->exists();
+    }
+
+    /**
+     * Rewrites every bracket's `order` to match ascending upper_kg (the
+     * catch-all, null upper_kg, always sorts last) -- the admin only ever
+     * enters a weight cutoff and a fee, never a raw order number, so this
+     * keeps `order` correct regardless of what sequence brackets were
+     * added/edited/deleted in.
+     */
+    protected function renormalizeBracketOrder(): void
+    {
+        ShippingWeightBracket::query()
+            ->orderByRaw('upper_kg IS NULL, upper_kg ASC')
+            ->get()
+            ->values()
+            ->each(fn (ShippingWeightBracket $bracket, int $index) => $bracket->update(['order' => $index + 1]));
+    }
+
+    /**
+     * Ascending by weight, catch-all last -- same ordering
+     * renormalizeBracketOrder() itself maintains in the `order` column.
+     *
+     * @return Collection<int, ShippingWeightBracket>
+     */
+    protected function brackets(): Collection
+    {
+        return ShippingWeightBracket::query()->orderBy('order')->get();
+    }
+
     public function render(): View
     {
         return view('livewire.admin.settings', [
             'countries' => $this->countries(),
             'makers' => $this->makers(),
+            'brackets' => $this->brackets(),
         ])->title(__('admin.settings.title'));
     }
 }
