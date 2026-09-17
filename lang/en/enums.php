@@ -25,9 +25,8 @@ return [
     // §14 Phase 4) -- a shipping method means the same thing to either
     // viewer, unlike genuinely per-portal copy.
     'shipping_method' => [
+        'standard' => 'Standard shipment',
         'dhl' => 'DHL / Express',
-        'vehicle' => 'Vehicle shipment',
-        'container' => 'Container shipment',
     ],
 
 ];

@@ -298,7 +298,7 @@ it('shows the payment summary -- amount, gateway, shipping method and address --
     $request = PartRequest::factory()->create([
         'status' => RequestStatus::Paid,
         'buyer_price' => 54_000,
-        'shipping_method' => ShippingMethod::Vehicle,
+        'shipping_method' => ShippingMethod::Standard,
         'shipping_fee' => 8_000,
         'shipping_recipient_name' => 'Jane Doe',
         'shipping_phone' => '555-0100',
@@ -314,7 +314,7 @@ it('shows the payment summary -- amount, gateway, shipping method and address --
         ->assertSee(__('admin.request_detail.paid_banner_heading'))
         ->assertSee('62,000')
         ->assertSee('stub')
-        ->assertSee(__('enums.shipping_method.vehicle'))
+        ->assertSee(__('enums.shipping_method.standard'))
         ->assertSee('Jane Doe')
         ->assertSee('123 Main St');
 });

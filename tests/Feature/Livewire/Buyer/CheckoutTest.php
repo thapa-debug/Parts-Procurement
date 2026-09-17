@@ -10,7 +10,7 @@ use App\Models\BuyerProfile;
 use App\Models\Country;
 use App\Models\PartRequest;
 use App\Models\Payment;
-use App\Models\Setting;
+use App\Models\ShippingWeightBracket;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
@@ -24,6 +24,9 @@ uses(RefreshDatabase::class);
  */
 function checkoutEligibleRequest(int $costPrice = 45_000): array
 {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 8_000, 'order' => 1]);
+
     $owner = User::factory()->buyer()->create();
     $profile = BuyerProfile::factory()->for($owner)->create();
     $request = PartRequest::factory()->for($profile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
@@ -33,6 +36,7 @@ function checkoutEligibleRequest(int $costPrice = 45_000): array
         'part_request_id' => $request->id,
         'vendor_id' => $vendor->id,
         'cost_price' => $costPrice,
+        'weight_kg' => 12,
     ]);
 
     $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
@@ -62,7 +66,6 @@ it('shows a not-eligible message once the request has already been paid', functi
 });
 
 it('pre-selects the buyer\'s default address and shows the fee breakdown when eligible', function () {
-    Setting::set('shipping_fee_vehicle', 8_000, 'integer');
     [$owner, $profile, $request] = checkoutEligibleRequest();
     $default = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true, 'recipient_name' => 'Default Recipient']);
 
@@ -71,7 +74,7 @@ it('pre-selects the buyer\'s default address and shows the fee breakdown when el
         ->assertSet('selectedAddressId', $default->id)
         ->assertSee('Default Recipient')
         ->assertSee('54,000') // buyer_price
-        ->assertSee('8,000'); // vehicle fee
+        ->assertSee('8,000'); // shipping fee, already fixed at selection time
 });
 
 it('never sends the vendor\'s identity or the request\'s cost fields to the browser', function () {
@@ -91,23 +94,12 @@ it('never sends the vendor\'s identity or the request\'s cost fields to the brow
     $component->assertDontSee('Secret Vendor Co')->assertDontSee('45,000');
 });
 
-it('never offers dhl as a shipping method', function () {
-    [$owner, $profile, $request] = checkoutEligibleRequest();
-    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
-
-    Livewire::actingAs($owner)
-        ->test(Checkout::class, ['partRequest' => $request])
-        ->assertDontSee('value="dhl"', false);
-});
-
 it('pays successfully: confirms the payment, snapshots the address, and redirects', function () {
-    Setting::set('shipping_fee_vehicle', 8_000, 'integer');
     [$owner, $profile, $request] = checkoutEligibleRequest();
     $address = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
 
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request])
-        ->set('shippingMethod', 'vehicle')
         ->call('pay')
         ->assertHasNoErrors()
         ->assertRedirect(route('buyer.requests.show', $request->id))
@@ -124,22 +116,21 @@ it('pays successfully: confirms the payment, snapshots the address, and redirect
         ->and($payment->amount)->toBe(54_000 + 8_000);
 });
 
-it('charges the container fee, not the vehicle fee, when container is chosen', function () {
-    Setting::set('shipping_fee_vehicle', 8_000, 'integer');
-    Setting::set('shipping_fee_container', 25_000, 'integer');
+it('charges the fee already fixed by SelectQuoteAction, unaffected by a later bracket change', function () {
     [$owner, $profile, $request] = checkoutEligibleRequest();
     BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
 
+    ShippingWeightBracket::query()->update(['fee' => 99_000]);
+
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request])
-        ->set('shippingMethod', 'container')
         ->call('pay')
         ->assertHasNoErrors();
 
-    expect($request->fresh()->shipping_fee)->toBe(25_000);
+    expect($request->fresh()->shipping_fee)->toBe(8_000);
 
     $payment = Payment::where('part_request_id', $request->id)->sole();
-    expect($payment->amount)->toBe(54_000 + 25_000);
+    expect($payment->amount)->toBe(54_000 + 8_000);
 });
 
 it('rejects paying with an address that belongs to a different buyer', function () {
@@ -149,7 +140,6 @@ it('rejects paying with an address that belongs to a different buyer', function 
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request])
         ->set('selectedAddressId', $othersAddress->id)
-        ->set('shippingMethod', 'vehicle')
         ->call('pay')
         ->assertHasErrors(['selectedAddressId']);
 

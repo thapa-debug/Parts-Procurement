@@ -3,9 +3,11 @@
 use App\Actions\PresentQuoteAction;
 use App\Actions\SelectQuoteAction;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
+use App\Models\ShippingWeightBracket;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -26,6 +28,28 @@ it('selects a presented quote, copying its snapshot onto the part_request', func
         ->and($result->applied_rate)->toBe($presentedQuote->applied_rate)
         ->and($result->applied_min_fee)->toBe($presentedQuote->applied_min_fee)
         ->and($result->buyer_price)->toBe($presentedQuote->buyer_price);
+});
+
+it('also copies the presented quote\'s shipping fee, and sets shipping_method to Standard (CLAUDE.md §14 Phase 4)', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 8_000, 'order' => 1]);
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 10,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
+
+    $result = app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
+
+    expect($result->shipping_fee)->toBe(8_000)
+        ->and($result->shipping_fee)->toBe($presentedQuote->shipping_fee)
+        ->and($result->shipping_method)->toBe(ShippingMethod::Standard);
 });
 
 it('lets the buyer re-select a different presented quote, overwriting the previous pick, without throwing', function () {

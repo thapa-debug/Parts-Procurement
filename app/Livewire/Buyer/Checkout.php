@@ -5,7 +5,6 @@ namespace App\Livewire\Buyer;
 use App\Actions\CheckoutAction;
 use App\Actions\CreateBuyerAddressAction;
 use App\Enums\RequestStatus;
-use App\Enums\ShippingMethod;
 use App\Exceptions\CheckoutNotAllowedException;
 use App\Exceptions\PaymentFailedException;
 use App\Exceptions\ShippingAddressNotAllowedException;
@@ -14,7 +13,6 @@ use App\Models\BuyerAddress;
 use App\Models\BuyerProfile;
 use App\Models\Country;
 use App\Models\PartRequest;
-use App\Models\Setting;
 use App\Models\User;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
@@ -24,22 +22,21 @@ use Livewire\Component;
 use Throwable;
 
 /**
- * 有償 checkout (CLAUDE.md §14 Phase 4 slice 3): pick a saved address (or
- * add one inline), pick vehicle/container shipping (DHL isn't offered --
- * its own slice, see CheckoutAction's docblock), see the fee breakdown,
- * and pay via CheckoutAction. Only the id is kept as component state, and
- * render() re-fetches with an explicit narrow select() -- same
- * serialization-safety discipline as App\Livewire\Buyer\RequestDetail:
- * cost_price/applied_rate/selected_response_id must never reach the
- * buyer's own browser.
+ * 有償 checkout (CLAUDE.md §14 Phase 4): pick a saved address (or add one
+ * inline), see the fee breakdown, and pay via CheckoutAction. There is no
+ * shipping method to pick any more (rule-based shipping v1): the fee was
+ * already fixed by SelectQuoteAction the moment the buyer chose their
+ * quote, so this screen only ever displays it. Only the id is kept as
+ * component state, and render() re-fetches with an explicit narrow
+ * select() -- same serialization-safety discipline as
+ * App\Livewire\Buyer\RequestDetail: cost_price/applied_rate/
+ * selected_response_id must never reach the buyer's own browser.
  */
 class Checkout extends Component
 {
     public int $partRequestId;
 
     public ?int $selectedAddressId = null;
-
-    public string $shippingMethod = '';
 
     public bool $showNewAddressForm = false;
 
@@ -76,7 +73,6 @@ class Checkout extends Component
     {
         return [
             'selectedAddressId' => ['required', 'integer', Rule::exists('buyer_addresses', 'id')->where('buyer_id', $this->buyer()->id)],
-            'shippingMethod' => ['required', Rule::in([ShippingMethod::Vehicle->value, ShippingMethod::Container->value])],
         ];
     }
 
@@ -117,10 +113,9 @@ class Checkout extends Component
         $validated = $this->validate();
 
         $address = BuyerAddress::findOrFail($validated['selectedAddressId']);
-        $shippingMethod = ShippingMethod::from($validated['shippingMethod']);
 
         try {
-            $result = $action->execute($partRequest, $address, $shippingMethod);
+            $result = $action->execute($partRequest, $address);
         } catch (CheckoutNotAllowedException|ShippingAddressNotAllowedException $e) {
             report($e);
             $this->addError('pay', __('buyer.checkout.error_not_allowed'));
@@ -178,14 +173,16 @@ class Checkout extends Component
             ->where('id', $this->partRequestId)
             ->where('status', RequestStatus::Quoted)
             ->whereNotNull('selected_response_id')
+            ->whereNotNull('shipping_fee')
             ->exists();
 
         // Explicit column allowlist -- cost_price, applied_rate,
         // applied_min_fee, and selected_response_id are deliberately
-        // absent, same discipline as RequestDetail. buyer_price is the one
-        // price column a buyer is ever allowed to see.
+        // absent, same discipline as RequestDetail. buyer_price and
+        // shipping_fee (already fixed by SelectQuoteAction) are the only
+        // price columns a buyer is ever allowed to see.
         $partRequest = PartRequest::query()
-            ->select(['id', 'request_code', 'status', 'buyer_price'])
+            ->select(['id', 'request_code', 'status', 'buyer_price', 'shipping_fee'])
             ->findOrFail($this->partRequestId);
 
         return view('livewire.buyer.checkout', [
@@ -193,10 +190,6 @@ class Checkout extends Component
             'isEligible' => $isEligible,
             'addresses' => $this->addresses(),
             'countryOptions' => Country::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
-            'shippingFees' => [
-                ShippingMethod::Vehicle->value => (int) Setting::get('shipping_fee_vehicle', 0),
-                ShippingMethod::Container->value => (int) Setting::get('shipping_fee_container', 0),
-            ],
         ])->title(__('buyer.checkout.title', ['code' => $partRequest->request_code]));
     }
 }

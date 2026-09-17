@@ -9,10 +9,12 @@ use App\Enums\RequestStatus;
 use App\Enums\VendorStatus;
 use App\Exceptions\PresentQuoteNotAllowedException;
 use App\Exceptions\RequestCannotBeBroadcastException;
+use App\Exceptions\ShippingBracketNotConfiguredException;
 use App\Models\PartRequest;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use App\Services\PricingService;
+use App\Services\ShippingCalculator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Livewire\Component;
@@ -46,6 +48,25 @@ class RequestDetail extends Component
      * @var array<int, int>
      */
     public array $selectedResponseIdsToPresent = [];
+
+    /**
+     * Keyed by vendor_response id -- the admin's shipping-fee override for
+     * that response, if any (CLAUDE.md §14 Phase 4: rule-based shipping
+     * v1). Left blank/unset, PresentQuoteAction uses ShippingCalculator's
+     * own figure instead. A response with an override MUST also have a
+     * non-blank reason in $shippingFeeOverrideReasons -- enforced by
+     * overrideRules() below, not left to PresentQuoteAction's own guard
+     * alone, so the admin gets a normal per-field validation error rather
+     * than the whole batch silently skipping that response.
+     *
+     * @var array<int, string>
+     */
+    public array $shippingFeeOverrides = [];
+
+    /**
+     * @var array<int, string>
+     */
+    public array $shippingFeeOverrideReasons = [];
 
     public function mount(PartRequest $partRequest): void
     {
@@ -116,11 +137,17 @@ class RequestDetail extends Component
             return;
         }
 
+        $this->validate($this->overrideRules());
+
         $presentedCount = 0;
 
         foreach (VendorResponse::query()->find($this->selectedResponseIdsToPresent) as $vendorResponse) {
+            $override = $this->shippingFeeOverrides[$vendorResponse->id] ?? '';
+            $override = $override === '' ? null : (int) $override;
+            $reason = $override !== null ? ($this->shippingFeeOverrideReasons[$vendorResponse->id] ?? null) : null;
+
             try {
-                $action->execute($this->partRequest, $vendorResponse);
+                $action->execute($this->partRequest, $vendorResponse, $override, $reason);
                 $presentedCount++;
             } catch (PresentQuoteNotAllowedException $e) {
                 report($e);
@@ -128,7 +155,7 @@ class RequestDetail extends Component
         }
 
         $this->partRequest = $this->partRequest->fresh();
-        $this->reset('selectedResponseIdsToPresent');
+        $this->reset('selectedResponseIdsToPresent', 'shippingFeeOverrides', 'shippingFeeOverrideReasons');
 
         if ($presentedCount === 0) {
             $message = __('admin.request_detail.present_quote_error');
@@ -141,6 +168,27 @@ class RequestDetail extends Component
         // Durable feedback is the "Presented" badge (see the Blade view)
         // -- this toast is just a brief, dismissable extra.
         $this->dispatch('toast', message: __('admin.request_detail.presented_toast', ['count' => $presentedCount]), type: 'success');
+    }
+
+    /**
+     * A reason is required precisely when that same response has a
+     * non-blank override -- built dynamically since these are array-keyed
+     * properties, one pair per currently-checked response.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    protected function overrideRules(): array
+    {
+        $rules = [];
+
+        foreach ($this->selectedResponseIdsToPresent as $responseId) {
+            $hasOverride = filled($this->shippingFeeOverrides[$responseId] ?? null);
+
+            $rules["shippingFeeOverrides.{$responseId}"] = ['nullable', 'integer', 'min:0'];
+            $rules["shippingFeeOverrideReasons.{$responseId}"] = [$hasOverride ? 'required' : 'nullable', 'string', 'max:1000'];
+        }
+
+        return $rules;
     }
 
     /**
@@ -167,6 +215,22 @@ class RequestDetail extends Component
             ->filter(fn (VendorResponse $response) => ! $response->is_no_stock && $response->cost_price !== null)
             ->mapWithKeys(fn (VendorResponse $response) => [$response->id => $pricingService->calculate($response->cost_price)]);
 
+        // The same figure PresentQuoteAction would use if the admin
+        // doesn't override it -- shown so the admin can decide whether to.
+        // A response with no weight recorded (shouldn't happen for a real
+        // quote, see PresentQuoteAction's own guard) or an unconfigured
+        // bracket table just shows nothing rather than crashing the page.
+        $shippingCalculator = app(ShippingCalculator::class);
+        $vendorResponseShipping = $vendorResponses
+            ->filter(fn (VendorResponse $response) => ! $response->is_no_stock && $response->cost_price !== null && $response->weight_kg !== null)
+            ->mapWithKeys(function (VendorResponse $response) use ($shippingCalculator) {
+                try {
+                    return [$response->id => $shippingCalculator->calculate((float) $response->weight_kg)];
+                } catch (ShippingBracketNotConfiguredException) {
+                    return [$response->id => null];
+                }
+            });
+
         return view('livewire.admin.request-detail', [
             'activeVendors' => $this->activeVendors(),
             'invitedVendors' => $this->partRequest->status !== RequestStatus::New
@@ -174,6 +238,7 @@ class RequestDetail extends Component
                 : Collection::make(),
             'vendorResponses' => $vendorResponses,
             'vendorResponsePricing' => $vendorResponsePricing,
+            'vendorResponseShipping' => $vendorResponseShipping,
             'presentedResponseIds' => $this->partRequest->presentedQuotes()->pluck('vendor_response_id')->all(),
             // The confirmed payment, if any (CLAUDE.md §6.3 gate) -- admin
             // has had no visibility into this at all until now, even though

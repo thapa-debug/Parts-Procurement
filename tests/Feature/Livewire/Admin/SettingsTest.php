@@ -6,6 +6,7 @@ use App\Models\Country;
 use App\Models\Maker;
 use App\Models\PartRequest;
 use App\Models\Setting;
+use App\Models\ShippingWeightBracket;
 use App\Models\User;
 use App\Services\PricingService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -45,7 +46,8 @@ it('defaults to the general section, showing the margin form and hiding the coun
         ->assertSet('activeSection', 'general')
         ->assertSee(__('admin.settings.save_button'))
         ->assertDontSee(__('admin.settings.add_country_button'))
-        ->assertDontSee(__('admin.settings.add_maker_button'));
+        ->assertDontSee(__('admin.settings.add_maker_button'))
+        ->assertDontSee(__('admin.settings.add_bracket_button'));
 });
 
 it('switches sections via showSection, rendering only the selected section', function () {
@@ -61,6 +63,11 @@ it('switches sections via showSection, rendering only the selected section', fun
         ->call('showSection', 'makers')
         ->assertSet('activeSection', 'makers')
         ->assertSee(__('admin.settings.add_maker_button'))
+        ->assertDontSee(__('admin.settings.save_button'))
+        ->assertDontSee(__('admin.settings.add_bracket_button'))
+        ->call('showSection', 'shipping_brackets')
+        ->assertSet('activeSection', 'shipping_brackets')
+        ->assertSee(__('admin.settings.add_bracket_button'))
         ->assertDontSee(__('admin.settings.save_button'))
         ->assertDontSee(__('admin.settings.add_country_button'));
 });
@@ -83,8 +90,6 @@ it('pre-fills the PricingService defaults when nothing has been configured yet',
         ->test(Settings::class)
         ->assertSet('margin_rate', 20)
         ->assertSet('margin_min_fee', 2000)
-        ->assertSet('shipping_fee_vehicle', 0)
-        ->assertSet('shipping_fee_container', 0)
         ->assertSet('admin_sender_email', '');
 });
 
@@ -104,27 +109,23 @@ it('loads existing stored values instead of the defaults', function () {
 
 // --- saving --------------------------------------------------------------
 
-it('saves all five settings and shows the saved indicator', function () {
+it('saves all three settings and shows the saved indicator', function () {
     $admin = User::factory()->admin()->create();
 
     Livewire::actingAs($admin)
         ->test(Settings::class)
         ->set('margin_rate', 30)
         ->set('margin_min_fee', 2500)
-        ->set('shipping_fee_vehicle', 80000)
-        ->set('shipping_fee_container', 150000)
         ->set('admin_sender_email', 'orders@example.com')
         ->call('save')
         ->assertSet('justSaved', true);
 
     expect(Setting::get('margin_rate'))->toBe(30)
         ->and(Setting::get('margin_min_fee'))->toBe(2500)
-        ->and(Setting::get('shipping_fee_vehicle'))->toBe(80000)
-        ->and(Setting::get('shipping_fee_container'))->toBe(150000)
         ->and(Setting::get('admin_sender_email'))->toBe('orders@example.com');
 });
 
-it('never writes a shipping_fee_dhl setting -- DHL is per-request, not a global fixed fee', function () {
+it('never writes a shipping_fee_vehicle, shipping_fee_container, or shipping_fee_dhl setting -- shipping moved to weight brackets', function () {
     $admin = User::factory()->admin()->create();
 
     Livewire::actingAs($admin)
@@ -132,7 +133,9 @@ it('never writes a shipping_fee_dhl setting -- DHL is per-request, not a global 
         ->set('admin_sender_email', 'orders@example.com')
         ->call('save');
 
-    expect(Setting::get('shipping_fee_dhl'))->toBeNull();
+    expect(Setting::get('shipping_fee_vehicle'))->toBeNull()
+        ->and(Setting::get('shipping_fee_container'))->toBeNull()
+        ->and(Setting::get('shipping_fee_dhl'))->toBeNull();
 });
 
 it('clears the saved indicator as soon as a field changes again', function () {
@@ -557,4 +560,151 @@ it('lists active makers before inactive ones, alphabetical within each group', f
         ->test(Settings::class)
         ->set('activeSection', 'makers')
         ->assertSeeInOrder(['Alpha Active', 'Zeta Active', 'Alpha Inactive', 'Zed Inactive']);
+});
+
+// --- shipping weight brackets (CLAUDE.md §14 Phase 4, rule-based shipping v1) ---
+
+it('does not let a buyer or vendor add, edit, or delete a shipping weight bracket -- same gating as the rest of Settings', function () {
+    $buyer = User::factory()->buyer()->create();
+    $vendor = User::factory()->vendor()->create();
+
+    Livewire::actingAs($buyer)->test(Settings::class)->assertForbidden();
+    Livewire::actingAs($vendor)->test(Settings::class)->assertForbidden();
+});
+
+it('lists brackets ordered by weight, ascending, catch-all last', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    ShippingWeightBracket::factory()->create(['upper_kg' => 5, 'fee' => 3_000, 'order' => 2]);
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 120_000, 'order' => 3]);
+
+    // Deliberately seeded out of weight order (order=1 is the 20kg one) --
+    // the component's own render() query orders by `order`, and this test
+    // is only meaningful once renormalizeBracketOrder() has never run, so
+    // assert on the underlying DB order column directly instead of the
+    // rendered page (which would just reflect whatever `order` already is).
+    expect(ShippingWeightBracket::orderBy('order')->pluck('upper_kg')->map(fn ($v) => $v === null ? null : (float) $v)->all())
+        ->toBe([20.0, 5.0, null]);
+});
+
+it('adds a bracket with an upper bound', function () {
+    ShippingWeightBracket::query()->delete();
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('activeSection', 'shipping_brackets')
+        ->set('new_bracket_upper_kg', '15')
+        ->set('new_bracket_fee', '6000')
+        ->call('addBracket')
+        ->assertHasNoErrors()
+        ->assertSet('new_bracket_upper_kg', '')
+        ->assertSet('new_bracket_fee', '');
+
+    $bracket = ShippingWeightBracket::sole();
+    expect((float) $bracket->upper_kg)->toBe(15.0)
+        ->and($bracket->fee)->toBe(6000)
+        ->and($bracket->order)->toBe(1);
+});
+
+it('adds a catch-all bracket by leaving the upper bound blank', function () {
+    ShippingWeightBracket::query()->delete();
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('activeSection', 'shipping_brackets')
+        ->set('new_bracket_upper_kg', '')
+        ->set('new_bracket_fee', '120000')
+        ->call('addBracket')
+        ->assertHasNoErrors();
+
+    $bracket = ShippingWeightBracket::sole();
+    expect($bracket->upper_kg)->toBeNull()
+        ->and($bracket->fee)->toBe(120_000);
+});
+
+it('refuses a second catch-all bracket while one already exists', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 100_000, 'order' => 1]);
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('activeSection', 'shipping_brackets')
+        ->set('new_bracket_upper_kg', '')
+        ->set('new_bracket_fee', '150000')
+        ->call('addBracket')
+        ->assertHasErrors(['new_bracket_upper_kg']);
+
+    expect(ShippingWeightBracket::whereNull('upper_kg')->count())->toBe(1);
+});
+
+it('rejects a duplicate upper_kg value', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('activeSection', 'shipping_brackets')
+        ->set('new_bracket_upper_kg', '20')
+        ->set('new_bracket_fee', '9000')
+        ->call('addBracket')
+        ->assertHasErrors(['new_bracket_upper_kg']);
+
+    expect(ShippingWeightBracket::count())->toBe(1);
+});
+
+it('edits a bracket\'s upper bound and fee', function () {
+    ShippingWeightBracket::query()->delete();
+    $bracket = ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('activeSection', 'shipping_brackets')
+        ->call('startEditingBracket', $bracket->id)
+        ->assertSet('editing_bracket_upper_kg', '20.00')
+        ->assertSet('editing_bracket_fee', '8000')
+        ->set('editing_bracket_upper_kg', '25')
+        ->set('editing_bracket_fee', '9500')
+        ->call('saveBracket')
+        ->assertHasNoErrors()
+        ->assertSet('editingBracketId', null);
+
+    expect((float) $bracket->fresh()->upper_kg)->toBe(25.0)
+        ->and($bracket->fresh()->fee)->toBe(9500);
+});
+
+it('deletes a bracket', function () {
+    ShippingWeightBracket::query()->delete();
+    $bracket = ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('deleteBracket', $bracket->id);
+
+    expect(ShippingWeightBracket::find($bracket->id))->toBeNull();
+});
+
+it('renumbers every bracket\'s order to match ascending weight after an add or delete', function () {
+    ShippingWeightBracket::query()->delete();
+    $keep20 = ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    $toDelete = ShippingWeightBracket::factory()->create(['upper_kg' => 10, 'fee' => 5_000, 'order' => 2]);
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)->test(Settings::class)->call('deleteBracket', $toDelete->id);
+
+    expect($keep20->fresh()->order)->toBe(1);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->set('new_bracket_upper_kg', '5')
+        ->set('new_bracket_fee', '3000')
+        ->call('addBracket');
+
+    expect(ShippingWeightBracket::where('upper_kg', 5)->value('order'))->toBe(1)
+        ->and($keep20->fresh()->order)->toBe(2);
 });

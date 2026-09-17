@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\ShippingMethod;
 use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
@@ -18,7 +19,12 @@ use Throwable;
  * (CLAUDE.md §6.2) onto part_requests' selected_response_id/cost_price/
  * applied_rate/applied_min_fee/buyer_price columns -- those columns now
  * mean "the buyer's current pick", not "what the admin presented", even
- * though nothing about their shape changed from Phase 2.
+ * though nothing about their shape changed from Phase 2. Same for
+ * shipping_fee (CLAUDE.md §14 Phase 4 rule-based shipping v1): copied here,
+ * not computed at checkout, so it's already fixed by the time the buyer
+ * reaches CheckoutAction -- shipping_method is set to Standard alongside
+ * it (the only method a presented quote's fee can represent today; Dhl
+ * isn't wired into this flow yet).
  *
  * Callable repeatedly: the buyer may change their mind and re-select a
  * different still-presented quote for as long as the request hasn't been
@@ -47,6 +53,8 @@ class SelectQuoteAction
                 'applied_rate' => $presentedQuote->applied_rate,
                 'applied_min_fee' => $presentedQuote->applied_min_fee,
                 'buyer_price' => $presentedQuote->buyer_price,
+                'shipping_fee' => $presentedQuote->shipping_fee,
+                'shipping_method' => ShippingMethod::Standard,
             ]);
 
             return $partRequest->fresh();

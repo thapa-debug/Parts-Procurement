@@ -19,8 +19,15 @@ class CheckoutNotAllowedException extends RuntimeException
         );
     }
 
-    public static function dhlNotYetSupported(): self
+    /**
+     * Defense-in-depth: shouldn't happen, since SelectQuoteAction always
+     * sets shipping_fee alongside selected_response_id -- but never let
+     * checkout silently charge for shipping it doesn't have a figure for.
+     */
+    public static function shippingFeeMissing(PartRequest $partRequest): self
     {
-        return new self('DHL is not yet supported at checkout -- only vehicle and container shipping are available.');
+        return new self(
+            "Request {$partRequest->request_code} has no shipping fee set -- select a presented quote again before checking out."
+        );
     }
 }
