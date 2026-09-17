@@ -4,10 +4,12 @@
     Shared persistent paid-status indicator (buyer + admin request-detail
     pages) -- a status, not a dismissible flash, so there is deliberately no
     close button. Renders full-size in normal flow at the top of the page;
-    once scrolled out of view, a compact one-line version pins itself to the
-    very top of the viewport instead, so the order's paid status stays
-    visible regardless of scroll position without permanently eating screen
-    space the way a fully sticky full-size banner would.
+    once scrolled out of view, a compact single-line version (heading and
+    body both, truncated as one line rather than dropping the body
+    entirely -- still a clear picture of the paid status, not just "paid")
+    pins itself to the very top of the viewport instead, so the order's
+    status stays visible regardless of scroll position without permanently
+    eating screen space the way a fully sticky full-size banner would.
 
     IntersectionObserver on the full banner itself drives this -- no scroll
     listener needed, and it stays correct if the banner's own height or
@@ -42,7 +44,10 @@
             <svg class="h-4 w-4 shrink-0 text-indigo-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
             </svg>
-            <p class="truncate text-sm font-semibold text-indigo-800">{{ $heading }}</p>
+            <p class="min-w-0 truncate text-sm text-indigo-800">
+                <span class="font-semibold">{{ $heading }}</span>
+                <span class="text-indigo-700">-- {{ $body }}</span>
+            </p>
         </div>
     </div>
 </div>
