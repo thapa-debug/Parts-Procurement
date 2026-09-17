@@ -30,4 +30,17 @@ class CheckoutNotAllowedException extends RuntimeException
             "Request {$partRequest->request_code} has no shipping fee set -- select a presented quote again before checking out."
         );
     }
+
+    /**
+     * 無償 flow (CLAUDE.md §14 Phase 4 slice 5): a free request has nothing
+     * to pay, so it never reaches CheckoutAction/the payment gateway --
+     * ConfirmFreeOrderAction is its mirror image instead.
+     */
+    public static function isFreeRequest(PartRequest $partRequest): self
+    {
+        return new self(
+            "Request {$partRequest->request_code} is a free (無償) request -- it has nothing to pay ".
+            'and must go through ConfirmFreeOrderAction instead of checkout.'
+        );
+    }
 }

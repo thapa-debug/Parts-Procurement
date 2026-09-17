@@ -35,6 +35,7 @@ class PresentedQuoteFactory extends Factory
             'shipping_fee' => fake()->numberBetween(3_000, 40_000),
             'shipping_fee_overridden' => false,
             'shipping_fee_override_reason' => null,
+            'is_free' => false,
         ];
     }
 }

@@ -234,6 +234,7 @@
                         $pricing = $vendorResponsePricing->get($response->id);
                         $isPresented = in_array($response->id, $presentedResponseIds, true);
                         $isBuyerSelected = $partRequest->selected_response_id === $response->id;
+                        $presentedQuote = $presentedQuotesByResponseId->get($response->id);
                     @endphp
                     @php
                         // Two independent signals, deliberately styled
@@ -270,7 +271,13 @@
                                 <div>
                                     <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_price_column') }}</dt>
                                     <dd class="mt-0.5 font-mono font-medium text-ink">
-                                        {{ $pricing ? '¥'.number_format($pricing['buyer_price']) : __('admin.request_detail.not_provided') }}
+                                        @if ($presentedQuote)
+                                            ¥{{ number_format($presentedQuote->buyer_price) }}
+                                        @elseif ($pricing)
+                                            ¥{{ number_format($pricing['buyer_price']) }}
+                                        @else
+                                            {{ __('admin.request_detail.not_provided') }}
+                                        @endif
                                     </dd>
                                 </div>
                                 <div>
@@ -284,8 +291,12 @@
                                 <div>
                                     <dt class="text-ink-muted">{{ __('admin.request_detail.shipping_fee_column') }}</dt>
                                     <dd class="mt-0.5 font-mono font-medium text-ink">
-                                        @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
-                                        {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
+                                        @if ($presentedQuote)
+                                            ¥{{ number_format($presentedQuote->shipping_fee) }}
+                                        @else
+                                            @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
+                                            {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
+                                        @endif
                                     </dd>
                                 </div>
                             </dl>
@@ -304,6 +315,12 @@
                                         {{ __('admin.request_detail.presented_badge') }}
                                     </span>
 
+                                    @if ($presentedQuote?->is_free)
+                                        <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                            {{ __('admin.request_detail.free_badge') }}
+                                        </span>
+                                    @endif
+
                                     @if ($isBuyerSelected)
                                         <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                             {{ __('admin.request_detail.buyer_selected_badge') }}
@@ -321,7 +338,7 @@
                                         {{ __('admin.request_detail.present_checkbox_label') }}
                                     </label>
 
-                                    @unless ($partRequest->hasBeenPaid())
+                                    @unless ($partRequest->hasBeenPaid() || $presentAsFree)
                                         <div class="mt-3 flex flex-wrap items-end gap-3">
                                             <div>
                                                 <label for="shipping-override-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
@@ -370,6 +387,18 @@
                         ->isNotEmpty();
                 @endphp
                 @if ($hasSelectablePresentableQuotes)
+                    <div class="mt-4 rounded-md border border-line bg-surface-muted p-3">
+                        <label class="flex items-center gap-2 text-sm font-medium text-ink">
+                            <input
+                                type="checkbox"
+                                wire:model.live="presentAsFree"
+                                class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                            >
+                            {{ __('admin.request_detail.present_as_free_label') }}
+                        </label>
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.present_as_free_help') }}</p>
+                    </div>
+
                     <div class="mt-4">
                         <button
                             type="button"

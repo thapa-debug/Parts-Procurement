@@ -19,7 +19,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'oem_part_number', 'part_name', 'reference_url', 'memo',
     'status', 'cost_price', 'applied_rate', 'applied_min_fee', 'buyer_price',
     'selected_response_id', 'confirmed_vendor_id', 'shipping_method', 'shipping_fee',
-    'shipping_address_id', 'shipping_recipient_name', 'shipping_phone',
+    'is_free', 'shipping_address_id', 'shipping_recipient_name', 'shipping_phone',
     'shipping_postal_code', 'shipping_country', 'shipping_state',
     'shipping_city', 'shipping_address_line1', 'shipping_address_line2',
 ])]
@@ -35,6 +35,7 @@ class PartRequest extends Model
         'part_type' => PartType::class,
         'status' => RequestStatus::class,
         'shipping_method' => ShippingMethod::class,
+        'is_free' => 'boolean',
     ];
 
     /**

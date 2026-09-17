@@ -227,6 +227,102 @@ it('presents every checked quote in one deliberate batch action, each snapshotti
         ->and(PresentedQuote::where('vendor_response_id', $responseB->id)->value('buyer_price'))->toBe(60_000);
 });
 
+// --- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) ---------------------
+
+it('presents a batch as free (無償) when checked, forcing buyer_price and shipping_fee to zero', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('selectedResponseIdsToPresent', [$responseA->id, $responseB->id])
+        ->set('presentAsFree', true)
+        ->call('presentSelectedQuotes')
+        ->assertHasNoErrors()
+        ->assertSee(__('admin.request_detail.free_badge'));
+
+    expect(PresentedQuote::count())->toBe(2)
+        ->and(PresentedQuote::where('vendor_response_id', $responseA->id)->value('buyer_price'))->toBe(0)
+        ->and(PresentedQuote::where('vendor_response_id', $responseA->id)->value('shipping_fee'))->toBe(0)
+        ->and(PresentedQuote::where('vendor_response_id', $responseA->id)->value('is_free'))->toBeTrue()
+        ->and(PresentedQuote::where('vendor_response_id', $responseB->id)->value('is_free'))->toBeTrue();
+});
+
+it('shows the free quote\'s frozen ¥0 buyer price and shipping fee once presented, not the live preview', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    // The live preview would show the real computed buyer_price/shipping
+    // fee (non-zero) -- this proves the actually-presented ¥0 figures win
+    // once a response has been presented, not that stale preview.
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertDontSee('54,000')
+        ->assertSeeInOrder([
+            __('admin.request_detail.buyer_price_column'),
+            '¥0',
+        ]);
+});
+
+it('keeps showing a presented quote\'s frozen buyer price after the margin rate changes, not a recomputed preview', function () {
+    Setting::set('margin_rate', 20, 'integer');
+    Setting::set('margin_min_fee', 2000, 'integer');
+
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+    ]);
+
+    // max(45000 * 20%, 2000) = 9000 -> 54,000
+    app(PresentQuoteAction::class)->execute($request, $response);
+
+    Setting::set('margin_rate', 50, 'integer');
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee('54,000')
+        // max(45000 * 50%, 2000) = 22,500 -> 67,500, the live preview's
+        // figure -- must never appear once the quote is actually presented.
+        ->assertDontSee('67,500');
+});
+
+it('ignores any typed shipping-fee override when presenting as free', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('selectedResponseIdsToPresent', [$response->id])
+        // Stale leftover values from before the admin checked "free" --
+        // must never reach PresentQuoteAction as a real override.
+        ->set("shippingFeeOverrides.{$response->id}", '50000')
+        ->set('presentAsFree', true)
+        ->call('presentSelectedQuotes')
+        ->assertHasNoErrors();
+
+    expect(PresentedQuote::where('vendor_response_id', $response->id)->value('shipping_fee'))->toBe(0)
+        ->and(PresentedQuote::where('vendor_response_id', $response->id)->value('shipping_fee_overridden'))->toBeFalse();
+});
+
 it('rejects presenting when nothing is checked', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);

@@ -76,7 +76,7 @@ class RequestDetail extends Component
             ->select([
                 'id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
                 'oem_part_number', 'part_name', 'reference_url', 'memo',
-                'status', 'buyer_price', 'created_at',
+                'status', 'buyer_price', 'created_at', 'is_free',
                 'shipping_method', 'shipping_fee', 'shipping_recipient_name',
                 'shipping_phone', 'shipping_postal_code', 'shipping_country',
                 'shipping_state', 'shipping_city', 'shipping_address_line1',
@@ -107,13 +107,13 @@ class RequestDetail extends Component
      * current pick (a plain boolean, never the raw selected_response_id
      * this is compared against).
      *
-     * @return array<int, array{presented_quote_id: int, buyer_price: int, quality_rank: QualityRank, photos: array<int, string>, is_selected: bool}>
+     * @return array<int, array{presented_quote_id: int, buyer_price: int, quality_rank: QualityRank, photos: array<int, string>, is_selected: bool, is_free: bool}>
      */
     protected function presentedQuoteOptions(?int $selectedResponseId): array
     {
         $presentedQuotes = PresentedQuote::query()
             ->where('part_request_id', $this->partRequestId)
-            ->get(['id', 'vendor_response_id', 'buyer_price']);
+            ->get(['id', 'vendor_response_id', 'buyer_price', 'is_free']);
 
         if ($presentedQuotes->isEmpty()) {
             return [];
@@ -133,6 +133,7 @@ class RequestDetail extends Component
                 'quality_rank' => $vendorResponses[$presentedQuote->vendor_response_id]->quality_rank,
                 'photos' => $vendorResponses[$presentedQuote->vendor_response_id]->photos->map(fn ($photo) => $photo->url())->all(),
                 'is_selected' => $presentedQuote->vendor_response_id === $selectedResponseId,
+                'is_free' => $presentedQuote->is_free,
             ])
             ->all();
     }

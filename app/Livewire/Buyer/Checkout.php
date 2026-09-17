@@ -3,9 +3,11 @@
 namespace App\Livewire\Buyer;
 
 use App\Actions\CheckoutAction;
+use App\Actions\ConfirmFreeOrderAction;
 use App\Actions\CreateBuyerAddressAction;
 use App\Enums\RequestStatus;
 use App\Exceptions\CheckoutNotAllowedException;
+use App\Exceptions\FreeOrderNotAllowedException;
 use App\Exceptions\PaymentFailedException;
 use App\Exceptions\ShippingAddressNotAllowedException;
 use App\Http\Requests\StoreBuyerAddressRequest;
@@ -31,6 +33,17 @@ use Throwable;
  * select() -- same serialization-safety discipline as
  * App\Livewire\Buyer\RequestDetail: cost_price/applied_rate/
  * selected_response_id must never reach the buyer's own browser.
+ *
+ * Also serves the 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) on this
+ * same screen, per the confirmed design: a free request skips payment
+ * entirely, but the buyer still confirms/picks a shipping address --
+ * their default isn't necessarily right for this particular shipment. The
+ * Blade view branches on $partRequest->is_free to show the address picker
+ * either alongside the fee breakdown + pay() (real charge, CheckoutAction)
+ * or alone + confirmFree() (¥0 confirmed payment, ConfirmFreeOrderAction).
+ * Two sibling methods calling two sibling actions, never one shared method
+ * with a flag (CLAUDE.md §8) -- each is already guarded against running on
+ * the other's kind of request by its own action.
  */
 class Checkout extends Component
 {
@@ -58,7 +71,11 @@ class Checkout extends Component
 
     public function mount(PartRequest $partRequest): void
     {
-        $this->authorize('checkout', $partRequest);
+        // Two abilities, same buyer-and-owner check underneath (CLAUDE.md
+        // §14 Phase 4 slice 5) -- which one applies depends on is_free,
+        // exactly the same branching the Blade view and pay()/confirmFree()
+        // below use.
+        $this->authorize($partRequest->is_free ? 'confirmFreeOrder' : 'checkout', $partRequest);
 
         $this->partRequestId = $partRequest->id;
 
@@ -145,6 +162,38 @@ class Checkout extends Component
         $this->redirect(route('buyer.requests.show', $result->id));
     }
 
+    /**
+     * The 無償 (free) mirror of pay() above -- same address validation and
+     * redirect shape, but confirms via ConfirmFreeOrderAction instead of
+     * charging anything.
+     */
+    public function confirmFree(ConfirmFreeOrderAction $action): void
+    {
+        $partRequest = PartRequest::findOrFail($this->partRequestId);
+        $this->authorize('confirmFreeOrder', $partRequest);
+
+        $validated = $this->validate();
+
+        $address = BuyerAddress::findOrFail($validated['selectedAddressId']);
+
+        try {
+            $result = $action->execute($partRequest, $address);
+        } catch (FreeOrderNotAllowedException|ShippingAddressNotAllowedException $e) {
+            report($e);
+            $this->addError('pay', __('buyer.checkout.error_not_allowed'));
+
+            return;
+        } catch (Throwable $e) {
+            report($e);
+            $this->addError('pay', __('buyer.checkout.error_generic'));
+
+            return;
+        }
+
+        session()->flash('status', __('buyer.checkout.free_confirmed', ['code' => $result->request_code]));
+        $this->redirect(route('buyer.requests.show', $result->id));
+    }
+
     protected function buyer(): BuyerProfile
     {
         /** @var User $user */
@@ -182,7 +231,7 @@ class Checkout extends Component
         // shipping_fee (already fixed by SelectQuoteAction) are the only
         // price columns a buyer is ever allowed to see.
         $partRequest = PartRequest::query()
-            ->select(['id', 'request_code', 'status', 'buyer_price', 'shipping_fee'])
+            ->select(['id', 'request_code', 'status', 'buyer_price', 'shipping_fee', 'is_free'])
             ->findOrFail($this->partRequestId);
 
         return view('livewire.buyer.checkout', [

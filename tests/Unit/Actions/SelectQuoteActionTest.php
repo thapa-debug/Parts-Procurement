@@ -154,3 +154,22 @@ it('rolls back the whole selection if the transaction fails', function () {
     expect($attempt)->toThrow(RuntimeException::class);
     expect($request->fresh()->selected_response_id)->toBeNull();
 });
+
+it('copies is_free onto the part_request when selecting a free presented quote (CLAUDE.md §14 Phase 4 slice 5)', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 10,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    $result = app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
+
+    expect($result->is_free)->toBeTrue()
+        ->and($result->buyer_price)->toBe(0)
+        ->and($result->shipping_fee)->toBe(0);
+});

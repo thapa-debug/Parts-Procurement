@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\CheckoutAction;
+use App\Actions\ConfirmFreeOrderAction;
 use App\Actions\ConfirmOrderToVendorAction;
 use App\Actions\PresentQuoteAction;
 use App\Actions\SelectQuoteAction;
@@ -52,6 +53,28 @@ it('confirms the order and transitions to ordered_to_vendor once payment is conf
 
     expect($result->status)->toBe(RequestStatus::OrderedToVendor)
         ->and($result->confirmed_vendor_id)->toBe($vendorId);
+});
+
+it('opens the payment gate for a free (無償) order exactly the same way, via its ¥0 confirmed payment', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+    app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
+
+    $address = BuyerAddress::factory()->create(['buyer_id' => $request->buyer_id]);
+    app(ConfirmFreeOrderAction::class)->execute($request->fresh(), $address);
+
+    $result = app(ConfirmOrderToVendorAction::class)->execute($request->fresh());
+
+    expect($result->status)->toBe(RequestStatus::OrderedToVendor)
+        ->and($result->confirmed_vendor_id)->toBe($vendor->id);
 });
 
 it('refuses to confirm a vendor purchase on an unpaid request -- CLAUDE.md §6.3\'s payment gate', function () {

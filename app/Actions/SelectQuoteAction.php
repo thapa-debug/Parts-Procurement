@@ -33,6 +33,13 @@ use Throwable;
  * it never touches any other PresentedQuote row; the ones not picked stay
  * presented, exactly as they were, as the admin's own record of what else
  * was on offer.
+ *
+ * is_free (CLAUDE.md §14 Phase 4 slice 5) is copied the same way as
+ * buyer_price/shipping_fee -- PresentQuoteAction already guarantees every
+ * presented quote on a given request agrees on is_free, so this is just
+ * carrying that already-settled value onto the request, not deciding it.
+ * CheckoutAction and ConfirmFreeOrderAction each guard against being called
+ * on the wrong kind of request using this column.
  */
 class SelectQuoteAction
 {
@@ -55,6 +62,7 @@ class SelectQuoteAction
                 'buyer_price' => $presentedQuote->buyer_price,
                 'shipping_fee' => $presentedQuote->shipping_fee,
                 'shipping_method' => ShippingMethod::Standard,
+                'is_free' => $presentedQuote->is_free,
             ]);
 
             return $partRequest->fresh();

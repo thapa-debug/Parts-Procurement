@@ -10,7 +10,7 @@
             <p class="text-sm text-amber-800">{{ __('buyer.checkout.not_eligible') }}</p>
         </div>
     @else
-        <form wire:submit="pay" class="mt-6 space-y-6">
+        <form wire:submit="{{ $partRequest->is_free ? 'confirmFree' : 'pay' }}" class="mt-6 space-y-6">
             {{-- Shipping address --}}
             <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
                 <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.address_section') }}</h2>
@@ -125,36 +125,44 @@
                 @endif
             </div>
 
-            {{-- Fee breakdown --}}
-            <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
-                <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.summary_section') }}</h2>
+            @if ($partRequest->is_free)
+                {{-- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5): no fee
+                breakdown, no payment section -- there's nothing to pay. --}}
+                <div class="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+                    <p class="text-sm text-emerald-800">{{ __('buyer.checkout.free_order_note') }}</p>
+                </div>
+            @else
+                {{-- Fee breakdown --}}
+                <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                    <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.summary_section') }}</h2>
 
-                <dl class="mt-4 space-y-2 text-sm">
-                    <div class="flex items-center justify-between">
-                        <dt class="text-ink-muted">{{ __('buyer.checkout.summary_part_price') }}</dt>
-                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between">
-                        <dt class="text-ink-muted">{{ __('buyer.checkout.summary_shipping_fee') }}</dt>
-                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->shipping_fee) }}</dd>
-                    </div>
-                    <div class="flex items-center justify-between border-t border-line pt-2 text-base font-semibold">
-                        <dt class="text-ink">{{ __('buyer.checkout.summary_total') }}</dt>
-                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
-                    </div>
-                </dl>
-                <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.shipping_fee_note') }}</p>
-            </div>
+                    <dl class="mt-4 space-y-2 text-sm">
+                        <div class="flex items-center justify-between">
+                            <dt class="text-ink-muted">{{ __('buyer.checkout.summary_part_price') }}</dt>
+                            <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <dt class="text-ink-muted">{{ __('buyer.checkout.summary_shipping_fee') }}</dt>
+                            <dd class="font-mono text-ink">¥{{ number_format($partRequest->shipping_fee) }}</dd>
+                        </div>
+                        <div class="flex items-center justify-between border-t border-line pt-2 text-base font-semibold">
+                            <dt class="text-ink">{{ __('buyer.checkout.summary_total') }}</dt>
+                            <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
+                        </div>
+                    </dl>
+                    <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.shipping_fee_note') }}</p>
+                </div>
+            @endif
 
             @error('pay') <p class="text-sm text-red-600">{{ $message }}</p> @enderror
 
             <button
                 type="submit"
                 wire:loading.attr="disabled"
-                wire:target="pay"
+                wire:target="{{ $partRequest->is_free ? 'confirmFree' : 'pay' }}"
                 class="w-full rounded-md bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
-                {{ __('buyer.checkout.pay_button') }}
+                {{ $partRequest->is_free ? __('buyer.checkout.confirm_free_button') : __('buyer.checkout.pay_button') }}
             </button>
         </form>
     @endunless

@@ -361,3 +361,123 @@ it('keeps an already-presented quote\'s shipping fee unchanged when the weight b
 
     expect($presentedQuote->fresh()->shipping_fee)->toBe(8_000);
 });
+
+// --- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) ---------------------
+
+it('forces buyer_price and shipping_fee to zero on a free quote, while cost_price/applied_rate/applied_min_fee stay real', function () {
+    Setting::set('margin_rate', 20, 'integer');
+    Setting::set('margin_min_fee', 2000, 'integer');
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    expect($presentedQuote->buyer_price)->toBe(0)
+        ->and($presentedQuote->shipping_fee)->toBe(0)
+        ->and($presentedQuote->is_free)->toBeTrue()
+        // The real, normally-computed figures -- the admin still owes the
+        // vendor 45,000 + margin, even though the buyer pays nothing.
+        ->and($presentedQuote->cost_price)->toBe(45_000)
+        ->and($presentedQuote->applied_rate)->toBe(20)
+        ->and($presentedQuote->applied_min_fee)->toBe(2000);
+});
+
+it('refuses to combine a free quote with a shipping fee override', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute(
+        $request,
+        $response,
+        shippingFeeOverride: 50_000,
+        shippingFeeOverrideReason: 'Oversized crate required for this part.',
+        isFree: true,
+    );
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(0);
+});
+
+it('refuses to present a free quote when the request already has a paid presented quote', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000, 'weight_kg' => 5]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000, 'weight_kg' => 5]);
+
+    app(PresentQuoteAction::class)->execute($request, $responseA);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute($request->fresh(), $responseB, isFree: true);
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(1);
+});
+
+it('refuses to present a paid quote when the request already has a free presented quote', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $responseA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 30_000, 'weight_kg' => 5]);
+    $responseB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 50_000, 'weight_kg' => 5]);
+
+    app(PresentQuoteAction::class)->execute($request, $responseA, isFree: true);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute($request->fresh(), $responseB);
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(1);
+});
+
+it('still requires a recorded weight for a free quote, even though shipping is free', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => null,
+    ]);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(0);
+});
+
+it('activity-logs is_free on a free presented quote', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    $activity = Activity::query()
+        ->where('subject_type', PresentedQuote::class)
+        ->where('subject_id', $presentedQuote->id)
+        ->where('event', 'created')
+        ->latest()
+        ->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->attribute_changes['attributes']['is_free'])->toBeTrue();
+});

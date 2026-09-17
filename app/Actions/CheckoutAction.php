@@ -32,6 +32,11 @@ use Illuminate\Support\Facades\Log;
  * of it: no partial snapshot, no status change, and no stray
  * pending/failed payment row left behind -- the same all-or-nothing shape
  * as SubmitVendorResponseAction's response+photos.
+ *
+ * Refuses to run against a 無償 (free) request (CLAUDE.md §14 Phase 4
+ * slice 5) -- one that has nothing to charge belongs to
+ * ConfirmFreeOrderAction instead, which opens CLAUDE.md §6.3's payment
+ * gate the same way but without a real gateway charge.
  */
 class CheckoutAction
 {
@@ -42,6 +47,10 @@ class CheckoutAction
 
     public function execute(PartRequest $partRequest, BuyerAddress $address): PartRequest
     {
+        if ($partRequest->is_free) {
+            throw CheckoutNotAllowedException::isFreeRequest($partRequest);
+        }
+
         if ($partRequest->status !== RequestStatus::Quoted || $partRequest->selected_response_id === null) {
             throw CheckoutNotAllowedException::noQuoteSelected($partRequest);
         }
