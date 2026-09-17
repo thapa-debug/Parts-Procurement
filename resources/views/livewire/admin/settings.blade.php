@@ -351,7 +351,7 @@
                         >
                         <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.bracket_upper_kg_help') }}</p>
                     </div>
-                    <div class="flex-1">
+                    <div>
                         <label for="new_bracket_fee" class="block text-sm font-medium text-ink">
                             {{ __('admin.settings.bracket_fee_label') }} <x-required-mark />
                         </label>
@@ -361,7 +361,7 @@
                             min="0"
                             wire:model="new_bracket_fee"
                             placeholder="{{ __('admin.settings.bracket_fee_placeholder') }}"
-                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            class="mt-1.5 block w-48 rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                         >
                     </div>
                     <button
@@ -409,7 +409,7 @@
                                                     type="number"
                                                     min="0"
                                                     wire:model="editing_bracket_fee"
-                                                    class="block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                    class="block w-48 rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
                                                 >
                                             </div>
                                             @error('editing_bracket_upper_kg')
