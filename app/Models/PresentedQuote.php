@@ -16,7 +16,12 @@ use Spatie\Activitylog\Support\LogOptions;
  * single-quote model). Each row carries its own price snapshot (CLAUDE.md
  * §6.2 applied per-quote, computed fresh via PricingService the moment it's
  * presented) -- never recomputed afterward, so a later margin-rate change
- * can't drift what the buyer was already shown for this option.
+ * can't drift what the buyer was already shown for this option. Same
+ * discipline for shipping_fee (CLAUDE.md §14 Phase 4 rule-based shipping
+ * v1): computed fresh via ShippingCalculator (or admin-overridden, with a
+ * required shipping_fee_override_reason -- admin-internal, never shown to
+ * the buyer) at presentation time, then frozen even if
+ * shipping_weight_brackets changes later.
  *
  * Presenting is final by explicit client decision -- there is no admin
  * action to withdraw/remove an already-presented quote, so this row is
@@ -30,6 +35,7 @@ use Spatie\Activitylog\Support\LogOptions;
 #[Fillable([
     'part_request_id', 'vendor_response_id', 'cost_price',
     'applied_rate', 'applied_min_fee', 'buyer_price', 'presented_at',
+    'shipping_fee', 'shipping_fee_overridden', 'shipping_fee_override_reason',
 ])]
 class PresentedQuote extends Model
 {
@@ -41,6 +47,7 @@ class PresentedQuote extends Model
      */
     protected $casts = [
         'presented_at' => 'datetime',
+        'shipping_fee_overridden' => 'boolean',
     ];
 
     /**
@@ -63,6 +70,7 @@ class PresentedQuote extends Model
     {
         return LogOptions::defaults()->logOnly([
             'part_request_id', 'vendor_response_id', 'buyer_price',
+            'shipping_fee', 'shipping_fee_overridden', 'shipping_fee_override_reason',
         ]);
     }
 }

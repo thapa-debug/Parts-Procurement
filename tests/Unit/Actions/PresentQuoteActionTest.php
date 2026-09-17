@@ -6,9 +6,11 @@ use App\Exceptions\PresentQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
 use App\Models\Setting;
+use App\Models\ShippingWeightBracket;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Spatie\Activitylog\Models\Activity;
 
 uses(RefreshDatabase::class);
 
@@ -244,4 +246,118 @@ it('rolls back the whole presentation -- no status change, no new row -- if the 
 
     expect($request->fresh()->status)->toBe(RequestStatus::VendorInquiry)
         ->and(PresentedQuote::count())->toBe(0);
+});
+
+// --- shipping (CLAUDE.md §14 Phase 4: rule-based v1) ----------------------
+
+it('auto-calculates the shipping fee from the response\'s own weight and snapshots it, not overridden', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 120_000, 'order' => 2]);
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
+
+    expect($presentedQuote->shipping_fee)->toBe(8_000)
+        ->and($presentedQuote->shipping_fee_overridden)->toBeFalse()
+        ->and($presentedQuote->shipping_fee_override_reason)->toBeNull();
+});
+
+it('lets the admin override the calculated shipping fee, given a reason -- stored and activity-logged', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute(
+        $request,
+        $response,
+        shippingFeeOverride: 50_000,
+        shippingFeeOverrideReason: 'Oversized crate required for this part.',
+    );
+
+    expect($presentedQuote->shipping_fee)->toBe(50_000)
+        ->and($presentedQuote->shipping_fee_overridden)->toBeTrue()
+        ->and($presentedQuote->shipping_fee_override_reason)->toBe('Oversized crate required for this part.');
+
+    $activity = Activity::query()
+        ->where('subject_type', PresentedQuote::class)
+        ->where('subject_id', $presentedQuote->id)
+        ->where('event', 'created')
+        ->latest()
+        ->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->attribute_changes['attributes']['shipping_fee'])->toBe(50_000)
+        ->and($activity->attribute_changes['attributes']['shipping_fee_overridden'])->toBeTrue()
+        ->and($activity->attribute_changes['attributes']['shipping_fee_override_reason'])->toBe('Oversized crate required for this part.');
+});
+
+it('refuses an override with no reason', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+    ]);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute($request, $response, shippingFeeOverride: 50_000, shippingFeeOverrideReason: null);
+    $blankAttempt = fn () => app(PresentQuoteAction::class)->execute($request, $response, shippingFeeOverride: 50_000, shippingFeeOverrideReason: '   ');
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect($blankAttempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(0);
+});
+
+it('refuses to present a response with no weight recorded', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => null,
+    ]);
+
+    $attempt = fn () => app(PresentQuoteAction::class)->execute($request, $response);
+
+    expect($attempt)->toThrow(PresentQuoteNotAllowedException::class);
+    expect(PresentedQuote::count())->toBe(0);
+});
+
+it('keeps an already-presented quote\'s shipping fee unchanged when the weight brackets change afterward', function () {
+    ShippingWeightBracket::query()->delete();
+    $bracket = ShippingWeightBracket::factory()->create(['upper_kg' => 20, 'fee' => 8_000, 'order' => 1]);
+
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
+    expect($presentedQuote->shipping_fee)->toBe(8_000);
+
+    $bracket->update(['fee' => 99_000]);
+
+    expect($presentedQuote->fresh()->shipping_fee)->toBe(8_000);
 });

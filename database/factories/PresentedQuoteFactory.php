@@ -32,6 +32,9 @@ class PresentedQuoteFactory extends Factory
             'applied_min_fee' => $appliedMinFee,
             'buyer_price' => $costPrice + $margin,
             'presented_at' => now(),
+            'shipping_fee' => fake()->numberBetween(3_000, 40_000),
+            'shipping_fee_overridden' => false,
+            'shipping_fee_override_reason' => null,
         ];
     }
 }
