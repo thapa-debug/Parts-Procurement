@@ -35,4 +35,14 @@ class PresentQuoteNotAllowedException extends RuntimeException
     {
         return new self('This vendor response is already presented to the buyer.');
     }
+
+    public static function missingWeight(): self
+    {
+        return new self('This vendor response has no weight recorded -- shipping cannot be calculated for it.');
+    }
+
+    public static function overrideReasonRequired(): self
+    {
+        return new self('A reason is required whenever the calculated shipping fee is overridden.');
+    }
 }

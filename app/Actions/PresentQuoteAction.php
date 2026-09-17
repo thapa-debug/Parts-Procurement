@@ -9,6 +9,7 @@ use App\Models\PresentedQuote;
 use App\Models\VendorResponse;
 use App\Notifications\QuotePresentedNotification;
 use App\Services\PricingService;
+use App\Services\ShippingCalculator;
 use Illuminate\Support\Facades\DB;
 use Throwable;
 
@@ -34,13 +35,28 @@ use Throwable;
  * cost_price (via PricingService) and its own id are written onto the new
  * row. See PresentedQuote's own docblock and the buyer-facing view for the
  * isolation discipline this must never undermine.
+ *
+ * Shipping (CLAUDE.md §14 Phase 4, rule-based v1): the fee is computed here
+ * -- at presentation, not at checkout -- via ShippingCalculator, from the
+ * response's own weight_kg. The admin may pass $shippingFeeOverride to use
+ * a different figure instead, but only alongside a non-empty
+ * $shippingFeeOverrideReason -- required, stored, and activity-logged
+ * (PresentedQuote::getActivitylogOptions()), admin-internal and never
+ * shown to the buyer.
  */
 class PresentQuoteAction
 {
-    public function __construct(private PricingService $pricingService) {}
+    public function __construct(
+        private PricingService $pricingService,
+        private ShippingCalculator $shippingCalculator,
+    ) {}
 
-    public function execute(PartRequest $partRequest, VendorResponse $vendorResponse): PresentedQuote
-    {
+    public function execute(
+        PartRequest $partRequest,
+        VendorResponse $vendorResponse,
+        ?int $shippingFeeOverride = null,
+        ?string $shippingFeeOverrideReason = null,
+    ): PresentedQuote {
         $statusAllowsPresenting = in_array(
             $partRequest->status,
             [RequestStatus::VendorInquiry, RequestStatus::Quoted],
@@ -59,6 +75,14 @@ class PresentQuoteAction
             throw PresentQuoteNotAllowedException::noStockResponse();
         }
 
+        if ($vendorResponse->weight_kg === null) {
+            throw PresentQuoteNotAllowedException::missingWeight();
+        }
+
+        if ($shippingFeeOverride !== null && trim((string) $shippingFeeOverrideReason) === '') {
+            throw PresentQuoteNotAllowedException::overrideReasonRequired();
+        }
+
         $alreadyPresented = PresentedQuote::query()
             ->where('vendor_response_id', $vendorResponse->id)
             ->exists();
@@ -69,7 +93,10 @@ class PresentQuoteAction
 
         $pricing = $this->pricingService->calculate($vendorResponse->cost_price);
 
-        $presentedQuote = DB::transaction(function () use ($partRequest, $vendorResponse, $pricing) {
+        $isOverridden = $shippingFeeOverride !== null;
+        $shippingFee = $shippingFeeOverride ?? $this->shippingCalculator->calculate((float) $vendorResponse->weight_kg);
+
+        $presentedQuote = DB::transaction(function () use ($partRequest, $vendorResponse, $pricing, $shippingFee, $isOverridden, $shippingFeeOverrideReason) {
             $presentedQuote = PresentedQuote::create([
                 'part_request_id' => $partRequest->id,
                 'vendor_response_id' => $vendorResponse->id,
@@ -78,6 +105,9 @@ class PresentQuoteAction
                 'applied_min_fee' => $pricing['applied_min_fee'],
                 'buyer_price' => $pricing['buyer_price'],
                 'presented_at' => now(),
+                'shipping_fee' => $shippingFee,
+                'shipping_fee_overridden' => $isOverridden,
+                'shipping_fee_override_reason' => $isOverridden ? $shippingFeeOverrideReason : null,
             ]);
 
             if ($partRequest->status === RequestStatus::VendorInquiry) {
