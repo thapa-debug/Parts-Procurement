@@ -43,6 +43,19 @@ use Throwable;
  * $shippingFeeOverrideReason -- required, stored, and activity-logged
  * (PresentedQuote::getActivitylogOptions()), admin-internal and never
  * shown to the buyer.
+ *
+ * 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5): $isFree is a purely
+ * admin-discretionary flag, never derived from anything else (not vehicle
+ * ownership, not any external system). When true, buyer_price and
+ * shipping_fee are forced to 0 on the new row regardless of the normal
+ * calculation -- cost_price/applied_rate/applied_min_fee are still the
+ * real PricingService figures, so the admin's own accounting keeps
+ * showing what was actually owed to the vendor. $isFree and
+ * $shippingFeeOverride are mutually exclusive (there is nothing to
+ * override on a fee that's forced to zero). A request may not mix free
+ * and paid presented quotes -- once one is presented, every later one for
+ * the same request must match its is_free value, enforced here rather
+ * than left to SelectQuoteAction/checkout to discover.
  */
 class PresentQuoteAction
 {
@@ -56,6 +69,7 @@ class PresentQuoteAction
         VendorResponse $vendorResponse,
         ?int $shippingFeeOverride = null,
         ?string $shippingFeeOverrideReason = null,
+        bool $isFree = false,
     ): PresentedQuote {
         $statusAllowsPresenting = in_array(
             $partRequest->status,
@@ -79,6 +93,10 @@ class PresentQuoteAction
             throw PresentQuoteNotAllowedException::missingWeight();
         }
 
+        if ($isFree && $shippingFeeOverride !== null) {
+            throw PresentQuoteNotAllowedException::cannotOverrideFreeShipping();
+        }
+
         if ($shippingFeeOverride !== null && trim((string) $shippingFeeOverrideReason) === '') {
             throw PresentQuoteNotAllowedException::overrideReasonRequired();
         }
@@ -91,23 +109,36 @@ class PresentQuoteAction
             throw PresentQuoteNotAllowedException::alreadyPresented();
         }
 
+        $mixesFreeAndPaid = PresentedQuote::query()
+            ->where('part_request_id', $partRequest->id)
+            ->where('is_free', ! $isFree)
+            ->exists();
+
+        if ($mixesFreeAndPaid) {
+            throw PresentQuoteNotAllowedException::mixedFreeAndPaidNotAllowed();
+        }
+
         $pricing = $this->pricingService->calculate($vendorResponse->cost_price);
 
         $isOverridden = $shippingFeeOverride !== null;
-        $shippingFee = $shippingFeeOverride ?? $this->shippingCalculator->calculate((float) $vendorResponse->weight_kg);
+        $shippingFee = $isFree
+            ? 0
+            : ($shippingFeeOverride ?? $this->shippingCalculator->calculate((float) $vendorResponse->weight_kg));
+        $buyerPrice = $isFree ? 0 : $pricing['buyer_price'];
 
-        $presentedQuote = DB::transaction(function () use ($partRequest, $vendorResponse, $pricing, $shippingFee, $isOverridden, $shippingFeeOverrideReason) {
+        $presentedQuote = DB::transaction(function () use ($partRequest, $vendorResponse, $pricing, $buyerPrice, $shippingFee, $isOverridden, $shippingFeeOverrideReason, $isFree) {
             $presentedQuote = PresentedQuote::create([
                 'part_request_id' => $partRequest->id,
                 'vendor_response_id' => $vendorResponse->id,
                 'cost_price' => $pricing['cost_price'],
                 'applied_rate' => $pricing['applied_rate'],
                 'applied_min_fee' => $pricing['applied_min_fee'],
-                'buyer_price' => $pricing['buyer_price'],
+                'buyer_price' => $buyerPrice,
                 'presented_at' => now(),
                 'shipping_fee' => $shippingFee,
                 'shipping_fee_overridden' => $isOverridden,
                 'shipping_fee_override_reason' => $isOverridden ? $shippingFeeOverrideReason : null,
+                'is_free' => $isFree,
             ]);
 
             if ($partRequest->status === RequestStatus::VendorInquiry) {

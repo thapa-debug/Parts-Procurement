@@ -23,6 +23,12 @@ use Spatie\Activitylog\Support\LogOptions;
  * the buyer) at presentation time, then frozen even if
  * shipping_weight_brackets changes later.
  *
+ * is_free (無償 flow, CLAUDE.md §14 Phase 4): an admin-discretionary flag,
+ * set here at presentation time, that forces buyer_price and shipping_fee
+ * on this same row to 0 -- cost_price/applied_rate/applied_min_fee are
+ * still the real, normally-computed figures, preserving what the admin
+ * actually owes the vendor and what the margin would have been.
+ *
  * Presenting is final by explicit client decision -- there is no admin
  * action to withdraw/remove an already-presented quote, so this row is
  * never deleted (see PresentQuoteAction). LogsActivity below records who
@@ -36,6 +42,7 @@ use Spatie\Activitylog\Support\LogOptions;
     'part_request_id', 'vendor_response_id', 'cost_price',
     'applied_rate', 'applied_min_fee', 'buyer_price', 'presented_at',
     'shipping_fee', 'shipping_fee_overridden', 'shipping_fee_override_reason',
+    'is_free',
 ])]
 class PresentedQuote extends Model
 {
@@ -48,6 +55,7 @@ class PresentedQuote extends Model
     protected $casts = [
         'presented_at' => 'datetime',
         'shipping_fee_overridden' => 'boolean',
+        'is_free' => 'boolean',
     ];
 
     /**
@@ -71,6 +79,7 @@ class PresentedQuote extends Model
         return LogOptions::defaults()->logOnly([
             'part_request_id', 'vendor_response_id', 'buyer_price',
             'shipping_fee', 'shipping_fee_overridden', 'shipping_fee_override_reason',
+            'is_free',
         ]);
     }
 }

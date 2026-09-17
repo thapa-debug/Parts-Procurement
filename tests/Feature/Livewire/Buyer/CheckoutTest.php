@@ -147,6 +147,104 @@ it('rejects paying with an address that belongs to a different buyer', function 
         ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
 });
 
+// --- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) ---------------------
+
+/**
+ * @return array{0: User, 1: BuyerProfile, 2: PartRequest}
+ */
+function freeCheckoutEligibleRequest(int $costPrice = 45_000): array
+{
+    $owner = User::factory()->buyer()->create();
+    $profile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($profile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+
+    $vendor = VendorProfile::factory()->create(['company_name' => 'Secret Vendor Co']);
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => $vendor->id,
+        'cost_price' => $costPrice,
+        'weight_kg' => 12,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+    app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
+
+    return [$owner, $profile, $request->fresh()];
+}
+
+it('shows the free-order confirmation screen -- no fee breakdown, address only', function () {
+    [$owner, $profile, $request] = freeCheckoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.confirm_free_button'))
+        ->assertSee(__('buyer.checkout.free_order_note'))
+        ->assertDontSee(__('buyer.checkout.pay_button'))
+        ->assertDontSee(__('buyer.checkout.summary_section'));
+});
+
+it('confirms a free order: snapshots the address, records a ¥0 confirmed payment, and redirects', function () {
+    [$owner, $profile, $request] = freeCheckoutEligibleRequest();
+    $address = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('confirmFree')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('buyer.requests.show', $request->id))
+        ->assertSessionHas('status', __('buyer.checkout.free_confirmed', ['code' => $request->request_code]));
+
+    $fresh = $request->fresh();
+    expect($fresh->status)->toBe(RequestStatus::Paid)
+        ->and($fresh->shipping_address_id)->toBe($address->id);
+
+    $payment = Payment::where('part_request_id', $request->id)->sole();
+    expect($payment->status)->toBe(PaymentStatus::Confirmed)
+        ->and($payment->amount)->toBe(0)
+        ->and($payment->gateway)->toBe('waived');
+});
+
+it('rejects confirming a free order with an address that belongs to a different buyer', function () {
+    [$owner, , $request] = freeCheckoutEligibleRequest();
+    $othersAddress = BuyerAddress::factory()->create();
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('selectedAddressId', $othersAddress->id)
+        ->call('confirmFree')
+        ->assertHasErrors(['selectedAddressId']);
+
+    expect(Payment::count())->toBe(0)
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
+it('never lets pay() charge a free request -- CheckoutAction\'s own guard reports a clean error instead', function () {
+    [$owner, $profile, $request] = freeCheckoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('pay')
+        ->assertHasErrors(['pay']);
+
+    expect(Payment::count())->toBe(0)
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
+it('never lets confirmFree() run on a paid (有償) request -- ConfirmFreeOrderAction\'s own guard reports a clean error instead', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('confirmFree')
+        ->assertHasErrors(['pay']);
+
+    expect(Payment::count())->toBe(0)
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
 it('adds a new address inline and auto-selects it', function () {
     [$owner, , $request] = checkoutEligibleRequest();
     $country = Country::factory()->create();

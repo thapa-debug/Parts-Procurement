@@ -179,6 +179,16 @@ it('rolls back the entire checkout -- no payment row, no status change -- when t
         ->and($fresh->shipping_address_id)->toBeNull();
 });
 
+it('refuses checkout against a free (無償) request -- that belongs to ConfirmFreeOrderAction instead', function () {
+    [$request, $address] = checkoutReadyRequest();
+    $request->update(['is_free' => true]);
+
+    $attempt = fn () => app(CheckoutAction::class)->execute($request->fresh(), $address);
+
+    expect($attempt)->toThrow(CheckoutNotAllowedException::class);
+    expect(Payment::count())->toBe(0);
+});
+
 // --- policy: isolation (CLAUDE.md 4, 9) -----------------------------------
 
 it('lets only the owning buyer check out their own request', function () {

@@ -165,6 +165,18 @@ class PartRequestPolicy
     }
 
     /**
+     * The buyer confirming a shipping address on their own 無償 (free)
+     * request (CLAUDE.md §14 Phase 4 slice 5) -- ConfirmFreeOrderAction's
+     * mirror of checkout(), same buyer-and-owner shape and no admin bypass.
+     * Whether the request is actually free/eligible is, again, a business
+     * rule the action enforces itself.
+     */
+    public function confirmFreeOrder(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isBuyer() && $user->buyerProfile?->id === $partRequest->buyer_id;
+    }
+
+    /**
      * Confirming the vendor purchase (CLAUDE.md §6.3/§14 Phase 4) is
      * operational admin work -- today just `isAdmin()`, the same
      * owner/staff permission slot as broadcast()/presentQuote()/viewBoard().

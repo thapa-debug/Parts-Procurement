@@ -45,4 +45,17 @@ class PresentQuoteNotAllowedException extends RuntimeException
     {
         return new self('A reason is required whenever the calculated shipping fee is overridden.');
     }
+
+    public static function cannotOverrideFreeShipping(): self
+    {
+        return new self('A free (無償) quote has no shipping fee to override -- it is always ¥0.');
+    }
+
+    public static function mixedFreeAndPaidNotAllowed(): self
+    {
+        return new self(
+            'This request already has a presented quote of the opposite free/paid kind -- '.
+            'a request cannot mix free (無償) and paid quotes.'
+        );
+    }
 }

@@ -10,22 +10,29 @@
         </span>
     </div>
 
-    {{-- shipping_method is only set once CheckoutAction has actually run --
-    hasBeenPaid() alone isn't enough (e.g. a future free/無償 request may
-    reach `paid` without ever going through checkout). --}}
+    {{-- shipping_method is set by SelectQuoteAction, the moment the buyer
+    picks a quote -- present as soon as one's been chosen, free or paid
+    alike, so this guard is really just hasBeenPaid() with a defensive
+    null-check against a request paid for before that column existed. --}}
     @if ($partRequest->hasBeenPaid() && $partRequest->shipping_method)
         <div class="mt-4 flex items-start gap-3 rounded-lg border border-indigo-200 bg-indigo-50 p-4">
             <svg class="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
             </svg>
             <div>
-                <p class="text-sm font-semibold text-indigo-800">{{ __('buyer.request_detail.paid_banner_heading') }}</p>
-                <p class="mt-0.5 text-sm text-indigo-700">{{ __('buyer.request_detail.paid_banner_body') }}</p>
+                <p class="text-sm font-semibold text-indigo-800">
+                    {{ $partRequest->is_free ? __('buyer.request_detail.paid_banner_heading_free') : __('buyer.request_detail.paid_banner_heading') }}
+                </p>
+                <p class="mt-0.5 text-sm text-indigo-700">
+                    {{ $partRequest->is_free ? __('buyer.request_detail.paid_banner_body_free') : __('buyer.request_detail.paid_banner_body') }}
+                </p>
             </div>
         </div>
 
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-base font-semibold text-ink">{{ __('buyer.request_detail.payment_summary_section') }}</h2>
+            <h2 class="text-base font-semibold text-ink">
+                {{ $partRequest->is_free ? __('buyer.request_detail.payment_summary_section_free') : __('buyer.request_detail.payment_summary_section') }}
+            </h2>
 
             <dl class="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                 <div>
@@ -44,7 +51,9 @@
                 </div>
 
                 <div>
-                    <dt class="text-ink-muted">{{ __('buyer.request_detail.payment_summary_total') }}</dt>
+                    <dt class="text-ink-muted">
+                        {{ $partRequest->is_free ? __('buyer.request_detail.payment_summary_total_free') : __('buyer.request_detail.payment_summary_total') }}
+                    </dt>
                     <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
                 </div>
 
@@ -131,7 +140,11 @@
 
         @if (count($options) > 0)
             <p class="mt-1 text-sm text-ink-muted">
-                {{ $partRequest->hasBeenPaid() ? __('buyer.request_detail.quote_locked_help') : __('buyer.request_detail.quote_options_help') }}
+                @if ($partRequest->hasBeenPaid())
+                    {{ $partRequest->is_free ? __('buyer.request_detail.quote_locked_help_free') : __('buyer.request_detail.quote_locked_help') }}
+                @else
+                    {{ __('buyer.request_detail.quote_options_help') }}
+                @endif
             </p>
 
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -150,7 +163,13 @@
                             </div>
                         </dl>
 
-                        <div class="mt-3">
+                        <div class="mt-3 flex flex-wrap items-center gap-2">
+                            @if ($option['is_free'])
+                                <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                    {{ __('buyer.request_detail.quote_free_badge') }}
+                                </span>
+                            @endif
+
                             @if ($option['is_selected'])
                                 <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                     {{ __('buyer.request_detail.quote_selected_badge') }}
@@ -180,7 +199,7 @@
                         href="{{ route('buyer.requests.checkout', $partRequest->id) }}"
                         class="inline-flex rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
                     >
-                        {{ __('buyer.request_detail.checkout_button') }}
+                        {{ $partRequest->is_free ? __('buyer.request_detail.checkout_button_free') : __('buyer.request_detail.checkout_button') }}
                     </a>
                 </div>
             @endif

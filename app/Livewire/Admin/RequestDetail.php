@@ -68,6 +68,17 @@ class RequestDetail extends Component
      */
     public array $shippingFeeOverrideReasons = [];
 
+    /**
+     * Applies to the whole "present selected" batch, not per-response --
+     * CLAUDE.md §14 Phase 4 slice 5 (無償): a request cannot mix free and
+     * paid presented quotes, so there is only one free/paid decision to
+     * make per click, not one per checked response. Checking this hides
+     * the per-response shipping-override fields above (mutually exclusive
+     * with $isFree in PresentQuoteAction -- nothing to override on a fee
+     * that's forced to ¥0).
+     */
+    public bool $presentAsFree = false;
+
     public function mount(PartRequest $partRequest): void
     {
         // 'viewBoard', not 'view' -- 'view' also permits a buyer to see
@@ -142,12 +153,12 @@ class RequestDetail extends Component
         $presentedCount = 0;
 
         foreach (VendorResponse::query()->find($this->selectedResponseIdsToPresent) as $vendorResponse) {
-            $override = $this->shippingFeeOverrides[$vendorResponse->id] ?? '';
-            $override = $override === '' ? null : (int) $override;
+            $override = $this->presentAsFree ? null : ($this->shippingFeeOverrides[$vendorResponse->id] ?? '');
+            $override = $override === '' || $override === null ? null : (int) $override;
             $reason = $override !== null ? ($this->shippingFeeOverrideReasons[$vendorResponse->id] ?? null) : null;
 
             try {
-                $action->execute($this->partRequest, $vendorResponse, $override, $reason);
+                $action->execute($this->partRequest, $vendorResponse, $override, $reason, $this->presentAsFree);
                 $presentedCount++;
             } catch (PresentQuoteNotAllowedException $e) {
                 report($e);
@@ -155,7 +166,7 @@ class RequestDetail extends Component
         }
 
         $this->partRequest = $this->partRequest->fresh();
-        $this->reset('selectedResponseIdsToPresent', 'shippingFeeOverrides', 'shippingFeeOverrideReasons');
+        $this->reset('selectedResponseIdsToPresent', 'shippingFeeOverrides', 'shippingFeeOverrideReasons', 'presentAsFree');
 
         if ($presentedCount === 0) {
             $message = __('admin.request_detail.present_quote_error');
@@ -182,7 +193,10 @@ class RequestDetail extends Component
         $rules = [];
 
         foreach ($this->selectedResponseIdsToPresent as $responseId) {
-            $hasOverride = filled($this->shippingFeeOverrides[$responseId] ?? null);
+            // A free batch ignores whatever these fields hold (see
+            // presentSelectedQuotes()) -- no point demanding a reason for
+            // an override that will never be applied.
+            $hasOverride = ! $this->presentAsFree && filled($this->shippingFeeOverrides[$responseId] ?? null);
 
             $rules["shippingFeeOverrides.{$responseId}"] = ['nullable', 'integer', 'min:0'];
             $rules["shippingFeeOverrideReasons.{$responseId}"] = [$hasOverride ? 'required' : 'nullable', 'string', 'max:1000'];
@@ -240,6 +254,18 @@ class RequestDetail extends Component
             'vendorResponsePricing' => $vendorResponsePricing,
             'vendorResponseShipping' => $vendorResponseShipping,
             'presentedResponseIds' => $this->partRequest->presentedQuotes()->pluck('vendor_response_id')->all(),
+            // The actual frozen figures for an already-presented response,
+            // keyed by vendor_response_id -- vendorResponsePricing/
+            // vendorResponseShipping above are always the live "what would
+            // this cost right now" preview (used before presenting, to help
+            // the admin decide), which can be badly wrong once a response
+            // is actually presented as free (CLAUDE.md §14 Phase 4 slice 5:
+            // the real buyer_price/shipping_fee are forced to 0, nothing
+            // like the preview). The Blade view prefers these over the
+            // preview whenever a response is presented.
+            'presentedQuotesByResponseId' => $this->partRequest->presentedQuotes()
+                ->get(['vendor_response_id', 'buyer_price', 'shipping_fee', 'is_free'])
+                ->keyBy('vendor_response_id'),
             // The confirmed payment, if any (CLAUDE.md §6.3 gate) -- admin
             // has had no visibility into this at all until now, even though
             // confirming a vendor purchase depends entirely on it existing.
