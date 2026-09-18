@@ -78,6 +78,28 @@ it('finds a request by the buyer\'s company name', function () {
         ->assertSee($request->request_code);
 });
 
+// --- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) ----------------------
+
+it('shows a Free (無償) badge for a free request, but not for a regular paid one', function () {
+    $admin = User::factory()->admin()->create();
+    $freeRequest = PartRequest::factory()->create(['is_free' => true, 'car_model' => 'Free Model']);
+    $paidRequest = PartRequest::factory()->create(['is_free' => false, 'car_model' => 'Paid Model']);
+
+    $html = Livewire::actingAs($admin)->test(RequestBoard::class)->html();
+
+    expect(substr_count($html, __('admin.request_board.free_badge')))->toBe(1);
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->set('search', 'Free Model')
+        ->assertSee(__('admin.request_board.free_badge'));
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->set('search', 'Paid Model')
+        ->assertDontSee(__('admin.request_board.free_badge'));
+});
+
 // --- status tabs -----------------------------------------------------------
 
 it('filters requests into the correct tab by status, with accurate counts', function () {

@@ -1,4 +1,4 @@
-@props(['title', 'backRoute', 'backLabel', 'accountFields', 'fields', 'justSaved'])
+@props(['title', 'backRoute', 'backLabel', 'accountFields', 'fields'])
 
 <div class="max-w-2xl">
     <a href="{{ $backRoute }}" class="text-sm text-ink-muted hover:text-ink">&larr; {{ $backLabel }}</a>
@@ -69,10 +69,6 @@
             >
                 {{ __('admin.profile_edit.save_button') }}
             </button>
-
-            @if ($justSaved)
-                <span class="text-sm font-medium text-green-700">{{ __('admin.profile_edit.saved') }}</span>
-            @endif
         </div>
     </form>
 </div>

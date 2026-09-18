@@ -47,7 +47,9 @@ class RequestForm extends Component
      * here would sit in the session unseen: Livewire only re-renders this
      * component's own HTML, never the surrounding layout that reads
      * session('status'), so that banner never gets a request to show it
-     * on. Same reasoning as Settings::$justSaved.
+     * on. A toast fires too (see submit()), but that's transient -- this
+     * is the durable record of it, since there's nothing else on this page
+     * to look back at afterward.
      */
     public ?string $submittedCode = null;
 

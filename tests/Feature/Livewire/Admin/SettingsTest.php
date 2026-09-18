@@ -109,7 +109,7 @@ it('loads existing stored values instead of the defaults', function () {
 
 // --- saving --------------------------------------------------------------
 
-it('saves all three settings and shows the saved indicator', function () {
+it('saves all three settings and dispatches a success toast', function () {
     $admin = User::factory()->admin()->create();
 
     Livewire::actingAs($admin)
@@ -118,7 +118,7 @@ it('saves all three settings and shows the saved indicator', function () {
         ->set('margin_min_fee', 2500)
         ->set('admin_sender_email', 'orders@example.com')
         ->call('save')
-        ->assertSet('justSaved', true);
+        ->assertDispatched('toast', message: __('admin.settings.saved'), type: 'success');
 
     expect(Setting::get('margin_rate'))->toBe(30)
         ->and(Setting::get('margin_min_fee'))->toBe(2500)
@@ -136,18 +136,6 @@ it('never writes a shipping_fee_vehicle, shipping_fee_container, or shipping_fee
     expect(Setting::get('shipping_fee_vehicle'))->toBeNull()
         ->and(Setting::get('shipping_fee_container'))->toBeNull()
         ->and(Setting::get('shipping_fee_dhl'))->toBeNull();
-});
-
-it('clears the saved indicator as soon as a field changes again', function () {
-    $admin = User::factory()->admin()->create();
-
-    Livewire::actingAs($admin)
-        ->test(Settings::class)
-        ->set('admin_sender_email', 'orders@example.com')
-        ->call('save')
-        ->assertSet('justSaved', true)
-        ->set('margin_rate', 21)
-        ->assertSet('justSaved', false);
 });
 
 // --- validation ------------------------------------------------------------

@@ -94,10 +94,6 @@
                     >
                         {{ __('admin.settings.save_button') }}
                     </button>
-
-                    @if ($justSaved)
-                        <span class="text-sm font-medium text-green-700">{{ __('admin.settings.saved') }}</span>
-                    @endif
                 </div>
             </form>
         @endif

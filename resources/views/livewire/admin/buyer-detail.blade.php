@@ -4,5 +4,4 @@
     :back-label="__('admin.buyer_master.back_link')"
     :account-fields="$accountFields"
     :fields="$fields"
-    :just-saved="$justSaved"
 />
