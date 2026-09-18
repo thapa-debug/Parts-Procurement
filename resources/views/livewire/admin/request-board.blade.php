@@ -4,20 +4,25 @@
         <p class="mt-1 text-sm text-ink-muted">{{ __('admin.request_board.subheading') }}</p>
     </div>
 
-    <div class="mt-6 flex flex-wrap gap-2 border-b border-line pb-3 text-sm font-medium">
+    {{-- No flex-wrap -- a wrapped second row (e.g. "Completed" falling
+    alone onto its own line) reads as broken, not responsive. Compact
+    padding/gaps keep every tab on one line at ordinary widths; overflow-x
+    is the deliberate fallback for whatever's left too narrow to fit
+    (mobile), so the row scrolls horizontally instead of wrapping. --}}
+    <div class="mt-6 flex gap-1.5 overflow-x-auto border-b border-line pb-3 text-sm font-medium">
         @foreach (['all', 'new', 'inquiring', 'quoted', 'order_confirmed', 'shipped', 'completed'] as $key)
             <button
                 type="button"
                 wire:click="$set('tab', '{{ $key }}')"
                 @class([
-                    'flex items-center gap-2 rounded-lg border px-3 py-1.5 transition duration-150',
+                    'flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-lg border px-2.5 py-1.5 transition duration-150',
                     $tabBadgeClasses[$key],
                     'border-current font-semibold' => $tab === $key,
                     'border-transparent hover:border-line' => $tab !== $key,
                 ])
             >
                 {{ __('admin.request_board.tabs.'.$key) }}
-                <span class="rounded-full bg-surface-muted px-2 py-0.5 text-xs text-ink-muted">{{ $tabCounts[$key] ?? 0 }}</span>
+                <span class="rounded-full bg-surface-muted px-1.5 py-0.5 text-xs text-ink-muted">{{ $tabCounts[$key] ?? 0 }}</span>
             </button>
         @endforeach
     </div>

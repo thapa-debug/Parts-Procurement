@@ -270,7 +270,7 @@ return [
             'new' => 'New request',
             'inquiring' => 'Inquiring suppliers',
             'quoted' => 'Quote provided',
-            'order_confirmed' => 'Order confirmed / inspection',
+            'order_confirmed' => 'Order confirmed',
             'shipped' => 'Shipped',
             'completed' => 'Completed',
             'all' => 'All',
