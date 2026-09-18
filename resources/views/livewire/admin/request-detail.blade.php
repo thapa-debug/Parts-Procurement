@@ -235,14 +235,30 @@
                         $isPresented = in_array($response->id, $presentedResponseIds, true);
                         $isBuyerSelected = $partRequest->selected_response_id === $response->id;
                         $presentedQuote = $presentedQuotesByResponseId->get($response->id);
+                        // The buyer's own pick has a confirmed payment once
+                        // the pay-before-purchase gate (CLAUDE.md §6.3) is
+                        // actually open -- $confirmedPayment itself is
+                        // request-wide (there's only ever one), so it only
+                        // means anything for whichever response the buyer
+                        // selected; another presented-but-unchosen response
+                        // never reads as paid just because the request is.
+                        $isPaidAndSelected = $isBuyerSelected && $confirmedPayment !== null;
                     @endphp
                     @php
-                        // Two independent signals, deliberately styled
-                        // differently so a row can show either, both, or
-                        // neither: "on offer" (presented) and "the buyer's
-                        // pick" (selected) are separate concepts now -- see
-                        // CLAUDE.md's client-revision note on this slice.
+                        // Distinct visual states, most money-significant
+                        // first: an open payment gate (real or 無償, CLAUDE.md
+                        // §14 Phase 4 slice 5) is the strongest signal on this
+                        // page -- it's what lets the admin confirm to the
+                        // vendor -- so it always wins over the plain
+                        // "selected" or "presented" treatment beneath it.
                         $rowClass = match (true) {
+                            // Cyan, not emerald -- emerald is already the
+                            // plain "Free (無償)" tag's own color (below), and
+                            // sitting too close to the new green Paid
+                            // treatment would blur the exact distinction
+                            // this slice exists to make.
+                            $isPaidAndSelected && $partRequest->is_free => 'border-cyan-300 bg-cyan-50',
+                            $isPaidAndSelected => 'border-green-300 bg-green-50',
                             $isBuyerSelected => 'border-brand-500 bg-brand-50',
                             $isPresented => 'border-blue-200 bg-blue-50/60',
                             default => 'border-line',
@@ -267,7 +283,11 @@
                                         {{ __('admin.request_detail.presented_badge') }}
                                     </span>
 
-                                    @if ($presentedQuote?->is_free)
+                                    {{-- "Free (無償)" marks what the quote WOULD cost the
+                                    buyer if chosen -- once it's actually confirmed, the
+                                    dedicated free-confirmed badge below takes over so
+                                    the two are never shown at once. --}}
+                                    @if ($presentedQuote?->is_free && ! $isPaidAndSelected)
                                         <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
                                             {{ __('admin.request_detail.free_badge') }}
                                         </span>
@@ -277,6 +297,18 @@
                                         <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                             {{ __('admin.request_detail.buyer_selected_badge') }}
                                         </span>
+                                    @endif
+
+                                    @if ($isPaidAndSelected)
+                                        @if ($partRequest->is_free)
+                                            <span class="inline-flex rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-800">
+                                                {{ __('admin.request_detail.free_confirmed_badge') }}
+                                            </span>
+                                        @else
+                                            <span class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                                {{ __('admin.request_detail.paid_badge') }}
+                                            </span>
+                                        @endif
                                     @endif
                                 @endif
                             </div>

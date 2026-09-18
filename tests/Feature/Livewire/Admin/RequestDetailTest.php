@@ -368,6 +368,97 @@ it('distinguishes the buyer-selected quote from merely-presented ones', function
         ->assertDontSee(__('admin.request_detail.present_checkbox_label'));
 });
 
+it('shows a Paid badge and a distinct background on the buyer-selected quote once payment is confirmed', function () {
+    $admin = User::factory()->admin()->create();
+    $vendor = VendorProfile::factory()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response);
+
+    $request->update([
+        'status' => RequestStatus::Paid,
+        'selected_response_id' => $response->id,
+        'buyer_price' => $presentedQuote->buyer_price,
+        'shipping_fee' => $presentedQuote->shipping_fee,
+    ]);
+    Payment::factory()->confirmed()->create(['part_request_id' => $request->id]);
+
+    $component = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('admin.request_detail.paid_badge'))
+        ->assertDontSee(__('admin.request_detail.free_confirmed_badge'))
+        // The plain "will be free if chosen" tag never applies to a real,
+        // non-free quote -- this is a paid-order regression check, not a
+        // free-flow one.
+        ->assertDontSee(__('admin.request_detail.free_badge'));
+
+    expect($component->html())->toContain('border-green-300');
+});
+
+it('shows a Free -- confirmed badge instead of Paid for a confirmed 無償 order', function () {
+    $admin = User::factory()->admin()->create();
+    $vendor = VendorProfile::factory()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000]);
+
+    app(PresentQuoteAction::class)->execute($request, $response, isFree: true);
+
+    $request->update([
+        'status' => RequestStatus::Paid,
+        'selected_response_id' => $response->id,
+        'buyer_price' => 0,
+        'shipping_fee' => 0,
+        'is_free' => true,
+    ]);
+    Payment::factory()->confirmed()->create(['part_request_id' => $request->id, 'amount' => 0, 'gateway' => 'waived']);
+
+    $html = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('admin.request_detail.free_confirmed_badge'))
+        // Superseded by the confirmed badge above -- never shown alongside it.
+        ->assertDontSee(__('admin.request_detail.free_badge'))
+        ->html();
+
+    // Not assertDontSee('Paid') -- the request's own status pill at the top
+    // of the page legitimately reads "Paid" regardless of this per-quote
+    // badge. bg-green-100 is that badge's own distinctive class, never
+    // used by the status pill or anything else on this page.
+    expect($html)->not->toContain('bg-green-100')
+        ->and($html)->toContain('border-cyan-300');
+});
+
+it('never shows the Paid badge on a presented-but-not-selected quote, even once the request is paid', function () {
+    $admin = User::factory()->admin()->create();
+    $vendorA = VendorProfile::factory()->create();
+    $vendorB = VendorProfile::factory()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $selectedResponse = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorA->id, 'cost_price' => 45_000]);
+    $otherResponse = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendorB->id, 'cost_price' => 30_000]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $selectedResponse);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $otherResponse);
+
+    $request->update([
+        'status' => RequestStatus::Paid,
+        'selected_response_id' => $selectedResponse->id,
+        'buyer_price' => $presentedQuote->buyer_price,
+        'shipping_fee' => $presentedQuote->shipping_fee,
+    ]);
+    Payment::factory()->confirmed()->create(['part_request_id' => $request->id]);
+
+    $html = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->html();
+
+    // Exactly one Paid badge -- for the selected response, not the other
+    // merely-presented one that also happens to be on this paid request.
+    // Counting bg-green-100 (the badge's own distinctive class) rather
+    // than the word "Paid", which the page's own status pill also uses
+    // legitimately, once, regardless of this per-quote badge.
+    expect(substr_count($html, 'bg-green-100'))->toBe(1);
+});
+
 it('locks out presenting entirely and shows the locked help text once the request has been paid for', function () {
     $admin = User::factory()->admin()->create();
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);

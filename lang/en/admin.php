@@ -355,6 +355,8 @@ return [
         'present_checkbox_label' => 'Select to present',
         'presented_badge' => 'Presented',
         'buyer_selected_badge' => 'Buyer selected',
+        'paid_badge' => 'Paid',
+        'free_confirmed_badge' => 'Free -- confirmed',
         'cost_price_column' => 'Cost price',
         'buyer_price_column' => 'Buyer price',
         'quality_rank_column' => 'Quality',
