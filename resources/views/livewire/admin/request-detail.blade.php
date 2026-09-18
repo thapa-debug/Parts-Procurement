@@ -255,61 +255,13 @@
                                 <span class="ml-2 text-xs text-ink-muted">{{ $response->vendor->contact_person }}</span>
                             </div>
 
-                            @if ($response->is_no_stock)
-                                <span class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                                    {{ __('admin.request_detail.no_stock_badge') }}
-                                </span>
-                            @endif
-                        </div>
+                            <div class="flex flex-wrap items-center gap-2">
+                                @if ($response->is_no_stock)
+                                    <span class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
+                                        {{ __('admin.request_detail.no_stock_badge') }}
+                                    </span>
+                                @endif
 
-                        @if (! $response->is_no_stock)
-                            <dl class="mt-3 grid grid-cols-2 gap-3 text-sm sm:grid-cols-4">
-                                <div>
-                                    <dt class="text-ink-muted">{{ __('admin.request_detail.cost_price_column') }}</dt>
-                                    <dd class="mt-0.5 font-mono font-medium text-ink">¥{{ number_format($response->cost_price) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_price_column') }}</dt>
-                                    <dd class="mt-0.5 font-mono font-medium text-ink">
-                                        @if ($presentedQuote)
-                                            ¥{{ number_format($presentedQuote->buyer_price) }}
-                                        @elseif ($pricing)
-                                            ¥{{ number_format($pricing['buyer_price']) }}
-                                        @else
-                                            {{ __('admin.request_detail.not_provided') }}
-                                        @endif
-                                    </dd>
-                                </div>
-                                <div>
-                                    <dt class="text-ink-muted">{{ __('admin.request_detail.quality_rank_column') }}</dt>
-                                    <dd class="mt-0.5 font-medium text-ink">{{ __('enums.quality_rank.'.$response->quality_rank->value) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-ink-muted">{{ __('admin.request_detail.lead_time_column') }}</dt>
-                                    <dd class="mt-0.5 font-medium text-ink">{{ __('enums.lead_time.'.$response->lead_time->value) }}</dd>
-                                </div>
-                                <div>
-                                    <dt class="text-ink-muted">{{ __('admin.request_detail.shipping_fee_column') }}</dt>
-                                    <dd class="mt-0.5 font-mono font-medium text-ink">
-                                        @if ($presentedQuote)
-                                            ¥{{ number_format($presentedQuote->shipping_fee) }}
-                                        @else
-                                            @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
-                                            {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
-                                        @endif
-                                    </dd>
-                                </div>
-                            </dl>
-
-                            @if ($response->comment)
-                                <p class="mt-3 text-sm text-ink">{{ $response->comment }}</p>
-                            @endif
-
-                            <div class="mt-3 max-w-sm">
-                                <x-photo-gallery :photos="$response->photos->map(fn ($photo) => $photo->url())->all()" />
-                            </div>
-
-                            <div class="mt-3 flex flex-wrap items-center gap-3">
                                 @if ($isPresented)
                                     <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
                                         {{ __('admin.request_detail.presented_badge') }}
@@ -326,7 +278,63 @@
                                             {{ __('admin.request_detail.buyer_selected_badge') }}
                                         </span>
                                     @endif
-                                @else
+                                @endif
+                            </div>
+                        </div>
+
+                        @if (! $response->is_no_stock)
+                            <div class="mt-3 overflow-x-auto rounded-md border border-line">
+                                <table class="min-w-full divide-y divide-line text-sm">
+                                    <thead class="bg-surface-muted">
+                                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
+                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.cost_price_column') }}</th>
+                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.buyer_price_column') }}</th>
+                                            <th class="px-3 py-2">{{ __('admin.request_detail.quality_rank_column') }}</th>
+                                            <th class="px-3 py-2">{{ __('admin.request_detail.lead_time_column') }}</th>
+                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.weight_column') }}</th>
+                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.shipping_fee_column') }}</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="divide-y divide-line bg-surface">
+                                        <tr>
+                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">¥{{ number_format($response->cost_price) }}</td>
+                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
+                                                @if ($presentedQuote)
+                                                    ¥{{ number_format($presentedQuote->buyer_price) }}
+                                                @elseif ($pricing)
+                                                    ¥{{ number_format($pricing['buyer_price']) }}
+                                                @else
+                                                    {{ __('admin.request_detail.not_provided') }}
+                                                @endif
+                                            </td>
+                                            <td class="px-3 py-2 text-ink">{{ __('enums.quality_rank.'.$response->quality_rank->value) }}</td>
+                                            <td class="px-3 py-2 text-ink">{{ __('enums.lead_time.'.$response->lead_time->value) }}</td>
+                                            <td class="whitespace-nowrap px-3 py-2 font-mono text-ink">
+                                                {{ $response->weight_kg !== null ? $response->weight_kg.' kg' : __('admin.request_detail.not_provided') }}
+                                            </td>
+                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
+                                                @if ($presentedQuote)
+                                                    ¥{{ number_format($presentedQuote->shipping_fee) }}
+                                                @else
+                                                    @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
+                                                    {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            @if ($response->comment)
+                                <p class="mt-3 text-sm text-ink">{{ $response->comment }}</p>
+                            @endif
+
+                            <div class="mt-3 max-w-sm">
+                                <x-photo-gallery :photos="$response->photos->map(fn ($photo) => $photo->url())->all()" />
+                            </div>
+
+                            <div class="mt-3 flex flex-wrap items-center gap-3">
+                                @unless ($isPresented)
                                     <label class="flex items-center gap-2 text-sm font-medium text-ink {{ $partRequest->hasBeenPaid() ? 'opacity-50' : '' }}">
                                         <input
                                             type="checkbox"
@@ -373,7 +381,7 @@
                                             <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
                                         @enderror
                                     @endunless
-                                @endif
+                                @endunless
                             </div>
                         @endif
                     </div>
