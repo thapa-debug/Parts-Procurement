@@ -66,9 +66,21 @@
                         <td class="px-4 py-3 text-ink-muted">{{ $request->car_model }} / {{ $request->part_name }}</td>
                         <td class="px-4 py-3 text-ink-muted">{{ $request->created_at->format('Y-m-d') }}</td>
                         <td class="px-4 py-3">
-                            <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $request->status->badgeClasses() }}">
-                                {{ __('admin.request_board.status.'.$request->status->value) }}
-                            </span>
+                            <div class="flex flex-wrap items-center gap-1.5">
+                                <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $request->status->badgeClasses() }}">
+                                    {{ __('admin.request_board.status.'.$request->status->value) }}
+                                </span>
+
+                                {{-- is_free (CLAUDE.md §14 Phase 4 slice 5) is set once the
+                                buyer selects a free presented quote -- shown here so the
+                                admin can spot a free order while scanning the list, not
+                                only once they've opened it. --}}
+                                @if ($request->is_free)
+                                    <span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                        {{ __('admin.request_board.free_badge') }}
+                                    </span>
+                                @endif
+                            </div>
                         </td>
                         <td class="px-4 py-3 text-right">
                             <a href="{{ route('admin.requests.show', $request) }}" class="text-sm text-ink-muted underline hover:text-ink">

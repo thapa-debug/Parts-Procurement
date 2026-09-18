@@ -303,6 +303,7 @@ return [
             'received' => 'Received',
         ],
 
+        'free_badge' => 'Free (無償)',
         'view_link' => 'View',
     ],
 
