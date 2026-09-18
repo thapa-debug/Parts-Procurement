@@ -19,8 +19,6 @@ class VendorDetail extends Component
 
     public string $notify_email = '';
 
-    public bool $justSaved = false;
-
     public function mount(VendorProfile $vendorProfile): void
     {
         // Gated on 'update', not 'view' -- this page's whole purpose is
@@ -49,11 +47,6 @@ class VendorDetail extends Component
         ];
     }
 
-    public function updated(string $property): void
-    {
-        $this->justSaved = false;
-    }
-
     public function save(): void
     {
         $this->authorize('update', $this->vendorProfile);
@@ -62,7 +55,7 @@ class VendorDetail extends Component
 
         $this->vendorProfile->update($validated);
 
-        $this->justSaved = true;
+        $this->dispatch('toast', message: __('admin.profile_edit.saved'), type: 'success');
     }
 
     public function render(): View

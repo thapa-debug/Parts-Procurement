@@ -84,7 +84,7 @@ it('saves changes to the buyer profile, including switching to a different count
         ->set('phone', '080-1234-5678')
         ->set('country_id', (string) $newCountry->id)
         ->call('save')
-        ->assertSet('justSaved', true);
+        ->assertDispatched('toast', message: __('admin.profile_edit.saved'), type: 'success');
 
     $profile->refresh();
 
@@ -104,21 +104,9 @@ it('keeps a since-deactivated country accepted when the rest of the form is resu
         ->set('phone', '080-9999-0000')
         ->call('save')
         ->assertHasNoErrors()
-        ->assertSet('justSaved', true);
+        ->assertDispatched('toast', message: __('admin.profile_edit.saved'), type: 'success');
 
     expect($profile->fresh()->country_id)->toBe($country->id);
-});
-
-it('clears the saved indicator as soon as a field changes again', function () {
-    $admin = User::factory()->admin()->create();
-    $profile = BuyerProfile::factory()->create();
-
-    Livewire::actingAs($admin)
-        ->test(BuyerDetail::class, ['buyerProfile' => $profile])
-        ->call('save')
-        ->assertSet('justSaved', true)
-        ->set('company_name', 'Something Else')
-        ->assertSet('justSaved', false);
 });
 
 // --- validation ------------------------------------------------------------

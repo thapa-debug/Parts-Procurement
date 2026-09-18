@@ -29,11 +29,12 @@ class RequestDetail extends Component
     public array $selectedVendorIds = [];
 
     /**
-     * Shown once, right after a successful send -- not cleared afterward
-     * (unlike Settings::$justSaved), since there's nothing else editable
-     * on this page once the request moves out of `new`; the vendor
-     * broadcast form itself disappears in its place (see render()/the
-     * view), which is confirmation enough for the rest of the page's life.
+     * Shown once, right after a successful send -- not cleared afterward,
+     * since there's nothing else editable on this page once the request
+     * moves out of `new`; the vendor broadcast form itself disappears in
+     * its place (see render()/the view), which is confirmation enough for
+     * the rest of the page's life. A toast fires too (see sendInquiry()),
+     * but that's transient -- this is the durable record of it.
      */
     public ?int $sentToCount = null;
 

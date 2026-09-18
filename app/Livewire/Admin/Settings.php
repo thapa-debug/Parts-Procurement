@@ -19,8 +19,6 @@ class Settings extends Component
 
     public string $admin_sender_email;
 
-    public bool $justSaved = false;
-
     /**
      * Which section the left nav currently has selected -- purely a view
      * concern (CLAUDE.md §8: no business logic in the component beyond
@@ -129,17 +127,6 @@ class Settings extends Component
         ];
     }
 
-    /**
-     * Clears the "Saved" indicator as soon as the admin changes any field --
-     * it should only ever describe the values currently on screen. Only
-     * fires for wire:model-driven updates, so this never fights with the
-     * `save()` method's own `justSaved = true` assignment.
-     */
-    public function updated(string $property): void
-    {
-        $this->justSaved = false;
-    }
-
     public function save(): void
     {
         $this->authorize('update', Setting::class);
@@ -150,7 +137,7 @@ class Settings extends Component
         Setting::set('margin_min_fee', $validated['margin_min_fee'], 'integer');
         Setting::set('admin_sender_email', $validated['admin_sender_email'], 'string');
 
-        $this->justSaved = true;
+        $this->dispatch('toast', message: __('admin.settings.saved'), type: 'success');
     }
 
     public function addCountry(): void

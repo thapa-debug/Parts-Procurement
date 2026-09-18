@@ -86,7 +86,7 @@ it('saves changes to the vendor profile', function () {
         ->set('phone', '080-1234-5678')
         ->set('notify_email', 'updated-notify@example.com')
         ->call('save')
-        ->assertSet('justSaved', true);
+        ->assertDispatched('toast', message: __('admin.profile_edit.saved'), type: 'success');
 
     $profile->refresh();
 
@@ -94,18 +94,6 @@ it('saves changes to the vendor profile', function () {
         ->and($profile->contact_person)->toBe('New Contact')
         ->and($profile->phone)->toBe('080-1234-5678')
         ->and($profile->notify_email)->toBe('updated-notify@example.com');
-});
-
-it('clears the saved indicator as soon as a field changes again', function () {
-    $admin = User::factory()->admin()->create();
-    $profile = VendorProfile::factory()->create();
-
-    Livewire::actingAs($admin)
-        ->test(VendorDetail::class, ['vendorProfile' => $profile])
-        ->call('save')
-        ->assertSet('justSaved', true)
-        ->set('company_name', 'Something Else')
-        ->assertSet('justSaved', false);
 });
 
 // --- validation ------------------------------------------------------------

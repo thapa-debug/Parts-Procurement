@@ -19,8 +19,6 @@ class BuyerDetail extends Component
 
     public string $country_id = '';
 
-    public bool $justSaved = false;
-
     public function mount(BuyerProfile $buyerProfile): void
     {
         // Gated on 'update', not 'view' -- see VendorDetail for why.
@@ -49,11 +47,6 @@ class BuyerDetail extends Component
         ];
     }
 
-    public function updated(string $property): void
-    {
-        $this->justSaved = false;
-    }
-
     public function save(): void
     {
         $this->authorize('update', $this->buyerProfile);
@@ -63,7 +56,7 @@ class BuyerDetail extends Component
 
         $this->buyerProfile->update($validated);
 
-        $this->justSaved = true;
+        $this->dispatch('toast', message: __('admin.profile_edit.saved'), type: 'success');
     }
 
     public function render(): View
