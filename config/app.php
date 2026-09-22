@@ -60,12 +60,17 @@ return [
     |--------------------------------------------------------------------------
     |
     | Here you may specify the default timezone for your application, which
-    | will be used by the PHP date and date-time functions. The timezone
-    | is set to "UTC" by default as it is suitable for most use cases.
+    | will be used by the PHP date and date-time functions. This app is
+    | Japan-only (buyers, vendors, and the admin are all operating on JST),
+    | so every timestamp -- now()/Carbon, Eloquent created_at/updated_at,
+    | log lines (including the dedicated payments/audit channels, CLAUDE.md
+    | §11), spatie/activitylog entries -- should read in JST, not UTC.
+    | Deliberately hardcoded rather than env()-driven: this must never
+    | silently vary per environment/developer machine.
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => 'Asia/Tokyo',
 
     /*
     |--------------------------------------------------------------------------
