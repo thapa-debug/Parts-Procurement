@@ -35,4 +35,21 @@ return [
         ],
     ],
 
+    /*
+    |--------------------------------------------------------------------------
+    | Stripe (CLAUDE.md §14 Phase 4 slice 1) -- raw PaymentIntents SDK, not
+    | Cashier. 'key' is the publishable key (safe client-side, for a future
+    | Stripe.js/Elements UI); 'secret' is the server-side API key; both are
+    | test-mode keys until the client goes live. 'webhook_secret' verifies an
+    | incoming webhook genuinely came from Stripe (StripeWebhookController) --
+    | never used for outgoing API calls.
+    |--------------------------------------------------------------------------
+    */
+
+    'stripe' => [
+        'key' => env('STRIPE_KEY'),
+        'secret' => env('STRIPE_SECRET'),
+        'webhook_secret' => env('STRIPE_WEBHOOK_SECRET'),
+    ],
+
 ];

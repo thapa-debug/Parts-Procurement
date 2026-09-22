@@ -3,6 +3,7 @@
 use App\Http\Controllers\Auth\AuthenticatedSessionController;
 use App\Http\Controllers\Auth\EmailVerificationNotificationController;
 use App\Http\Controllers\Auth\VerifyEmailController;
+use App\Http\Controllers\StripeWebhookController;
 use App\Livewire\Admin\BuyerDetail;
 use App\Livewire\Admin\BuyerMaster;
 use App\Livewire\Admin\RequestBoard;
@@ -82,3 +83,9 @@ Route::prefix('vendor')->name('vendor.')->middleware(['auth', 'vendor'])->group(
     Route::get('/inbox', Inbox::class)->name('inbox');
     Route::get('/inbox/{partRequest}', RequestResponse::class)->name('inbox.show');
 });
+
+// Deliberately outside every auth/role middleware group above -- Stripe's
+// server calls this directly, with no session and no CSRF token (see the
+// exemption in bootstrap/app.php). The webhook's own signature check
+// (StripeWebhookController) is what stands in for authentication here.
+Route::post('/webhooks/stripe', StripeWebhookController::class)->name('webhooks.stripe');

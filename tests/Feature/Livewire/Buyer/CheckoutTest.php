@@ -16,8 +16,27 @@ use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Stripe\ApiRequestor;
+use Stripe\HttpClient\ClientInterface;
 
 uses(RefreshDatabase::class);
+
+/**
+ * Same HTTP-transport-swap technique as StripePaymentGatewayTest -- the
+ * real stripe-php SDK code runs (both the PaymentIntent create() inside
+ * StripePaymentGateway::charge() and the retrieve() Checkout::pay() does
+ * afterward to hand the client secret to the browser), only the network
+ * call is faked.
+ */
+class FakeStripeHttpClientForCheckoutTest implements ClientInterface
+{
+    public function __construct(private readonly array $responseBody) {}
+
+    public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+    {
+        return [json_encode($this->responseBody), 200, []];
+    }
+}
 
 /**
  * @return array{0: User, 1: BuyerProfile, 2: PartRequest}
@@ -145,6 +164,255 @@ it('rejects paying with an address that belongs to a different buyer', function 
 
     expect(Payment::count())->toBe(0)
         ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
+// --- stripe gateway (CLAUDE.md §14 stripe integration) ---------------------
+
+afterEach(function () {
+    ApiRequestor::setHttpClient(null);
+});
+
+it('shows the Stripe Elements card form when the stripe gateway is active, not the plain pay button alone', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.card_section'))
+        ->assertSee('js.stripe.com');
+});
+
+it('blocks the Stripe card step and shows an upfront message when the buyer has no addresses at all', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, , $request] = checkoutEligibleRequest();
+    // Deliberately no BuyerAddress rows for this buyer.
+
+    $component = Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('selectedAddressId', null)
+        ->assertSee(__('buyer.checkout.address_required_for_payment'))
+        ->assertDontSee(__('buyer.checkout.card_section_help'));
+
+    // The Payment Element's mount point itself must not be in the DOM --
+    // it must never be possible to reach card entry without an address.
+    expect($component->html())->not->toContain('x-ref="paymentElement"');
+});
+
+it('reaches the card step (a "Proceed to payment" prompt, not the card form itself) immediately for a buyer who already has a default address', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    $component = Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.proceed_to_payment_button'))
+        ->assertSee(__('buyer.checkout.proceed_to_payment_help'))
+        ->assertDontSee(__('buyer.checkout.address_required_for_payment'));
+
+    // The Payment Element's own real PaymentIntent doesn't exist yet --
+    // no charge attempt happens just from loading this page. The card
+    // form's markup (card_section_help/the mount <div>) IS present in
+    // the server-rendered HTML at this point (Alpine's x-show, not a
+    // Blade @if, controls its visibility -- see checkout.blade.php's own
+    // comment on why $refs.paymentElement must always resolve), but it
+    // stays hidden client-side until proceedToPayment() actually mounts
+    // it, which Pest can't exercise without a real browser.
+    expect($component->html())->toContain('x-ref="paymentElement"')
+        ->toContain('x-show="cardMounted"');
+});
+
+it('reports a Stripe pay() validation failure through the return value, never the error bag, once the card form is mounted', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    $ownAddress = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+    $othersAddress = BuyerAddress::factory()->create(); // a different buyer entirely
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        // The card form is mounted for this state (an address is already
+        // selected) -- an error bag entry here would trigger a normal
+        // re-render and wipe it out from under the buyer, the exact bug
+        // this fix closes.
+        ->assertSet('selectedAddressId', $ownAddress->id)
+        ->set('selectedAddressId', $othersAddress->id)
+        ->call('pay')
+        ->assertHasNoErrors()
+        ->assertReturned(fn ($data) => is_array($data) && isset($data['error']));
+
+    expect(Payment::count())->toBe(0)
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
+it('defers address-radio updates (no live round trip) once the Stripe card form is already mounted, protecting it from a wiping re-render', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    $first = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id]);
+
+    $component = Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('selectedAddressId', $first->id) // card form is already mounted for this state
+        ->assertSee(__('buyer.checkout.card_section_help'));
+
+    $html = $component->html();
+    expect($html)->toContain('wire:model="selectedAddressId"')
+        ->and($html)->not->toContain('wire:model.live="selectedAddressId"')
+        // A shared name= is what makes the browser itself enforce "only one
+        // checked at a time" now that there's no live round trip doing it
+        // via a fresh render on every click (see the Blade comment).
+        ->and(substr_count($html, 'name="selectedAddressId"'))->toBe(2)
+        // Switching addresses after the real PaymentIntent already exists
+        // (cardMounted) would silently do nothing -- the shipping address
+        // is snapshotted the moment proceedToPayment() succeeds -- so the
+        // radios disable themselves at that point instead of pretending
+        // the switch still works.
+        ->and(substr_count($html, ':disabled="cardMounted"'))->toBe(2);
+});
+
+it('uses a live round trip for the address radios before any address is selected, so picking one actually reveals the card form', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    // No default address -- selectedAddressId starts null, nothing is
+    // mounted yet, so a normal re-render on selection is still safe (and
+    // is exactly what's needed to reveal the card form for the first time).
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => false]);
+
+    $component = Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('selectedAddressId', null)
+        ->assertSee(__('buyer.checkout.address_required_for_payment'));
+
+    expect($component->html())->toContain('wire:model.live="selectedAddressId"');
+});
+
+it('lets a buyer switch to a different saved address after the card form is showing, and ships to the newly selected one', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    $default = BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+    $alternate = BuyerAddress::factory()->create(['buyer_id' => $profile->id]);
+
+    ApiRequestor::setHttpClient(new FakeStripeHttpClientForCheckoutTest([
+        'id' => 'pi_switch_test',
+        'object' => 'payment_intent',
+        'status' => 'requires_payment_method',
+        'client_secret' => 'pi_switch_test_secret',
+    ]));
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('selectedAddressId', $default->id) // card form mounted on the default
+        // Simulates the deferred wire:model eventually syncing the
+        // buyer's later click -- in the browser this never round-trips on
+        // its own (see the two tests above), it travels along with the
+        // next actual request instead, exactly like the real
+        // $wire.pay() call below.
+        ->set('selectedAddressId', $alternate->id)
+        ->call('pay')
+        ->assertHasNoErrors()
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_switch_test_secret');
+
+    expect($request->fresh()->shipping_address_id)->toBe($alternate->id);
+});
+
+it('does a full page redirect after adding the buyer\'s first address, when that turns the Stripe card form on', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, , $request] = checkoutEligibleRequest();
+    // Deliberately no BuyerAddress rows -- this add is the buyer's first,
+    // so it flips cardStepReady from false to true on this response.
+    $country = Country::factory()->create();
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('selectedAddressId', null)
+        ->call('toggleNewAddressForm')
+        ->set('recipient_name', 'Inline Recipient')
+        ->set('phone', '080-0000-0000')
+        ->set('postal_code', '100-0001')
+        ->set('country_id', (string) $country->id)
+        ->set('city', 'Chiyoda')
+        ->set('address_line1', '1-1 Marunouchi')
+        ->call('addAddress')
+        ->assertHasNoErrors()
+        // Not an in-place update: a real re-render here would either add
+        // x-data to the <form> after the fact (Alpine won't reliably pick
+        // that up on an existing element) or, once the card is already
+        // mounted, wipe it via morph -- see addAddress()'s own docblock.
+        ->assertRedirect(route('buyer.requests.checkout', $request->id));
+
+    $address = BuyerAddress::where('recipient_name', 'Inline Recipient')->sole();
+    expect($address->buyer_id)->toBe(BuyerProfile::where('user_id', $owner->id)->value('id'));
+});
+
+it('does not redirect after adding an address while the stub gateway is active', function () {
+    [$owner, , $request] = checkoutEligibleRequest();
+    $country = Country::factory()->create();
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('toggleNewAddressForm')
+        ->set('recipient_name', 'Stub Recipient')
+        ->set('phone', '080-0000-0000')
+        ->set('postal_code', '100-0001')
+        ->set('country_id', (string) $country->id)
+        ->set('city', 'Chiyoda')
+        ->set('address_line1', '1-1 Marunouchi')
+        ->call('addAddress')
+        ->assertHasNoErrors()
+        ->assertNoRedirect();
+});
+
+it('does not load Stripe.js or show the card form when the stub gateway is active', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.checkout.card_section'))
+        ->assertDontSee('js.stripe.com');
+});
+
+it('does not show the card form for a free (無償) request even when the stripe gateway is active', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = freeCheckoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.checkout.card_section'))
+        ->assertDontSee('js.stripe.com');
+});
+
+it('pay() returns the PaymentIntent client secret instead of redirecting, when the stripe gateway is active', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    ApiRequestor::setHttpClient(new FakeStripeHttpClientForCheckoutTest([
+        'id' => 'pi_ui_test',
+        'object' => 'payment_intent',
+        'status' => 'requires_payment_method',
+        'client_secret' => 'pi_ui_test_secret',
+    ]));
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('pay')
+        ->assertHasNoErrors()
+        ->assertNoRedirect()
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_ui_test_secret'
+            && $data['redirectUrl'] === route('buyer.requests.show', $request->id));
+
+    // CheckoutAction already ran (the whole point) -- but the payment
+    // itself stays pending. Only the webhook is ever allowed to confirm
+    // it (CLAUDE.md §14 stripe integration).
+    $fresh = $request->fresh();
+    expect($fresh->status)->toBe(RequestStatus::Paid);
+
+    $payment = Payment::where('part_request_id', $request->id)->sole();
+    expect($payment->status)->toBe(PaymentStatus::Pending)
+        ->and($payment->gateway)->toBe('stripe')
+        ->and($payment->gateway_reference)->toBe('pi_ui_test');
 });
 
 // --- 無償 (free) flow (CLAUDE.md §14 Phase 4 slice 5) ---------------------

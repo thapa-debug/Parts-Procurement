@@ -6,6 +6,7 @@ use App\Payments\PaymentGateway;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use RuntimeException;
+use Stripe\StripeClient;
 
 /**
  * Binds the PaymentGateway interface to whichever gateway
@@ -18,6 +19,18 @@ class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // One client per request is plenty -- nothing here is
+        // request-scoped state that would leak between requests. Tests
+        // never mock this binding directly (StripeClient's real services
+        // like ->paymentIntents are lazily-constructed magic properties,
+        // awkward to mock cleanly) -- instead they swap Stripe's own HTTP
+        // transport (\Stripe\ApiRequestor::setHttpClient()) so the real
+        // SDK code runs against a canned response, never a real network
+        // call (CLAUDE.md §9: tests must not hit real Stripe).
+        $this->app->singleton(StripeClient::class, fn () => new StripeClient(
+            config('services.stripe.secret')
+        ));
+
         $this->app->bind(PaymentGateway::class, function ($app) {
             $gateway = config('payments.gateway');
 

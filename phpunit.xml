@@ -29,6 +29,14 @@
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
+        <!-- Pinned regardless of whatever a developer's own .env has set
+             for live manual testing (e.g. PAYMENT_GATEWAY=stripe): the
+             test suite must never depend on it, and must never be able to
+             silently resolve the real Stripe gateway (CLAUDE.md section 9:
+             tests must not hit real Stripe). Tests that specifically want
+             the stripe binding already do config(['payments.gateway' =>
+             'stripe']) themselves, with Stripe's HTTP transport faked. -->
+        <env name="PAYMENT_GATEWAY" value="stub"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>

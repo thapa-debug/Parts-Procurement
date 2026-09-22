@@ -1,5 +1,6 @@
 <?php
 
+use App\Payments\StripePaymentGateway;
 use App\Payments\StubPaymentGateway;
 
 return [
@@ -25,14 +26,16 @@ return [
     |--------------------------------------------------------------------------
     |
     | Maps a gateway name to the PaymentGateway implementation it resolves
-    | to. Add a real provider (e.g. "stripe") here once the client confirms
-    | one -- calling code never changes, it only ever depends on the
-    | PaymentGateway interface.
+    | to -- calling code (CheckoutAction) never changes, it only ever depends
+    | on the PaymentGateway interface. "stripe" is the production gateway;
+    | "stub" remains for local dev and the test suite (never bindable in
+    | production -- see PaymentServiceProvider).
     |
     */
 
     'gateways' => [
         'stub' => StubPaymentGateway::class,
+        'stripe' => StripePaymentGateway::class,
     ],
 
 ];
