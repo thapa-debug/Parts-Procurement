@@ -39,6 +39,7 @@ class ConfirmFreeOrderAction
 {
     public function __construct(
         private readonly SnapshotShippingAddressAction $snapshotShippingAddress,
+        private readonly SendPaymentConfirmedNotificationsAction $sendPaymentConfirmedNotifications,
     ) {}
 
     public function execute(PartRequest $partRequest, BuyerAddress $address): PartRequest
@@ -51,7 +52,7 @@ class ConfirmFreeOrderAction
             throw FreeOrderNotAllowedException::noQuoteSelected($partRequest);
         }
 
-        return DB::transaction(function () use ($partRequest, $address) {
+        [$partRequest, $payment] = DB::transaction(function () use ($partRequest, $address) {
             $this->snapshotShippingAddress->execute($partRequest, $address);
 
             $payment = Payment::create([
@@ -70,7 +71,11 @@ class ConfirmFreeOrderAction
                 'payment_id' => $payment->id,
             ]);
 
-            return $partRequest->fresh();
+            return [$partRequest->fresh(), $payment];
         });
+
+        $this->sendPaymentConfirmedNotifications->execute($payment);
+
+        return $partRequest;
     }
 }

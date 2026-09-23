@@ -17,9 +17,12 @@ use App\Models\ShippingWeightBracket;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
+use App\Notifications\PaymentConfirmedAdminNotification;
+use App\Notifications\PaymentConfirmedNotification;
 use App\Payments\PaymentGateway;
 use App\Payments\PaymentResult;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
@@ -88,6 +91,36 @@ it('checks out a quoted request: confirms payment, snapshots the address, and mo
         ->and($payment->currency)->toBe('JPY')
         ->and($payment->gateway)->toBe('stub')
         ->and($payment->paid_at)->not->toBeNull();
+});
+
+it('notifies the buyer and admins once the stub gateway confirms the payment', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    [$request, $address] = checkoutReadyRequest();
+
+    app(CheckoutAction::class)->execute($request, $address);
+
+    $buyer = $request->fresh()->buyer;
+    Notification::assertSentToTimes($buyer->user, PaymentConfirmedNotification::class, 1);
+    Notification::assertSentToTimes($admin, PaymentConfirmedAdminNotification::class, 1);
+});
+
+it('never sends a payment-confirmed notification when the gateway declines the charge', function () {
+    [$request, $address] = checkoutReadyRequest();
+    app()->instance(PaymentGateway::class, fakeFailingGateway());
+
+    // Faked only from here -- checkoutReadyRequest() itself legitimately
+    // fires QuotePresentedNotification/QuoteSelectedNotification as part
+    // of its own setup, which assertNothingSent() would otherwise also
+    // (correctly, but irrelevantly here) catch.
+    Notification::fake();
+
+    $attempt = fn () => app(CheckoutAction::class)->execute($request, $address);
+
+    expect($attempt)->toThrow(PaymentFailedException::class);
+
+    Notification::assertNothingSent();
 });
 
 it('charges the shipping fee already fixed by SelectQuoteAction, not a live recalculation', function () {

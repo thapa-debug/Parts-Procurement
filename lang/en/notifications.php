@@ -24,6 +24,10 @@ return [
         'buyer_registered' => ':buyer_company_name registered and is awaiting approval.',
         'buyer_approved' => 'Your account has been approved -- you can now submit requests.',
         'part_request_submitted' => ':buyer_company_name submitted a new request: :part_name.',
+        'payment_confirmed' => 'Your payment for :request_code is confirmed -- your order is being processed.',
+        'payment_confirmed_free' => 'Your free (無償) order for :request_code is confirmed -- your order is being processed.',
+        'payment_confirmed_admin' => ':buyer_company_name paid for request :request_code -- ready to confirm the order to the vendor.',
+        'payment_confirmed_admin_free' => ':buyer_company_name\'s free (無償) order for :request_code is confirmed -- ready to confirm the order to the vendor.',
     ],
 
     // Phase 3 Slice 2: email copy for each Notification class's toMail().
@@ -73,6 +77,30 @@ return [
         'part_request_submitted' => [
             'subject' => 'New request: :part_name',
             'line' => ':buyer_company_name submitted a new request: :part_name (:request_code).',
+            'action' => 'View request',
+        ],
+
+        'payment_confirmed' => [
+            'subject' => 'Your payment for :request_code is confirmed',
+            'line' => 'Your payment for :request_code is confirmed (¥:amount) -- your order is being processed.',
+            'action' => 'View your order',
+        ],
+
+        'payment_confirmed_free' => [
+            'subject' => 'Your free (無償) order for :request_code is confirmed',
+            'line' => 'Your free (無償) order for :request_code is confirmed -- no payment was required. Your order is being processed.',
+            'action' => 'View your order',
+        ],
+
+        'payment_confirmed_admin' => [
+            'subject' => ':buyer_company_name paid for :request_code',
+            'line' => ':buyer_company_name paid ¥:amount for request :request_code -- the order is now ready to confirm to the vendor.',
+            'action' => 'View request',
+        ],
+
+        'payment_confirmed_admin_free' => [
+            'subject' => ':buyer_company_name\'s free order is confirmed',
+            'line' => ':buyer_company_name\'s free (無償) order for request :request_code is confirmed -- ready to confirm to the vendor.',
             'action' => 'View request',
         ],
     ],

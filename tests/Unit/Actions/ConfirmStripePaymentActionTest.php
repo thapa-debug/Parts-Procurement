@@ -2,8 +2,15 @@
 
 use App\Actions\ConfirmStripePaymentAction;
 use App\Enums\PaymentStatus;
+use App\Enums\RequestStatus;
+use App\Models\BuyerProfile;
+use App\Models\PartRequest;
 use App\Models\Payment;
+use App\Models\User;
+use App\Notifications\PaymentConfirmedAdminNotification;
+use App\Notifications\PaymentConfirmedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
@@ -37,6 +44,32 @@ it('is idempotent -- running it twice for the same PaymentIntent does not error 
 
     expect($payment->refresh()->status)->toBe(PaymentStatus::Confirmed)
         ->and($payment->paid_at->eq($firstPaidAt))->toBeTrue();
+});
+
+it('does not send a duplicate payment-confirmed notification when a webhook is redelivered', function () {
+    Notification::fake();
+
+    $buyer = BuyerProfile::factory()->create();
+    $admin = User::factory()->admin()->create();
+    $partRequest = PartRequest::factory()->for($buyer, 'buyer')->create(['status' => RequestStatus::Paid]);
+    $payment = Payment::factory()->create([
+        'part_request_id' => $partRequest->id,
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_test_redelivered_notify',
+        'status' => PaymentStatus::Pending,
+    ]);
+
+    app(ConfirmStripePaymentAction::class)->execute('pi_test_redelivered_notify');
+
+    // Stripe redelivering the same already-confirmed event must hit the
+    // "already-confirmed, ignored" early return -- not run
+    // SendPaymentConfirmedNotificationsAction a second time. Without this,
+    // Stripe's at-least-once webhook delivery would mean a buyer/admin
+    // could be notified more than once for the exact same payment.
+    app(ConfirmStripePaymentAction::class)->execute('pi_test_redelivered_notify');
+
+    Notification::assertSentToTimes($buyer->user, PaymentConfirmedNotification::class, 1);
+    Notification::assertSentToTimes($admin, PaymentConfirmedAdminNotification::class, 1);
 });
 
 it('confirms a payment that previously failed -- a retried PaymentIntent can still succeed', function () {

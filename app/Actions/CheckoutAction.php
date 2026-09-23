@@ -43,6 +43,7 @@ class CheckoutAction
     public function __construct(
         private readonly PaymentGateway $gateway,
         private readonly SnapshotShippingAddressAction $snapshotShippingAddress,
+        private readonly SendPaymentConfirmedNotificationsAction $sendPaymentConfirmedNotifications,
     ) {}
 
     public function execute(PartRequest $partRequest, BuyerAddress $address): PartRequest
@@ -59,7 +60,7 @@ class CheckoutAction
             throw CheckoutNotAllowedException::shippingFeeMissing($partRequest);
         }
 
-        return DB::transaction(function () use ($partRequest, $address) {
+        [$partRequest, $payment] = DB::transaction(function () use ($partRequest, $address) {
             $this->snapshotShippingAddress->execute($partRequest, $address);
 
             $payment = Payment::create([
@@ -93,7 +94,19 @@ class CheckoutAction
                 'gateway' => $this->gateway->name(),
             ]);
 
-            return $partRequest->fresh();
+            return [$partRequest->fresh(), $payment];
         });
+
+        // The stub gateway confirms synchronously inside charge() (dev/
+        // test only) -- Stripe never does (ConfirmStripePaymentAction,
+        // webhook-only, handles that path instead, CLAUDE.md §14 stripe
+        // integration). $payment was read inside the transaction, before
+        // charge() had necessarily updated it in every gateway's case, so
+        // it's re-checked fresh here rather than trusted stale.
+        if ($payment->fresh()->status === PaymentStatus::Confirmed) {
+            $this->sendPaymentConfirmedNotifications->execute($payment);
+        }
+
+        return $partRequest;
     }
 }

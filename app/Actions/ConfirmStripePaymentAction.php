@@ -23,9 +23,20 @@ use Illuminate\Support\Facades\Log;
  * on a retried payment method (the same Stripe object, confirmed again) --
  * so the guard is simply "not already confirmed", not "must currently be
  * pending".
+ *
+ * The buyer/admin payment-confirmed notifications (SendPaymentConfirmed
+ * NotificationsAction) fire only from the genuinely-new-confirmation path
+ * below -- never from the "already confirmed, ignored" early return above
+ * it. Without that distinction, Stripe's at-least-once webhook redelivery
+ * would mean a buyer could be notified twice (or more) for the exact same
+ * payment.
  */
 class ConfirmStripePaymentAction
 {
+    public function __construct(
+        private readonly SendPaymentConfirmedNotificationsAction $sendPaymentConfirmedNotifications,
+    ) {}
+
     public function execute(string $paymentIntentId): void
     {
         $payment = Payment::query()
@@ -67,5 +78,7 @@ class ConfirmStripePaymentAction
                 'payment_intent_id' => $paymentIntentId,
             ]);
         });
+
+        $this->sendPaymentConfirmedNotifications->execute($payment);
     }
 }
