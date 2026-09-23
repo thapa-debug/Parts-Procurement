@@ -37,6 +37,21 @@
              the stripe binding already do config(['payments.gateway' =>
              'stripe']) themselves, with Stripe's HTTP transport faked. -->
         <env name="PAYMENT_GATEWAY" value="stub"/>
+        <!-- A test-only dummy key, never a real credential: the same
+             literal value already used everywhere a test constructs
+             StripeClient directly (StripePaymentGatewayTest,
+             StripeCheckoutFlowTest). Needed so the container-resolved
+             StripeClient::class singleton (Checkout.php's own use of it)
+             also gets a syntactically valid api_key: the Stripe SDK
+             requires a non-empty key string to build a request at all,
+             even though every test swaps out Stripe's HTTP transport
+             (ApiRequestor::setHttpClient()) so nothing ever reaches the
+             real network (CLAUDE.md section 9). Without this pin, tests
+             silently depended on whatever STRIPE_SECRET happened to be
+             in a developer's own .env, which CI's own "copy env example
+             to env" step leaves empty, and Stripe's SDK rejects an empty
+             (as opposed to unset) api_key outright. -->
+        <env name="STRIPE_SECRET" value="sk_test_fake"/>
         <env name="PULSE_ENABLED" value="false"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
