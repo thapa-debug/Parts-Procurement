@@ -14,7 +14,10 @@ use App\Models\Payment;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
+use App\Notifications\PaymentConfirmedAdminNotification;
+use App\Notifications\PaymentConfirmedNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
@@ -63,6 +66,19 @@ it('confirms a free order: snapshots the address, records a ¥0 confirmed paymen
         ->and($payment->paid_at)->not->toBeNull();
 });
 
+it('notifies the buyer and admins once the free order is confirmed', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    [$request, $address] = freeOrderReadyRequest();
+
+    app(ConfirmFreeOrderAction::class)->execute($request, $address);
+
+    $buyer = $request->fresh()->buyer;
+    Notification::assertSentToTimes($buyer->user, PaymentConfirmedNotification::class, 1);
+    Notification::assertSentToTimes($admin, PaymentConfirmedAdminNotification::class, 1);
+});
+
 it('refuses to confirm a request that is not free -- that belongs to CheckoutAction instead', function () {
     $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
     $vendor = VendorProfile::factory()->create();
@@ -108,12 +124,18 @@ it('refuses an address that belongs to a different buyer, rolling back the whole
         ->and($fresh->shipping_address_id)->toBeNull();
 });
 
-it('rolls back the whole confirmation -- no payment row, no status change -- if the transaction fails', function () {
+it('rolls back the whole confirmation -- no payment row, no status change, no notification -- if the transaction fails', function () {
     [$request, $address] = freeOrderReadyRequest();
 
     PartRequest::updating(function () {
         throw new RuntimeException('forced failure for test');
     });
+
+    // Faked only from here -- freeOrderReadyRequest() itself legitimately
+    // fires QuotePresentedNotification/QuoteSelectedNotification as part
+    // of its own setup, which assertNothingSent() would otherwise also
+    // (correctly, but irrelevantly here) catch.
+    Notification::fake();
 
     $attempt = fn () => app(ConfirmFreeOrderAction::class)->execute($request, $address);
 
@@ -123,6 +145,8 @@ it('rolls back the whole confirmation -- no payment row, no status change -- if 
     $fresh = $request->fresh();
     expect($fresh->status)->toBe(RequestStatus::Quoted)
         ->and($fresh->shipping_address_id)->toBeNull();
+
+    Notification::assertNothingSent();
 });
 
 // --- policy: isolation (CLAUDE.md 4, 9) -----------------------------------

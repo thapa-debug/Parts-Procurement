@@ -28,6 +28,14 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
 
         $middleware->redirectGuestsTo('/login');
+
+        // Stripe's server has no session and sends no CSRF token -- the
+        // webhook route's own signature verification (CLAUDE.md §14 stripe
+        // integration, StripeWebhookController) is what proves the request
+        // is genuine instead.
+        $middleware->validateCsrfTokens(except: [
+            'webhooks/stripe',
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

@@ -6,6 +6,7 @@ use App\Payments\PaymentGateway;
 use Illuminate\Support\ServiceProvider;
 use InvalidArgumentException;
 use RuntimeException;
+use Stripe\StripeClient;
 
 /**
  * Binds the PaymentGateway interface to whichever gateway
@@ -18,6 +19,27 @@ class PaymentServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // One client per request is plenty -- nothing here is
+        // request-scoped state that would leak between requests. Tests
+        // never mock this binding directly (StripeClient's real services
+        // like ->paymentIntents are lazily-constructed magic properties,
+        // awkward to mock cleanly) -- instead they swap Stripe's own HTTP
+        // transport (\Stripe\ApiRequestor::setHttpClient()) so the real
+        // SDK code runs against a canned response, never a real network
+        // call (CLAUDE.md §9: tests must not hit real Stripe).
+        //
+        // `?: []` matters: StripeClient's constructor requires a string or
+        // an array, and only an *array* config (defaulting api_key to
+        // null internally) is tolerated when no key is configured -- a
+        // bare `null` argument fails that type check before api_key is
+        // ever inspected. An unset STRIPE_SECRET resolves to '' rather
+        // than null whenever a literal (empty) STRIPE_SECRET= line exists
+        // in the loaded .env -- exactly what CI's own `cp .env.example
+        // .env` step produces, with no real Stripe credentials configured.
+        $this->app->singleton(StripeClient::class, fn () => new StripeClient(
+            config('services.stripe.secret') ?: []
+        ));
+
         $this->app->bind(PaymentGateway::class, function ($app) {
             $gateway = config('payments.gateway');
 

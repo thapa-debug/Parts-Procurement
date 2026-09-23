@@ -173,6 +173,13 @@ return [
         'summary_total' => 'Total',
         'shipping_fee_note' => 'Your shipping fee was calculated when your quote was presented and is already included above.',
 
+        'card_section' => 'Card details',
+        'card_section_help' => 'Your card details are entered directly into Stripe\'s own secure form below -- they never pass through our servers.',
+        'address_required_for_payment' => 'Please add or select a shipping address above before paying.',
+        'proceed_to_payment_help' => 'Click below to continue to secure card payment.',
+        'proceed_to_payment_button' => 'Proceed to payment',
+        'processing_button' => 'Processing...',
+
         'pay_button' => 'Pay now',
         'confirm_free_button' => 'Confirm free order',
         'free_order_note' => 'This is a free (無償) order -- there\'s nothing to pay. Just confirm your shipping address below.',

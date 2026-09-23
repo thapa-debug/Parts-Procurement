@@ -5,6 +5,7 @@ use App\Actions\BroadcastRequestAction;
 use App\Actions\PresentQuoteAction;
 use App\Actions\RegisterBuyerAction;
 use App\Actions\SelectQuoteAction;
+use App\Actions\SendPaymentConfirmedNotificationsAction;
 use App\Actions\SubmitPartRequestAction;
 use App\Actions\SubmitVendorResponseAction;
 use App\Enums\PartType;
@@ -13,12 +14,15 @@ use App\Models\BuyerProfile;
 use App\Models\Country;
 use App\Models\Maker;
 use App\Models\PartRequest;
+use App\Models\Payment;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use App\Notifications\BuyerApprovedNotification;
 use App\Notifications\BuyerRegisteredNotification;
 use App\Notifications\PartRequestSubmittedNotification;
+use App\Notifications\PaymentConfirmedAdminNotification;
+use App\Notifications\PaymentConfirmedNotification;
 use App\Notifications\QuotePresentedNotification;
 use App\Notifications\QuoteSelectedNotification;
 use App\Notifications\RequestBroadcastNotification;
@@ -301,4 +305,187 @@ it('tells every admin, and only admins, when a buyer submits a new request', fun
     }
 
     Notification::assertNotSentTo($buyer->user, PartRequestSubmittedNotification::class);
+});
+
+// SendPaymentConfirmedNotificationsAction is the single place that fires
+// both notifications below -- called from CheckoutAction (right after the
+// stub gateway confirms synchronously), ConfirmStripePaymentAction (the
+// webhook confirmation point), and ConfirmFreeOrderAction (無償, ¥0).
+// Exercised directly here against a Payment fixture rather than through
+// those three call sites, so isolation/copy is proven once, independent
+// of which path reached "confirmed".
+
+it('tells only the buyer their payment is confirmed, with their own amount and no vendor data', function () {
+    Notification::fake();
+
+    $buyer = BuyerProfile::factory()->create();
+    $request = PartRequest::factory()->for($buyer, 'buyer')->create(['status' => RequestStatus::Paid, 'is_free' => false]);
+    $vendor = VendorProfile::factory()->create(['company_name' => 'Secret Vendor Co']);
+    $payment = Payment::factory()->confirmed()->create([
+        'part_request_id' => $request->id,
+        'amount' => 54_000,
+        'gateway' => 'stripe',
+    ]);
+
+    app(SendPaymentConfirmedNotificationsAction::class)->execute($payment);
+
+    Notification::assertSentTo($buyer->user, PaymentConfirmedNotification::class, function ($notification, $channels) use ($buyer, $request) {
+        expect($channels)->toBe(['database', 'mail']);
+
+        $data = $notification->toArray($buyer->user);
+
+        expect($data['type'])->toBe('payment_confirmed')
+            ->and($data['request_id'])->toBe($request->id)
+            ->and($data['request_code'])->toBe($request->request_code)
+            ->and($data['amount'])->toBe(54_000)
+            ->and($data['url'])->toBe(route('buyer.requests.show', $request));
+
+        $encodedData = json_encode($data);
+        expect($encodedData)->not->toContain('Secret Vendor Co');
+
+        $mail = $notification->toMail($buyer->user);
+        $encodedMail = json_encode([$mail->subject, $mail->introLines, $mail->outroLines, $mail->actionText, $mail->actionUrl]);
+
+        expect($mail->actionUrl)->toBe(route('buyer.requests.show', $request))
+            ->and($encodedMail)->toContain('54,000')
+            ->and($encodedMail)->not->toContain('Secret Vendor Co');
+
+        // Regression guard: every :placeholder in the lang string must
+        // actually be replaced with real data, never left as a literal
+        // token in the rendered subject/body.
+        expect($mail->subject)->toContain($request->request_code)
+            ->and($encodedMail)->not->toContain(':request_code')
+            ->and($encodedMail)->not->toContain(':amount')
+            ->and($encodedMail)->not->toContain(':buyer_company_name');
+
+        return true;
+    });
+
+    Notification::assertNotSentTo($vendor->user, PaymentConfirmedNotification::class);
+});
+
+it('tells the buyer their free (無償) order is confirmed, distinctly worded from a real payment', function () {
+    Notification::fake();
+
+    $buyer = BuyerProfile::factory()->create();
+    $request = PartRequest::factory()->for($buyer, 'buyer')->create(['status' => RequestStatus::Paid, 'is_free' => true]);
+    $payment = Payment::factory()->confirmed()->create([
+        'part_request_id' => $request->id,
+        'amount' => 0,
+        'gateway' => 'waived',
+    ]);
+
+    app(SendPaymentConfirmedNotificationsAction::class)->execute($payment);
+
+    Notification::assertSentTo($buyer->user, PaymentConfirmedNotification::class, function ($notification, $channels) use ($buyer, $request) {
+        expect($channels)->toBe(['database', 'mail']);
+
+        $data = $notification->toArray($buyer->user);
+
+        expect($data['type'])->toBe('payment_confirmed_free')
+            ->and($data['request_id'])->toBe($request->id)
+            ->and($data['amount'])->toBe(0);
+
+        // json_encode() would escape 無償 to \uXXXX by default, so this
+        // checks the mail's own string properties directly instead.
+        $mail = $notification->toMail($buyer->user);
+        $mailText = implode(' ', [$mail->subject, ...$mail->introLines, ...$mail->outroLines]);
+
+        expect($mailText)->toContain('無償')
+            ->and($mailText)->toContain('no payment was required');
+
+        // Regression guard: every :placeholder in the lang string must
+        // actually be replaced with real data, never left as a literal
+        // token in the rendered subject/body.
+        expect($mailText)->toContain($request->request_code)
+            ->and($mailText)->not->toContain(':request_code')
+            ->and($mailText)->not->toContain(':buyer_company_name');
+
+        return true;
+    });
+});
+
+it('tells every admin, and only admins, that a payment is confirmed and the vendor-order gate is open', function () {
+    Notification::fake();
+
+    $adminA = User::factory()->admin()->create();
+    $adminB = User::factory()->admin()->create();
+    $buyer = BuyerProfile::factory()->create(['company_name' => 'Acme Imports']);
+    $request = PartRequest::factory()->for($buyer, 'buyer')->create(['status' => RequestStatus::Paid, 'is_free' => false]);
+    $vendor = VendorProfile::factory()->create();
+    $payment = Payment::factory()->confirmed()->create([
+        'part_request_id' => $request->id,
+        'amount' => 54_000,
+        'gateway' => 'stripe',
+    ]);
+
+    app(SendPaymentConfirmedNotificationsAction::class)->execute($payment);
+
+    foreach ([$adminA, $adminB] as $admin) {
+        Notification::assertSentTo($admin, PaymentConfirmedAdminNotification::class, function ($notification, $channels) use ($admin, $request) {
+            expect($channels)->toBe(['database', 'mail']);
+
+            $data = $notification->toArray($admin);
+
+            expect($data['type'])->toBe('payment_confirmed_admin')
+                ->and($data['request_id'])->toBe($request->id)
+                ->and($data['buyer_company_name'])->toBe('Acme Imports')
+                ->and($data['amount'])->toBe(54_000)
+                ->and($data['url'])->toBe(route('admin.requests.show', $request));
+
+            $mail = $notification->toMail($admin);
+            expect($mail->actionUrl)->toBe(route('admin.requests.show', $request))
+                ->and($mail->subject)->toContain('Acme Imports');
+
+            // Regression guard: every :placeholder in the lang string must
+            // actually be replaced with real data, never left as a literal
+            // token in the rendered subject/body -- this exact bug shipped
+            // once already (subject() dropped :request_code's replacement).
+            $mailText = implode(' ', [$mail->subject, ...$mail->introLines, ...$mail->outroLines]);
+            expect($mailText)->toContain($request->request_code)
+                ->and($mailText)->not->toContain(':request_code')
+                ->and($mailText)->not->toContain(':amount')
+                ->and($mailText)->not->toContain(':buyer_company_name');
+
+            return true;
+        });
+    }
+
+    Notification::assertNotSentTo($buyer->user, PaymentConfirmedAdminNotification::class);
+    Notification::assertNotSentTo($vendor->user, PaymentConfirmedAdminNotification::class);
+});
+
+it('tells admins the free-order equivalent, distinctly worded from a real payment', function () {
+    Notification::fake();
+
+    $admin = User::factory()->admin()->create();
+    $buyer = BuyerProfile::factory()->create(['company_name' => 'Acme Imports']);
+    $request = PartRequest::factory()->for($buyer, 'buyer')->create(['status' => RequestStatus::Paid, 'is_free' => true]);
+    $payment = Payment::factory()->confirmed()->create([
+        'part_request_id' => $request->id,
+        'amount' => 0,
+        'gateway' => 'waived',
+    ]);
+
+    app(SendPaymentConfirmedNotificationsAction::class)->execute($payment);
+
+    Notification::assertSentTo($admin, PaymentConfirmedAdminNotification::class, function ($notification, $channels) use ($admin, $request) {
+        $data = $notification->toArray($admin);
+
+        expect($data['type'])->toBe('payment_confirmed_admin_free')
+            ->and($data['buyer_company_name'])->toBe('Acme Imports');
+
+        $mail = $notification->toMail($admin);
+        $mailText = implode(' ', [$mail->subject, ...$mail->introLines, ...$mail->outroLines]);
+        expect($mailText)->toContain('無償');
+
+        // Regression guard: every :placeholder in the lang string must
+        // actually be replaced with real data, never left as a literal
+        // token in the rendered subject/body.
+        expect($mailText)->toContain($request->request_code)
+            ->and($mailText)->not->toContain(':request_code')
+            ->and($mailText)->not->toContain(':buyer_company_name');
+
+        return true;
+    });
 });
