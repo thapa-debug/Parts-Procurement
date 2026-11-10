@@ -359,7 +359,6 @@ return [
             'order_confirmed' => 'Order confirmed',
         ],
 
-        'details_section' => 'Request details',
         'buyer_label' => 'Buyer',
         'part_type_label' => 'Part type',
         'maker_label' => 'Maker',
@@ -405,16 +404,10 @@ return [
         'broadcast_help' => 'Select which active vendors should receive this inquiry. Suspended vendors are never shown here and can\'t be selected.',
         'select_all_button' => 'Select all',
         'no_active_vendors' => 'There are no active vendors to send this to yet. Activate or add a vendor first.',
-        'vendor_column' => 'Vendor',
-        'contact_column' => 'Contact',
         'send_button' => 'Send inquiry',
         'select_at_least_one' => 'Select at least one vendor before sending.',
         'sent_confirmation' => 'Inquiry sent to :count vendor(s).',
         'broadcast_error' => 'Something went wrong sending this inquiry. Please refresh the page and try again.',
-
-        'sent_section' => 'Sent to vendors',
-        'sent_help' => 'This request has already been broadcast -- no response deadline, so vendors can quote whenever they\'re ready.',
-        'invited_at_column' => 'Invited',
 
         'compare_section' => 'Vendor quotes',
         'compare_help' => 'Check the vendor replies you want to present as priced quotes, then click "Present to buyer" to confirm.',
@@ -423,6 +416,28 @@ return [
         'no_vendor_responses' => 'No vendor responses yet -- check back once an invited vendor replies.',
         'no_stock_badge' => 'No stock',
         'present_checkbox_label' => 'Select to present',
+        'select_all_quotes' => 'Select all',
+
+        // Bottom action bar. :letters is filled in client-side (e.g. "A, B").
+        'present_bar_none' => 'Tick the quotes to present to :buyer',
+        'present_bar_selected_one' => 'Quote :letters selected for :buyer',
+        'present_bar_selected_many' => 'Quotes :letters selected for :buyer',
+        'present_bar_isolation_note' => 'The buyer sees grade, photos, condition notes, lead time and price -- never the vendor name or cost.',
+        'present_count_button_one' => 'Present 1 quote to buyer',
+        'present_count_button_many' => 'Present :count quotes to buyer',
+
+        // Right sidebar.
+        'request_info_section' => 'Request',
+        'country_label' => 'Country',
+        'ships_to_label' => 'Ships to',
+        'inquiry_panel_section' => 'Vendor inquiry · 打診',
+        'inquiry_sent_at' => 'Sent :date',
+        'invited_at' => 'invited :date',
+        'vendor_reply' => [
+            'quoted' => 'Quoted',
+            'no_stock' => 'No stock',
+            'pending' => 'Pending',
+        ],
         'pending_replies' => ':count pending',
         'replied_at' => 'replied :date',
 
