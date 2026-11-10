@@ -48,9 +48,11 @@
 
     <x-admin.request-stepper class="mt-5" :status="$partRequest->status" :quotes-to-review="$quotesToReview" />
 
-    {{-- Stage 1 of the restyle: the sections below keep their existing
-    layout until the quote columns / sidebar stages re-lay them out. --}}
-    <div class="max-w-3xl">
+    {{-- Two-column body: main (actions + quotes) and a right sidebar
+    (request info + vendor inquiry). The main column is min-w-0 so the
+    quote table scrolls inside it rather than stretching the page. --}}
+    <div class="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
+    <div class="min-w-0 [&>:first-child]:mt-0">
 
     {{-- shipping_method is only set once CheckoutAction has actually run --
     a confirmed payment alone isn't enough (e.g. a future free/無償 request
@@ -190,70 +192,6 @@
         </div>
     @endif
 
-    <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-        <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.details_section') }}</h2>
-
-        <dl class="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->buyer->company_name }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.part_type_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ __('admin.request_board.part_type.'.$partRequest->part_type->value) }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.maker_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->maker->name }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.car_model_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->car_model }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.vin_label') }}</dt>
-                <dd class="mt-0.5 font-mono font-medium text-ink">{{ $partRequest->vin }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.oem_part_number_label') }}</dt>
-                <dd class="mt-0.5 font-mono font-medium text-ink">{{ $partRequest->oem_part_number ?? __('admin.request_detail.not_provided') }}</dd>
-            </div>
-
-            <div class="sm:col-span-2">
-                <dt class="text-ink-muted">{{ __('admin.request_detail.part_name_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->part_name }}</dd>
-            </div>
-
-            <div class="sm:col-span-2">
-                <dt class="text-ink-muted">{{ __('admin.request_detail.reference_url_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">
-                    @if ($partRequest->reference_url)
-                        <a href="{{ $partRequest->reference_url }}" target="_blank" rel="noopener noreferrer" class="break-all text-brand-700 hover:underline">
-                            {{ $partRequest->reference_url }}
-                        </a>
-                    @else
-                        {{ __('admin.request_detail.not_provided') }}
-                    @endif
-                </dd>
-            </div>
-
-            <div class="sm:col-span-2">
-                <dt class="text-ink-muted">{{ __('admin.request_detail.memo_label') }}</dt>
-                <dd class="mt-0.5 whitespace-pre-line font-medium text-ink">{{ $partRequest->memo ?? __('admin.request_detail.not_provided') }}</dd>
-            </div>
-
-            <div>
-                <dt class="text-ink-muted">{{ __('admin.request_detail.requested_at_label') }}</dt>
-                <dd class="mt-0.5 font-medium text-ink">{{ $partRequest->created_at->format('Y-m-d H:i') }}</dd>
-            </div>
-        </dl>
-    </div>
-
     @if ($sentToCount !== null)
         <div class="mt-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
             {{ __('admin.request_detail.sent_confirmation', ['count' => $sentToCount]) }}
@@ -314,35 +252,7 @@
                 </div>
             @endif
         </div>
-    @else
-        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.sent_section') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted">{{ __('admin.request_detail.sent_help') }}</p>
-
-            <div class="mt-4 overflow-x-auto rounded-md border border-line">
-                <table class="min-w-full divide-y divide-line text-sm">
-                    <thead class="bg-surface-muted">
-                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
-                            <th class="px-4 py-2.5">{{ __('admin.request_detail.vendor_column') }}</th>
-                            <th class="px-4 py-2.5">{{ __('admin.request_detail.contact_column') }}</th>
-                            <th class="px-4 py-2.5">{{ __('admin.request_detail.invited_at_column') }}</th>
-                        </tr>
-                    </thead>
-                    <tbody class="divide-y divide-line">
-                        @foreach ($invitedVendors as $vendor)
-                            <tr>
-                                <td class="px-4 py-2.5 font-medium text-ink">{{ $vendor->company_name }}</td>
-                                <td class="px-4 py-2.5 text-ink-muted">{{ $vendor->contact_person }}</td>
-                                <td class="px-4 py-2.5 text-ink-muted">{{ $vendor->pivot->invited_at->format('Y-m-d H:i') }}</td>
-                            </tr>
-                        @endforeach
-                    </tbody>
-                </table>
-            </div>
-        </div>
     @endif
-
-    </div>
 
     {{-- Vendor quotes: one column per real quote, full page width,
     scrolling sideways when there are many vendors. Restyle only -- every
@@ -409,9 +319,35 @@
             });
 
             $formatNumber = fn ($value) => $value === null ? null : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+
+            // The quotes that can still be ticked for presenting (real
+            // quotes, not yet presented, choice not locked) -- exactly the
+            // ones with a checkbox, and what select-all toggles. No-stock
+            // replies never get a column, so they're never in here.
+            $presentableIds = $choiceLocked
+                ? []
+                : $columns->reject(fn ($column) => $column['isPresented'])->map(fn ($column) => (string) $column['response']->id)->values()->all();
+            $lettersById = $columns->mapWithKeys(fn ($column) => [(string) $column['response']->id => $column['letter']])->all();
         @endphp
 
-        <section class="mt-6 rounded-lg border border-line bg-surface shadow-sm">
+        {{-- Alpine here only reads/writes the existing
+        selectedResponseIdsToPresent (deferred, like the checkboxes'
+        wire:model) -- no new server state. It drives the column tint,
+        select-all, and the bottom bar's count. --}}
+        <section
+            class="mt-6 rounded-lg border border-line bg-surface shadow-sm"
+            x-data="{
+                presentable: @js($presentableIds),
+                letters: @js($lettersById),
+                selectedIds() { return (this.$wire.selectedResponseIdsToPresent || []).map(String) },
+                checked(id) { return this.selectedIds().includes(String(id)) },
+                selectedPresentable() { return this.presentable.filter((id) => this.checked(id)) },
+                allChecked() { return this.presentable.length > 0 && this.selectedPresentable().length === this.presentable.length },
+                someChecked() { const count = this.selectedPresentable().length; return count > 0 && count < this.presentable.length },
+                toggleAll(on) { this.$wire.selectedResponseIdsToPresent = on ? [...this.presentable] : [] },
+                selectedLetters() { return this.selectedPresentable().map((id) => this.letters[id]).sort().join(', ') },
+            }"
+        >
             <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
                 <div>
                     <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
@@ -457,18 +393,28 @@
                 </p>
             @else
                 @if ($columns->isNotEmpty())
-                    {{-- x-data only so cells can read the existing
-                    selectedResponseIdsToPresent (read-only) and tint a
-                    column the moment its box is ticked. --}}
-                    <div
-                        class="overflow-x-auto"
-                        x-data="{ checked(id) { return (this.$wire.selectedResponseIdsToPresent || []).some((value) => String(value) === String(id)) } }"
-                    >
+                    <div class="overflow-x-auto">
                         <table class="w-full min-w-max border-separate border-spacing-0 text-sm">
                             <thead>
                                 <tr>
                                     <th scope="col" class="sticky left-0 z-10 w-40 min-w-40 border-b border-line bg-surface px-4 py-3 text-left align-top text-xs font-medium uppercase tracking-wide text-ink-muted">
                                         {{ __('admin.request_detail.quote_row') }}
+
+                                        {{-- Select all presentable quotes; checked when
+                                        all are, indeterminate when only some are. --}}
+                                        @if (count($presentableIds) > 0)
+                                            <label class="mt-2 flex items-center gap-2 text-xs font-medium normal-case tracking-normal text-ink">
+                                                <input
+                                                    type="checkbox"
+                                                    data-select-all-quotes
+                                                    :checked="allChecked()"
+                                                    :indeterminate="someChecked()"
+                                                    x-on:change="toggleAll($event.target.checked)"
+                                                    class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                                                >
+                                                {{ __('admin.request_detail.select_all_quotes') }}
+                                            </label>
+                                        @endif
                                     </th>
                                     @foreach ($columns as $column)
                                         @php $response = $column['response']; @endphp
@@ -774,8 +720,10 @@
                     </div>
                 @endif
 
-                {{-- Free flag + present button: unchanged behaviour, shown
-                under the same conditions as before. --}}
+                {{-- Bottom action bar: free flag + present button --
+                unchanged behaviour, shown under the same conditions as
+                before. Sticks to the bottom of the screen while the quotes
+                are in view. --}}
                 @unless ($choiceLocked)
                     @php
                         $hasSelectablePresentableQuotes = $vendorResponses
@@ -783,8 +731,45 @@
                             ->isNotEmpty();
                     @endphp
                     @if ($hasSelectablePresentableQuotes)
-                        <div class="flex flex-wrap items-center justify-between gap-4 border-t border-line bg-surface-muted px-5 py-4">
-                            <div>
+                        <div class="sticky bottom-4 z-20 m-4 rounded-lg border border-line bg-surface p-4 shadow-lg">
+                            <div class="flex flex-wrap items-center justify-between gap-4">
+                                <div class="flex min-w-0 items-start gap-3">
+                                    <span
+                                        class="flex size-8 shrink-0 items-center justify-center rounded-md bg-surface-muted text-sm font-semibold text-ink"
+                                        :class="selectedPresentable().length > 0 && 'bg-brand-50 text-brand-700'"
+                                        x-text="selectedPresentable().length"
+                                    >0</span>
+                                    <div class="min-w-0">
+                                        <p
+                                            class="text-sm font-semibold text-ink"
+                                            x-text="selectedPresentable().length === 0
+                                                ? @js(__('admin.request_detail.present_bar_none', ['buyer' => $partRequest->buyer->company_name]))
+                                                : (selectedPresentable().length === 1 ? @js(__('admin.request_detail.present_bar_selected_one', ['buyer' => $partRequest->buyer->company_name])) : @js(__('admin.request_detail.present_bar_selected_many', ['buyer' => $partRequest->buyer->company_name]))).replace(':letters', selectedLetters())"
+                                        >{{ __('admin.request_detail.present_bar_none', ['buyer' => $partRequest->buyer->company_name]) }}</p>
+                                        <p class="mt-0.5 flex items-center gap-1 text-xs text-ink-muted">
+                                            <svg class="size-3.5 shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M3.28 2.22a.75.75 0 0 0-1.06 1.06l14.5 14.5a.75.75 0 1 0 1.06-1.06l-1.745-1.745a10.029 10.029 0 0 0 3.3-4.38 1.651 1.651 0 0 0 0-1.185A10.004 10.004 0 0 0 9.999 3a9.956 9.956 0 0 0-4.744 1.194L3.28 2.22ZM7.752 6.69l1.092 1.092a2.5 2.5 0 0 1 3.374 3.373l1.091 1.092a4 4 0 0 0-5.557-5.557Z" clip-rule="evenodd"/><path d="m10.748 13.93 2.523 2.523a9.987 9.987 0 0 1-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 0 1 0-1.186A10.007 10.007 0 0 1 2.839 6.02L6.07 9.252a4 4 0 0 0 4.678 4.678Z"/></svg>
+                                            {{ __('admin.request_detail.present_bar_isolation_note') }}
+                                        </p>
+                                    </div>
+                                </div>
+
+                                <button
+                                    type="button"
+                                    wire:click="presentSelectedQuotes"
+                                    wire:confirm="{{ __('admin.request_detail.present_selected_confirm') }}"
+                                    wire:loading.attr="disabled"
+                                    wire:target="presentSelectedQuotes"
+                                    class="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                    <span x-text="selectedPresentable().length === 0
+                                        ? @js(__('admin.request_detail.present_selected_button'))
+                                        : (selectedPresentable().length === 1 ? @js(__('admin.request_detail.present_count_button_one')) : @js(__('admin.request_detail.present_count_button_many')).replace(':count', selectedPresentable().length))"
+                                    >{{ __('admin.request_detail.present_selected_button') }}</span>
+                                    <span aria-hidden="true">&rarr;</span>
+                                </button>
+                            </div>
+
+                            <div class="mt-3 border-t border-line pt-3">
                                 <label class="flex items-center gap-2 text-sm font-medium text-ink">
                                     <input
                                         type="checkbox"
@@ -793,23 +778,118 @@
                                     >
                                     {{ __('admin.request_detail.present_as_free_label') }}
                                 </label>
-                                <p class="mt-1 max-w-xl text-xs text-ink-muted">{{ __('admin.request_detail.present_as_free_help') }}</p>
+                                <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.present_as_free_help') }}</p>
                             </div>
-
-                            <button
-                                type="button"
-                                wire:click="presentSelectedQuotes"
-                                wire:confirm="{{ __('admin.request_detail.present_selected_confirm') }}"
-                                wire:loading.attr="disabled"
-                                wire:target="presentSelectedQuotes"
-                                class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                            >
-                                {{ __('admin.request_detail.present_selected_button') }}
-                            </button>
                         </div>
                     @endif
                 @endunless
             @endif
         </section>
     @endif
+
+    </div>
+
+    {{-- Right sidebar: request info + vendor inquiry (打診) status.
+    Read-only, built from data the component already passes. --}}
+    <aside class="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <section class="rounded-lg border border-line bg-surface p-5 shadow-sm">
+            <h2 class="text-sm font-semibold text-ink">{{ __('admin.request_detail.request_info_section') }}</h2>
+
+            <dl class="mt-3 space-y-2 text-sm">
+                @php
+                    $infoRows = [
+                        [__('admin.request_detail.buyer_label'), $partRequest->buyer->company_name, 'font-medium'],
+                        [__('admin.request_detail.country_label'), $partRequest->buyer->country?->name, ''],
+                        [__('admin.request_detail.maker_label'), $partRequest->maker->name, ''],
+                        [__('admin.request_detail.car_model_label'), $partRequest->car_model, ''],
+                        [__('admin.request_detail.vin_label'), $partRequest->vin, 'font-mono text-xs'],
+                        [__('admin.request_detail.part_name_label'), $partRequest->part_name, 'font-medium'],
+                        [__('admin.request_detail.part_type_label'), __('admin.request_board.part_type.'.$partRequest->part_type->value), ''],
+                        [__('admin.request_detail.oem_part_number_label'), $partRequest->oem_part_number, 'font-mono text-xs'],
+                    ];
+                @endphp
+                @foreach ($infoRows as [$label, $value, $valueClass])
+                    <div class="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2">
+                        <dt class="text-ink-muted">{{ $label }}</dt>
+                        <dd class="break-words text-ink {{ $valueClass }}">{{ $value ?? __('admin.request_detail.not_provided') }}</dd>
+                    </div>
+                @endforeach
+
+                {{-- Where it actually ships, once checkout has snapshotted it. --}}
+                @if ($partRequest->shipping_country)
+                    <div class="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2">
+                        <dt class="text-ink-muted">{{ __('admin.request_detail.ships_to_label') }}</dt>
+                        <dd class="text-ink">{{ $partRequest->shipping_city }}, {{ $partRequest->shipping_country }}</dd>
+                    </div>
+                @endif
+
+                <div class="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2">
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.reference_url_label') }}</dt>
+                    <dd class="min-w-0 text-ink">
+                        @if ($partRequest->reference_url)
+                            <a href="{{ $partRequest->reference_url }}" target="_blank" rel="noopener noreferrer" class="block truncate text-brand-700 hover:underline" title="{{ $partRequest->reference_url }}">
+                                {{ $partRequest->reference_url }}
+                            </a>
+                        @else
+                            {{ __('admin.request_detail.not_provided') }}
+                        @endif
+                    </dd>
+                </div>
+
+                <div class="grid grid-cols-[6.5rem_minmax(0,1fr)] gap-2">
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.requested_at_label') }}</dt>
+                    <dd class="text-ink">{{ $partRequest->created_at->format('Y-m-d H:i') }}</dd>
+                </div>
+            </dl>
+
+            @if ($partRequest->memo)
+                <div class="mt-3">
+                    <p class="text-xs text-ink-muted">{{ __('admin.request_detail.memo_label') }}</p>
+                    <p class="mt-1 whitespace-pre-line rounded-md bg-surface-muted px-3 py-2 text-sm text-ink">{{ $partRequest->memo }}</p>
+                </div>
+            @endif
+        </section>
+
+        {{-- Who the request went to, and whether each has replied. Only
+        once it has been broadcast (invitedVendors is empty at `new`). --}}
+        @if ($invitedVendors->isNotEmpty())
+            @php
+                $responsesByVendorId = $vendorResponses->keyBy('vendor_id');
+                $firstInvitedAt = $invitedVendors->min(fn ($vendor) => $vendor->pivot->invited_at);
+            @endphp
+            <section class="rounded-lg border border-line bg-surface p-5 shadow-sm">
+                <div class="flex items-baseline justify-between gap-2">
+                    <h2 class="text-sm font-semibold text-ink">{{ __('admin.request_detail.inquiry_panel_section') }}</h2>
+                    <span class="text-xs text-ink-muted">{{ __('admin.request_detail.inquiry_sent_at', ['date' => $firstInvitedAt->format('m-d H:i')]) }}</span>
+                </div>
+
+                <ul class="mt-3 divide-y divide-line">
+                    @foreach ($invitedVendors as $vendor)
+                        @php $reply = $responsesByVendorId->get($vendor->id); @endphp
+                        <li wire:key="inquiry-vendor-{{ $vendor->id }}" class="flex items-start justify-between gap-3 py-2.5">
+                            <div class="min-w-0">
+                                <p class="truncate text-sm font-medium text-ink">{{ $vendor->company_name }}</p>
+                                <p class="text-xs text-ink-muted">
+                                    {{ $vendor->contact_person }} &middot;
+                                    @if ($reply)
+                                        {{ __('admin.request_detail.replied_at', ['date' => $reply->created_at->format('m-d H:i')]) }}
+                                    @else
+                                        {{ __('admin.request_detail.invited_at', ['date' => $vendor->pivot->invited_at->format('m-d H:i')]) }}
+                                    @endif
+                                </p>
+                            </div>
+                            @if ($reply === null)
+                                <span class="shrink-0 rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">{{ __('admin.request_detail.vendor_reply.pending') }}</span>
+                            @elseif ($reply->is_no_stock)
+                                <span class="shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-ink-muted">{{ __('admin.request_detail.vendor_reply.no_stock') }}</span>
+                            @else
+                                <span class="shrink-0 rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">{{ __('admin.request_detail.vendor_reply.quoted') }}</span>
+                            @endif
+                        </li>
+                    @endforeach
+                </ul>
+            </section>
+        @endif
+    </aside>
+    </div>
 </div>

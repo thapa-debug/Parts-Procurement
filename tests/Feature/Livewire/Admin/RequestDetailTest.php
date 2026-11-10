@@ -847,3 +847,118 @@ it('still presents the ticked quotes from the column layout', function () {
 
     expect(PresentedQuote::where('vendor_response_id', $response->id)->exists())->toBeTrue();
 });
+
+// --- select-all, sidebar, bottom action bar (restyle stage 3) --------------------
+
+/**
+ * The ids the select-all checkbox toggles, read from the section's Alpine
+ * data (rendered with @js, i.e. JSON.parse('...')).
+ *
+ * @return list<string>
+ */
+function presentableIdsIn(string $html): array
+{
+    preg_match("/presentable: JSON\.parse\('([^']*)'\)/", $html, $match);
+
+    return json_decode(json_decode('"'.($match[1] ?? '[]').'"'), true);
+}
+
+it('select-all toggles exactly the presentable quotes -- never no-stock replies or already-presented quotes', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $openA = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    $openB = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    $presented = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    $noStock = VendorResponse::factory()->noStock()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    app(PresentQuoteAction::class)->execute($request, $presented);
+
+    $html = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSeeHtml('data-select-all-quotes')
+        ->assertSee(__('admin.request_detail.select_all_quotes'))
+        ->html();
+
+    expect(presentableIdsIn($html))->toBe([(string) $openA->id, (string) $openB->id])
+        ->not->toContain((string) $presented->id)
+        ->not->toContain((string) $noStock->id);
+});
+
+it('presents every quote when all are selected (what select-all sets)', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $responses = VendorResponse::factory()->count(3)->sequence(fn () => ['vendor_id' => VendorProfile::factory()->create()->id])->create(['part_request_id' => $request->id]);
+
+    $html = Livewire::actingAs($admin)->test(RequestDetail::class, ['partRequest' => $request])->html();
+    $allIds = presentableIdsIn($html);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('selectedResponseIdsToPresent', $allIds)
+        ->call('presentSelectedQuotes')
+        ->assertHasNoErrors();
+
+    expect(PresentedQuote::whereIn('vendor_response_id', $responses->pluck('id'))->count())->toBe(3);
+});
+
+it('hides select-all and the action bar once the quote choice is locked', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSeeHtml('data-select-all-quotes')
+        ->assertDontSee(__('admin.request_detail.present_bar_isolation_note'));
+});
+
+it('shows the bottom action bar with the isolation note and the present button', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.present_bar_isolation_note'))
+        ->assertSee(__('admin.request_detail.present_bar_none', ['buyer' => $request->buyer->company_name]))
+        ->assertSee(__('admin.request_detail.present_selected_button'))
+        ->assertSeeHtml('wire:click="presentSelectedQuotes"');
+});
+
+it('lists each invited vendor in the sidebar with its reply status', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $alpha = VendorProfile::factory()->create(['company_name' => 'Alpha Parts']);
+    $beta = VendorProfile::factory()->create(['company_name' => 'Beta Parts']);
+    $gamma = VendorProfile::factory()->create(['company_name' => 'Gamma Parts']);
+    foreach ([$alpha, $beta, $gamma] as $vendor) {
+        $request->vendors()->attach($vendor->id, ['invited_at' => now()]);
+    }
+    VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $alpha->id]);
+    VendorResponse::factory()->noStock()->create(['part_request_id' => $request->id, 'vendor_id' => $beta->id]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeInOrder([
+            __('admin.request_detail.inquiry_panel_section'),
+            'Alpha Parts', __('admin.request_detail.vendor_reply.quoted'),
+            'Beta Parts', __('admin.request_detail.vendor_reply.no_stock'),
+            'Gamma Parts', __('admin.request_detail.vendor_reply.pending'),
+        ]);
+});
+
+it('shows the request info panel in the sidebar', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['memo' => 'Xenon type with leveling motor.', 'oem_part_number' => '26060-JG00A']);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeInOrder([
+            __('admin.request_detail.request_info_section'),
+            $request->buyer->company_name,
+            $request->buyer->country->name,
+            $request->maker->name,
+            '26060-JG00A',
+            'Xenon type with leveling motor.',
+        ])
+        ->assertDontSee(__('admin.request_detail.inquiry_panel_section'));
+});
