@@ -329,6 +329,9 @@ class RequestDetail extends Component
                 ? CompanyAddress::query()->orderBy('label')->get()
                 : Collection::make(),
             'confirmedVendor' => $this->partRequest->confirmedVendor,
-        ])->title($this->partRequest->request_code);
+        ])->title($this->partRequest->request_code)
+            // Wider page container: the side-by-side quote columns + sidebar
+            // need the room (see layouts/app.blade.php).
+            ->layoutData(['wide' => true]);
     }
 }
