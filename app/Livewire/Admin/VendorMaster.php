@@ -189,6 +189,8 @@ class VendorMaster extends Component
         return view('livewire.admin.vendor-master', [
             'vendors' => $this->vendors(),
             'deliveryMethods' => DeliveryMethod::cases(),
-        ])->title(__('admin.vendor_master.title'));
+        ])->title(__('admin.vendor_master.title'))
+            // Wide container for this data-dense table (layouts/app.blade.php).
+            ->layoutData(['wide' => true]);
     }
 }

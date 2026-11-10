@@ -219,6 +219,8 @@ class BuyerMaster extends Component
         return view('livewire.admin.buyer-master', [
             'buyers' => $this->buyers(),
             'activeCountries' => $this->activeCountries(),
-        ])->title(__('admin.buyer_master.title'));
+        ])->title(__('admin.buyer_master.title'))
+            // Wide container for this data-dense table (layouts/app.blade.php).
+            ->layoutData(['wide' => true]);
     }
 }

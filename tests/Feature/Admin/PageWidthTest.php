@@ -26,10 +26,16 @@ it('renders dense admin list/detail screens in the wide container', function (Cl
         ->assertOk()
         ->assertSee(WIDE_MAIN, false);
 })->with([
+    'request board' => fn () => route('admin.requests.index'),
     'request detail' => fn () => route('admin.requests.show', PartRequest::factory()->create()),
+    'vendor master' => fn () => route('admin.vendors.index'),
+    'buyer master' => fn () => route('admin.buyers.index'),
+    // Each settings section stays capped at max-w-2xl; the wide frame only
+    // keeps the menu + nav aligned with the other admin screens.
+    'settings' => fn () => route('admin.settings'),
 ]);
 
-it('keeps the other admin screens at the standard width', function (Closure $url) {
+it('keeps form-centric admin screens at the standard width', function (Closure $url) {
     $admin = User::factory()->admin()->create();
 
     $this->actingAs($admin)
@@ -37,10 +43,6 @@ it('keeps the other admin screens at the standard width', function (Closure $url
         ->assertOk()
         ->assertSee(STANDARD_MAIN, false);
 })->with([
-    'request board' => fn () => route('admin.requests.index'),
-    'vendor master' => fn () => route('admin.vendors.index'),
-    'buyer master' => fn () => route('admin.buyers.index'),
-    'settings' => fn () => route('admin.settings'),
     'vendor detail' => fn () => route('admin.vendors.show', VendorProfile::factory()->create()),
     'buyer detail' => fn () => route('admin.buyers.show', BuyerProfile::factory()->create()),
 ]);

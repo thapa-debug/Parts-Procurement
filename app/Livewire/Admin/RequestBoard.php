@@ -132,6 +132,8 @@ class RequestBoard extends Component
             'requests' => $this->requests(),
             'tabCounts' => $this->tabCounts(),
             'tabBadgeClasses' => $this->tabBadgeClasses(),
-        ])->title(__('admin.request_board.title'));
+        ])->title(__('admin.request_board.title'))
+            // Wide container for this data-dense table (layouts/app.blade.php).
+            ->layoutData(['wide' => true]);
     }
 }
