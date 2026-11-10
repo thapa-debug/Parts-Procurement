@@ -541,6 +541,10 @@ class Settings extends Component
             'makers' => $this->makers(),
             'brackets' => $this->brackets(),
             'companyAddresses' => CompanyAddress::query()->orderBy('label')->get(),
-        ])->title(__('admin.settings.title'));
+        ])->title(__('admin.settings.title'))
+            // Wide container so the page frame lines up with the other admin
+            // screens (layouts/app.blade.php). Each section's form/table stays
+            // capped at max-w-2xl in the view, so nothing stretches.
+            ->layoutData(['wide' => true]);
     }
 }
