@@ -32,15 +32,6 @@
                 {{ __('admin.request_board.status.'.$partRequest->status->value) }}
             </span>
         @endif
-
-        {{-- Same quote-progress chip as the request board. --}}
-        @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
-            <x-admin.quote-response-count
-                :quotes="$partRequest->quotes_count"
-                :invited="$partRequest->invited_vendors_count"
-                :no-stock="$partRequest->no_stock_replies_count"
-            />
-        @endif
     </div>
 
     <p class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
@@ -351,255 +342,474 @@
         </div>
     @endif
 
+    </div>
+
+    {{-- Vendor quotes: one column per real quote, full page width,
+    scrolling sideways when there are many vendors. Restyle only -- every
+    input keeps its original wire: binding and the conditions it rendered
+    under before. Vendor name and cost are shown here because this is the
+    admin's own screen; the buyer side builds its own isolated data. --}}
     @if ($partRequest->status !== \App\Enums\RequestStatus::New)
-        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
-            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
-            <p class="mt-1 text-sm text-ink-muted">
-                @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
-                    {{ __('admin.request_detail.compare_awaiting_payment_help') }}
-                @elseif ($partRequest->hasBeenPaid())
-                    {{ __('admin.request_detail.compare_locked_help') }}
-                @else
-                    {{ __('admin.request_detail.compare_help') }}
+        @php
+            $quoteResponses = $vendorResponses->reject(fn ($response) => $response->is_no_stock)->values();
+            $noStockResponses = $vendorResponses->filter(fn ($response) => $response->is_no_stock)->values();
+            $choiceLocked = $partRequest->quoteChoiceLocked();
+
+            // Everything each column shows, worked out once from the data
+            // the component already passes (no new data). A presented
+            // quote shows its frozen snapshot; an unpresented one shows the
+            // live PricingService/ShippingCalculator preview, as before.
+            $columns = $quoteResponses->map(function ($response, $index) use ($vendorResponsePricing, $vendorResponseShipping, $presentedResponseIds, $presentedQuotesByResponseId, $partRequest, $confirmedPayment) {
+                $pricing = $vendorResponsePricing->get($response->id);
+                $presentedQuote = $presentedQuotesByResponseId->get($response->id);
+                $isPresented = in_array($response->id, $presentedResponseIds, true);
+                $isBuyerSelected = $partRequest->selected_response_id === $response->id;
+                $isPaidAndSelected = $isBuyerSelected && $confirmedPayment !== null;
+                $calculatedShipping = $vendorResponseShipping->get($response->id);
+
+                $buyerPrice = $presentedQuote?->buyer_price ?? $pricing['buyer_price'] ?? null;
+                $shipping = $presentedQuote ? $presentedQuote->shipping_fee : $calculatedShipping;
+
+                return [
+                    'response' => $response,
+                    'letter' => chr(65 + $index % 26),
+                    'presentedQuote' => $presentedQuote,
+                    'isPresented' => $isPresented,
+                    'isBuyerSelected' => $isBuyerSelected,
+                    'isPaidAndSelected' => $isPaidAndSelected,
+                    'isFree' => (bool) $presentedQuote?->is_free,
+                    'calculatedShipping' => $calculatedShipping,
+                    'rate' => $presentedQuote?->applied_rate ?? $pricing['applied_rate'] ?? null,
+                    'minFee' => $presentedQuote?->applied_min_fee ?? $pricing['applied_min_fee'] ?? null,
+                    'margin' => $presentedQuote
+                        ? ($presentedQuote->is_free ? null : $presentedQuote->buyer_price - $presentedQuote->cost_price)
+                        : ($pricing['margin'] ?? null),
+                    'buyerPrice' => $buyerPrice,
+                    'shipping' => $shipping,
+                    'total' => $buyerPrice !== null && $shipping !== null ? $buyerPrice + $shipping : null,
+                    // Same precedence as before: an open payment gate (real
+                    // or 無償) wins over "selected", which wins over
+                    // "presented". Cyan for free-confirmed, so it never
+                    // blurs with the emerald "Free" tag or green "Paid".
+                    'tint' => match (true) {
+                        $isPaidAndSelected && $partRequest->is_free => 'bg-cyan-50',
+                        $isPaidAndSelected => 'bg-green-50',
+                        $isBuyerSelected => 'bg-brand-50',
+                        $isPresented => 'bg-blue-50/60',
+                        default => '',
+                    },
+                    'accent' => match (true) {
+                        $isPaidAndSelected && $partRequest->is_free => 'border-t-cyan-400',
+                        $isPaidAndSelected => 'border-t-green-500',
+                        $isBuyerSelected => 'border-t-brand-600',
+                        $isPresented => 'border-t-blue-300',
+                        default => 'border-t-transparent',
+                    },
+                ];
+            });
+
+            $formatNumber = fn ($value) => $value === null ? null : rtrim(rtrim(number_format((float) $value, 2, '.', ''), '0'), '.');
+        @endphp
+
+        <section class="mt-6 rounded-lg border border-line bg-surface shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3 border-b border-line px-5 py-4">
+                <div>
+                    <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
+                    <p class="mt-0.5 text-sm text-ink-muted">
+                        @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+                            {{ __('admin.request_detail.compare_awaiting_payment_help') }}
+                        @elseif ($partRequest->hasBeenPaid())
+                            {{ __('admin.request_detail.compare_locked_help') }}
+                        @else
+                            {{ __('admin.request_detail.compare_help') }}
+                        @endif
+                    </p>
+                </div>
+
+                {{-- Inquiry progress (moved here from the header): real
+                quotes out of invited vendors, plus no-stock and pending. --}}
+                @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
+                    @php
+                        $pendingReplies = max($partRequest->invited_vendors_count - $partRequest->quotes_count - $partRequest->no_stock_replies_count, 0);
+                    @endphp
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <x-admin.quote-response-count
+                            :quotes="$partRequest->quotes_count"
+                            :invited="$partRequest->invited_vendors_count"
+                            :no-stock="$partRequest->no_stock_replies_count"
+                        />
+                        @if ($pendingReplies > 0)
+                            <span class="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
+                                {{ __('admin.request_detail.pending_replies', ['count' => $pendingReplies]) }}
+                            </span>
+                        @endif
+                    </div>
                 @endif
-            </p>
+            </div>
 
             @error('presentQuote')
-                <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
+                <p class="mx-5 mt-4 text-sm text-red-600">{{ $message }}</p>
             @enderror
 
             @if ($vendorResponses->isEmpty())
-                <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                <p class="m-5 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
                     {{ __('admin.request_detail.no_vendor_responses') }}
                 </p>
             @else
-            <div class="mt-4 space-y-4">
-                @foreach ($vendorResponses as $response)
-                    @php
-                        $pricing = $vendorResponsePricing->get($response->id);
-                        $isPresented = in_array($response->id, $presentedResponseIds, true);
-                        $isBuyerSelected = $partRequest->selected_response_id === $response->id;
-                        $presentedQuote = $presentedQuotesByResponseId->get($response->id);
-                        // The buyer's own pick has a confirmed payment once
-                        // the pay-before-purchase gate (CLAUDE.md §6.3) is
-                        // actually open -- $confirmedPayment itself is
-                        // request-wide (there's only ever one), so it only
-                        // means anything for whichever response the buyer
-                        // selected; another presented-but-unchosen response
-                        // never reads as paid just because the request is.
-                        $isPaidAndSelected = $isBuyerSelected && $confirmedPayment !== null;
-                    @endphp
-                    @php
-                        // Distinct visual states, most money-significant
-                        // first: an open payment gate (real or 無償, CLAUDE.md
-                        // §14 Phase 4 slice 5) is the strongest signal on this
-                        // page -- it's what lets the admin confirm to the
-                        // vendor -- so it always wins over the plain
-                        // "selected" or "presented" treatment beneath it.
-                        $rowClass = match (true) {
-                            // Cyan, not emerald -- emerald is already the
-                            // plain "Free (無償)" tag's own color (below), and
-                            // sitting too close to the new green Paid
-                            // treatment would blur the exact distinction
-                            // this slice exists to make.
-                            $isPaidAndSelected && $partRequest->is_free => 'border-cyan-300 bg-cyan-50',
-                            $isPaidAndSelected => 'border-green-300 bg-green-50',
-                            $isBuyerSelected => 'border-brand-500 bg-brand-50',
-                            $isPresented => 'border-blue-200 bg-blue-50/60',
-                            default => 'border-line',
-                        };
-                    @endphp
-                    <div class="rounded-md border p-4 {{ $rowClass }}">
-                        <div class="flex flex-wrap items-start justify-between gap-3">
-                            <div>
-                                <span class="font-medium text-ink">{{ $response->vendor->company_name }}</span>
-                                <span class="ml-2 text-xs text-ink-muted">{{ $response->vendor->contact_person }}</span>
-                            </div>
-
-                            <div class="flex flex-wrap items-center gap-2">
-                                @if ($response->is_no_stock)
-                                    <span class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">
-                                        {{ __('admin.request_detail.no_stock_badge') }}
-                                    </span>
-                                @endif
-
-                                @if ($isPresented)
-                                    <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
-                                        {{ __('admin.request_detail.presented_badge') }}
-                                    </span>
-
-                                    {{-- "Free (無償)" marks what the quote WOULD cost the
-                                    buyer if chosen -- once it's actually confirmed, the
-                                    dedicated free-confirmed badge below takes over so
-                                    the two are never shown at once. --}}
-                                    @if ($presentedQuote?->is_free && ! $isPaidAndSelected)
-                                        <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
-                                            {{ __('admin.request_detail.free_badge') }}
-                                        </span>
-                                    @endif
-
-                                    @if ($isBuyerSelected)
-                                        <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
-                                            {{ __('admin.request_detail.buyer_selected_badge') }}
-                                        </span>
-                                    @endif
-
-                                    @if ($isPaidAndSelected)
-                                        @if ($partRequest->is_free)
-                                            <span class="inline-flex rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-800">
-                                                {{ __('admin.request_detail.free_confirmed_badge') }}
-                                            </span>
-                                        @else
-                                            <span class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
-                                                {{ __('admin.request_detail.paid_badge') }}
-                                            </span>
-                                        @endif
-                                    @endif
-                                @endif
-                            </div>
-                        </div>
-
-                        @if (! $response->is_no_stock)
-                            <div class="mt-3 overflow-x-auto rounded-md border border-line">
-                                <table class="min-w-full divide-y divide-line text-sm">
-                                    <thead class="bg-surface-muted">
-                                        <tr class="text-left text-xs font-medium uppercase tracking-wide text-ink-muted">
-                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.cost_price_column') }}</th>
-                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.buyer_price_column') }}</th>
-                                            <th class="px-3 py-2">{{ __('admin.request_detail.quality_rank_column') }}</th>
-                                            <th class="px-3 py-2">{{ __('admin.request_detail.lead_time_column') }}</th>
-                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.weight_column') }}</th>
-                                            <th class="whitespace-nowrap px-3 py-2">{{ __('admin.request_detail.shipping_fee_column') }}</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-line bg-surface">
-                                        <tr>
-                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">¥{{ number_format($response->cost_price) }}</td>
-                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
-                                                @if ($presentedQuote)
-                                                    ¥{{ number_format($presentedQuote->buyer_price) }}
-                                                @elseif ($pricing)
-                                                    ¥{{ number_format($pricing['buyer_price']) }}
-                                                @else
-                                                    {{ __('admin.request_detail.not_provided') }}
-                                                @endif
-                                            </td>
-                                            <td class="px-3 py-2 text-ink">{{ __('enums.quality_rank.'.$response->quality_rank->value) }}</td>
-                                            <td class="px-3 py-2 text-ink">{{ __('enums.lead_time.'.$response->lead_time->value) }}</td>
-                                            <td class="whitespace-nowrap px-3 py-2 font-mono text-ink">
-                                                {{ $response->weight_kg !== null ? $response->weight_kg.' kg' : __('admin.request_detail.not_provided') }}
-                                            </td>
-                                            <td class="whitespace-nowrap px-3 py-2 font-mono font-medium text-ink">
-                                                @if ($presentedQuote)
-                                                    ¥{{ number_format($presentedQuote->shipping_fee) }}
-                                                @else
-                                                    @php $calculatedShipping = $vendorResponseShipping->get($response->id); @endphp
-                                                    {{ $calculatedShipping !== null ? '¥'.number_format($calculatedShipping) : __('admin.request_detail.not_provided') }}
-                                                @endif
-                                            </td>
-                                        </tr>
-                                    </tbody>
-                                </table>
-                            </div>
-
-                            @if ($response->comment)
-                                <p class="mt-3 text-sm text-ink">{{ $response->comment }}</p>
-                            @endif
-
-                            <div class="mt-3 max-w-sm">
-                                <x-photo-gallery :photos="$response->photos->map(fn ($photo) => $photo->url())->all()" />
-                            </div>
-
-                            <div class="mt-3 flex flex-wrap items-center gap-3">
-                                @unless ($isPresented)
-                                    <label class="flex items-center gap-2 text-sm font-medium text-ink {{ $partRequest->quoteChoiceLocked() ? 'opacity-50' : '' }}">
-                                        <input
-                                            type="checkbox"
-                                            wire:model="selectedResponseIdsToPresent"
-                                            value="{{ $response->id }}"
-                                            {{ $partRequest->quoteChoiceLocked() ? 'disabled' : '' }}
-                                            class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                @if ($columns->isNotEmpty())
+                    {{-- x-data only so cells can read the existing
+                    selectedResponseIdsToPresent (read-only) and tint a
+                    column the moment its box is ticked. --}}
+                    <div
+                        class="overflow-x-auto"
+                        x-data="{ checked(id) { return (this.$wire.selectedResponseIdsToPresent || []).some((value) => String(value) === String(id)) } }"
+                    >
+                        <table class="w-full min-w-max border-separate border-spacing-0 text-sm">
+                            <thead>
+                                <tr>
+                                    <th scope="col" class="sticky left-0 z-10 w-40 min-w-40 border-b border-line bg-surface px-4 py-3 text-left align-top text-xs font-medium uppercase tracking-wide text-ink-muted">
+                                        {{ __('admin.request_detail.quote_row') }}
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        @php $response = $column['response']; @endphp
+                                        <th
+                                            scope="col"
+                                            wire:key="quote-head-{{ $response->id }}"
+                                            class="w-72 min-w-72 border-b border-t-2 border-b-line px-4 py-3 text-left align-top font-normal {{ $column['accent'] }} {{ $column['tint'] }}"
+                                            @unless ($column['isPresented']) :class="checked({{ $response->id }}) && 'bg-brand-50/70 border-t-brand-600!'" @endunless
                                         >
-                                        {{ __('admin.request_detail.present_checkbox_label') }}
-                                    </label>
-
-                                    @unless ($partRequest->quoteChoiceLocked() || $presentAsFree)
-                                        <div class="mt-3 flex flex-wrap items-end gap-3">
-                                            <div>
-                                                <label for="shipping-override-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
-                                                    {{ __('admin.request_detail.shipping_override_label') }}
-                                                </label>
-                                                <input
-                                                    id="shipping-override-{{ $response->id }}"
-                                                    type="number"
-                                                    min="0"
-                                                    wire:model="shippingFeeOverrides.{{ $response->id }}"
-                                                    placeholder="{{ $calculatedShipping !== null ? number_format($calculatedShipping) : '' }}"
-                                                    class="mt-1 block w-36 rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                                >
+                                            <div class="flex items-start gap-2">
+                                                @unless ($column['isPresented'])
+                                                    <input
+                                                        type="checkbox"
+                                                        wire:model="selectedResponseIdsToPresent"
+                                                        value="{{ $response->id }}"
+                                                        {{ $choiceLocked ? 'disabled' : '' }}
+                                                        aria-label="{{ __('admin.request_detail.present_checkbox_label') }} -- {{ $column['letter'] }}"
+                                                        class="mt-0.5 rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500 disabled:opacity-50"
+                                                    >
+                                                @endunless
+                                                <div class="min-w-0">
+                                                    <p class="font-semibold text-ink">
+                                                        <span class="text-brand-700">{{ $column['letter'] }}</span>
+                                                        &middot; {{ $response->vendor->company_name }}
+                                                    </p>
+                                                    <p class="mt-0.5 text-xs text-ink-muted">
+                                                        {{ $response->vendor->contact_person }}
+                                                        &middot; {{ __('admin.request_detail.replied_at', ['date' => $response->created_at->format('m-d H:i')]) }}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div class="min-w-[16rem] flex-1">
-                                                <label for="shipping-override-reason-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
-                                                    {{ __('admin.request_detail.shipping_override_reason_label') }}
-                                                </label>
-                                                <input
-                                                    id="shipping-override-reason-{{ $response->id }}"
-                                                    type="text"
-                                                    wire:model="shippingFeeOverrideReasons.{{ $response->id }}"
-                                                    placeholder="{{ __('admin.request_detail.shipping_override_reason_placeholder') }}"
-                                                    class="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
-                                                >
+                                        </th>
+                                    @endforeach
+                                </tr>
+                            </thead>
+
+                            <tbody>
+                                {{-- Photos --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.photos_row') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            <x-photo-gallery :photos="$column['response']->photos->map(fn ($photo) => $photo->url())->all()" />
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Quality rank --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.quality_rank_column') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.quality_rank_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        @php $rankLabel = __('enums.quality_rank.'.$column['response']->quality_rank->value); @endphp
+                                        <td class="border-b border-line px-4 py-3 align-top {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            <span class="flex items-start gap-2">
+                                                <span class="inline-flex size-6 shrink-0 items-center justify-center rounded-md bg-surface-muted text-xs font-semibold text-ink">{{ strtoupper($column['response']->quality_rank->value) }}</span>
+                                                <span class="text-ink">{{ \Illuminate\Support\Str::after($rankLabel, ' -- ') }}</span>
+                                            </span>
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Vendor cost (admin only) --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.cost_price_column') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.admin_only_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top font-mono font-semibold text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            ¥{{ number_format($column['response']->cost_price) }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Markup --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.markup_row') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.markup_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            @if ($column['isFree'])
+                                                <span class="text-ink-muted">{{ __('admin.request_detail.markup_free') }}</span>
+                                            @elseif ($column['rate'] !== null && $column['margin'] !== null)
+                                                <span class="font-mono">{{ $column['rate'] }} %</span>
+                                                <span class="text-xs text-ink-muted">
+                                                    &middot; {{ __('admin.request_detail.margin_amount', ['amount' => number_format($column['margin'])]) }}
+                                                    @if ($column['minFee'] !== null && $column['margin'] === $column['minFee'])
+                                                        ({{ __('admin.request_detail.min_fee_applied') }})
+                                                    @endif
+                                                </span>
+                                            @else
+                                                {{ __('admin.request_detail.not_provided') }}
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Buyer price --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.buyer_price_column') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.part_only_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top font-mono text-base font-semibold text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            {{ $column['buyerPrice'] !== null ? '¥'.number_format($column['buyerPrice']) : __('admin.request_detail.not_provided') }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Estimated shipping (+ the override inputs, unchanged) --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.shipping_fee_column') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.shipping_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        @php $response = $column['response']; @endphp
+                                        <td class="border-b border-line px-4 py-3 align-top {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $response->id }}) && 'bg-brand-50/70'" @endunless>
+                                            <span class="font-mono text-ink">{{ $column['shipping'] !== null ? '¥'.number_format($column['shipping']) : __('admin.request_detail.not_provided') }}</span>
+                                            @if ($column['presentedQuote']?->shipping_fee_overridden)
+                                                <span class="ml-1 text-xs text-ink-muted">({{ __('admin.request_detail.shipping_overridden_note') }})</span>
+                                            @endif
+
+                                            @unless ($column['isPresented'] || $choiceLocked || $presentAsFree)
+                                                <div class="mt-2 space-y-2">
+                                                    <div>
+                                                        <label for="shipping-override-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
+                                                            {{ __('admin.request_detail.shipping_override_label') }}
+                                                        </label>
+                                                        <input
+                                                            id="shipping-override-{{ $response->id }}"
+                                                            type="number"
+                                                            min="0"
+                                                            wire:model="shippingFeeOverrides.{{ $response->id }}"
+                                                            placeholder="{{ $column['calculatedShipping'] !== null ? number_format($column['calculatedShipping']) : '' }}"
+                                                            class="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                        >
+                                                    </div>
+                                                    <div>
+                                                        <label for="shipping-override-reason-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
+                                                            {{ __('admin.request_detail.shipping_override_reason_label') }}
+                                                        </label>
+                                                        <input
+                                                            id="shipping-override-reason-{{ $response->id }}"
+                                                            type="text"
+                                                            wire:model="shippingFeeOverrideReasons.{{ $response->id }}"
+                                                            placeholder="{{ __('admin.request_detail.shipping_override_reason_placeholder') }}"
+                                                            class="mt-1 block w-full rounded-md border border-line bg-surface px-2 py-1 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                                                        >
+                                                    </div>
+                                                    @error("shippingFeeOverrides.{$response->id}")
+                                                        <p class="text-xs text-red-600">{{ $message }}</p>
+                                                    @enderror
+                                                    @error("shippingFeeOverrideReasons.{$response->id}")
+                                                        <p class="text-xs text-red-600">{{ $message }}</p>
+                                                    @enderror
+                                                </div>
+                                            @endunless
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Buyer total --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.buyer_total_row') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.buyer_total_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top font-mono font-semibold text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            {{ $column['total'] !== null ? '¥'.number_format($column['total']) : __('admin.request_detail.not_provided') }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Lead time --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.lead_time_column') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            {{ __('enums.lead_time.'.$column['response']->lead_time->value) }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Weight --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.weight_column') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="border-b border-line px-4 py-3 align-top font-mono text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            {{ $column['response']->weight_kg !== null ? $formatNumber($column['response']->weight_kg).' kg' : __('admin.request_detail.not_provided') }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Dimensions --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.dimensions_row') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.dimensions_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        @php $r = $column['response']; @endphp
+                                        <td class="border-b border-line px-4 py-3 align-top font-mono text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $r->id }}) && 'bg-brand-50/70'" @endunless>
+                                            @if ($r->length_cm !== null && $r->width_cm !== null && $r->height_cm !== null)
+                                                {{ $formatNumber($r->length_cm) }} &times; {{ $formatNumber($r->width_cm) }} &times; {{ $formatNumber($r->height_cm) }} cm
+                                            @else
+                                                {{ __('admin.request_detail.not_provided') }}
+                                            @endif
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- Condition notes --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 border-b border-line bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.condition_notes_row') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.condition_notes_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="whitespace-normal border-b border-line px-4 py-3 align-top text-ink {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            {{ $column['response']->comment ?: __('admin.request_detail.not_provided') }}
+                                        </td>
+                                    @endforeach
+                                </tr>
+
+                                {{-- This quote's status --}}
+                                <tr>
+                                    <th scope="row" class="sticky left-0 z-10 bg-surface px-4 py-3 text-left align-top font-normal">
+                                        <span class="block text-xs font-medium text-ink">{{ __('admin.request_detail.quote_status_row') }}</span>
+                                        <span class="block text-[11px] text-ink-muted">{{ __('admin.request_detail.quote_status_hint') }}</span>
+                                    </th>
+                                    @foreach ($columns as $column)
+                                        <td class="px-4 py-3 align-top {{ $column['tint'] }}" @unless ($column['isPresented']) :class="checked({{ $column['response']->id }}) && 'bg-brand-50/70'" @endunless>
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                @if ($column['isPresented'])
+                                                    <span class="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium text-blue-700">
+                                                        {{ __('admin.request_detail.presented_badge') }}
+                                                    </span>
+
+                                                    {{-- "Free (無償)" marks what the quote WOULD cost
+                                                    the buyer if chosen -- once confirmed, the
+                                                    free-confirmed badge takes over instead. --}}
+                                                    @if ($column['isFree'] && ! $column['isPaidAndSelected'])
+                                                        <span class="inline-flex rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-medium text-emerald-700">
+                                                            {{ __('admin.request_detail.free_badge') }}
+                                                        </span>
+                                                    @endif
+
+                                                    @if ($column['isBuyerSelected'])
+                                                        <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
+                                                            {{ __('admin.request_detail.buyer_selected_badge') }}
+                                                        </span>
+                                                    @endif
+
+                                                    @if ($column['isPaidAndSelected'])
+                                                        @if ($partRequest->is_free)
+                                                            <span class="inline-flex rounded-full bg-cyan-100 px-2.5 py-1 text-xs font-semibold text-cyan-800">
+                                                                {{ __('admin.request_detail.free_confirmed_badge') }}
+                                                            </span>
+                                                        @else
+                                                            <span class="inline-flex rounded-full bg-green-100 px-2.5 py-1 text-xs font-semibold text-green-800">
+                                                                {{ __('admin.request_detail.paid_badge') }}
+                                                            </span>
+                                                        @endif
+                                                    @endif
+                                                @else
+                                                    <span class="text-xs font-medium text-brand-700" x-show="checked({{ $column['response']->id }})" x-cloak>{{ __('admin.request_detail.checked_to_present') }}</span>
+                                                    <span class="text-xs text-ink-muted" x-show="! checked({{ $column['response']->id }})">{{ __('admin.request_detail.not_presented') }}</span>
+                                                @endif
                                             </div>
-                                        </div>
-                                        @error("shippingFeeOverrides.{$response->id}")
-                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                        @enderror
-                                        @error("shippingFeeOverrideReasons.{$response->id}")
-                                            <p class="mt-1 text-sm text-red-600">{{ $message }}</p>
-                                        @enderror
-                                    @endunless
-                                @endunless
-                            </div>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-
-            @unless ($partRequest->quoteChoiceLocked())
-                @php
-                    $hasSelectablePresentableQuotes = $vendorResponses
-                        ->filter(fn ($response) => ! $response->is_no_stock && ! in_array($response->id, $presentedResponseIds, true))
-                        ->isNotEmpty();
-                @endphp
-                @if ($hasSelectablePresentableQuotes)
-                    <div class="mt-4 rounded-md border border-line bg-surface-muted p-3">
-                        <label class="flex items-center gap-2 text-sm font-medium text-ink">
-                            <input
-                                type="checkbox"
-                                wire:model.live="presentAsFree"
-                                class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
-                            >
-                            {{ __('admin.request_detail.present_as_free_label') }}
-                        </label>
-                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.present_as_free_help') }}</p>
-                    </div>
-
-                    <div class="mt-4">
-                        <button
-                            type="button"
-                            wire:click="presentSelectedQuotes"
-                            wire:confirm="{{ __('admin.request_detail.present_selected_confirm') }}"
-                            wire:loading.attr="disabled"
-                            wire:target="presentSelectedQuotes"
-                            class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
-                        >
-                            {{ __('admin.request_detail.present_selected_button') }}
-                        </button>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            </tbody>
+                        </table>
                     </div>
                 @endif
-            @endunless
+
+                {{-- No-stock replies: no quote to compare, so a compact
+                line rather than an empty column. --}}
+                @if ($noStockResponses->isNotEmpty())
+                    <div class="flex flex-wrap items-center gap-2 border-t border-line px-5 py-3 text-sm">
+                        <span class="inline-flex rounded-full bg-red-50 px-2.5 py-1 text-xs font-medium text-red-700">{{ __('admin.request_detail.no_stock_badge') }}</span>
+                        @foreach ($noStockResponses as $response)
+                            <span wire:key="no-stock-{{ $response->id }}" class="text-ink">
+                                {{ $response->vendor->company_name }}
+                                <span class="text-xs text-ink-muted">{{ __('admin.request_detail.replied_at', ['date' => $response->created_at->format('m-d H:i')]) }}</span>@unless ($loop->last),@endunless
+                            </span>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Free flag + present button: unchanged behaviour, shown
+                under the same conditions as before. --}}
+                @unless ($choiceLocked)
+                    @php
+                        $hasSelectablePresentableQuotes = $vendorResponses
+                            ->filter(fn ($response) => ! $response->is_no_stock && ! in_array($response->id, $presentedResponseIds, true))
+                            ->isNotEmpty();
+                    @endphp
+                    @if ($hasSelectablePresentableQuotes)
+                        <div class="flex flex-wrap items-center justify-between gap-4 border-t border-line bg-surface-muted px-5 py-4">
+                            <div>
+                                <label class="flex items-center gap-2 text-sm font-medium text-ink">
+                                    <input
+                                        type="checkbox"
+                                        wire:model.live="presentAsFree"
+                                        class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
+                                    >
+                                    {{ __('admin.request_detail.present_as_free_label') }}
+                                </label>
+                                <p class="mt-1 max-w-xl text-xs text-ink-muted">{{ __('admin.request_detail.present_as_free_help') }}</p>
+                            </div>
+
+                            <button
+                                type="button"
+                                wire:click="presentSelectedQuotes"
+                                wire:confirm="{{ __('admin.request_detail.present_selected_confirm') }}"
+                                wire:loading.attr="disabled"
+                                wire:target="presentSelectedQuotes"
+                                class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                            >
+                                {{ __('admin.request_detail.present_selected_button') }}
+                            </button>
+                        </div>
+                    @endif
+                @endunless
             @endif
-        </div>
+        </section>
     @endif
-    </div>
 </div>

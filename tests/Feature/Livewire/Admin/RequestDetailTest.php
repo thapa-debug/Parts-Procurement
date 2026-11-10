@@ -182,7 +182,9 @@ it('shows each vendor response\'s cost, computed buyer price, quality rank, lead
         ->assertSee('45,000')
         // max(45000 * 20%, 2000) = 9000 -> buyer_price 54000
         ->assertSee('54,000')
-        ->assertSee(__('enums.quality_rank.a'))
+        // Rank letter chip + its description (the "A -- " prefix is the chip).
+        ->assertSeeHtml('>A</span>')
+        ->assertSee('Excellent condition')
         ->assertSee(__('enums.lead_time.within_1_week'))
         ->assertSee('Clean, no visible damage.')
         ->assertSee(__('admin.request_detail.present_checkbox_label'));
@@ -396,7 +398,9 @@ it('shows a Paid badge and a distinct background on the buyer-selected quote onc
         // free-flow one.
         ->assertDontSee(__('admin.request_detail.free_badge'));
 
-    expect($component->html())->toContain('border-green-300');
+    // The paid quote's column carries the green accent (restyle: column
+    // layout, previously a green card border).
+    expect($component->html())->toContain('border-t-green-500');
 });
 
 it('shows a Free -- confirmed badge instead of Paid for a confirmed 無償 order', function () {
@@ -428,7 +432,8 @@ it('shows a Free -- confirmed badge instead of Paid for a confirmed 無償 order
     // badge. bg-green-100 is that badge's own distinctive class, never
     // used by the status pill or anything else on this page.
     expect($html)->not->toContain('bg-green-100')
-        ->and($html)->toContain('border-cyan-300');
+        // Free-confirmed column accent (restyle: was a cyan card border).
+        ->and($html)->toContain('border-t-cyan-400');
 });
 
 it('never shows the Paid badge on a presented-but-not-selected quote, even once the request is paid', function () {
@@ -772,4 +777,73 @@ it('shows procurement_failed in red on the "Order confirmed" step', function () 
     $html = Livewire::actingAs($admin)->test(RequestDetail::class, ['partRequest' => $request])->html();
 
     expect($html)->toMatch('/aria-current="step"[\s\S]*?text-red-700">Order confirmed[\s\S]*?Procurement failed/');
+});
+
+// --- vendor-quote columns (restyle) ----------------------------------------------
+
+it('lays real quotes out as lettered columns and lists no-stock replies on their own line', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    foreach (['Yokohama Eco Parts', 'Chiba Auto Recycle'] as $name) {
+        VendorResponse::factory()->create([
+            'part_request_id' => $request->id,
+            'vendor_id' => VendorProfile::factory()->create(['company_name' => $name])->id,
+        ]);
+    }
+    VendorResponse::factory()->noStock()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => VendorProfile::factory()->create(['company_name' => 'Gunma Recycle Works'])->id,
+    ]);
+
+    $html = Livewire::actingAs($admin)->test(RequestDetail::class, ['partRequest' => $request])->html();
+
+    expect(substr_count($html, 'wire:key="quote-head-'))->toBe(2)
+        ->and($html)->toMatch('/>A<\/span>\s*&middot; Yokohama Eco Parts/')
+        ->and($html)->toMatch('/>B<\/span>\s*&middot; Chiba Auto Recycle/')
+        ->and($html)->toContain('wire:key="no-stock-')
+        ->and($html)->toContain('Gunma Recycle Works');
+});
+
+it('shows the quotes-received chip with a pending count above the quote columns', function () {
+    $admin = User::factory()->admin()->create();
+    $request = inquiryWithResponses(invited: 6, quotes: 4, noStock: 1);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeInOrder([
+            __('admin.request_detail.compare_section'),
+            '4 / 6 quotes received',
+            '1 no stock',
+            __('admin.request_detail.pending_replies', ['count' => 1]),
+        ]);
+});
+
+it('offers the present checkbox and shipping-override inputs only on not-yet-presented quotes', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $presented = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    $open = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+    app(PresentQuoteAction::class)->execute($request, $presented);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSeeHtml('value="'.$open->id.'"')
+        ->assertDontSeeHtml('value="'.$presented->id.'"')
+        ->assertSeeHtml('id="shipping-override-'.$open->id.'"')
+        ->assertDontSeeHtml('id="shipping-override-'.$presented->id.'"');
+});
+
+it('still presents the ticked quotes from the column layout', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('selectedResponseIdsToPresent', [(string) $response->id])
+        ->call('presentSelectedQuotes')
+        ->assertHasNoErrors()
+        ->assertSee(__('admin.request_detail.presented_badge'));
+
+    expect(PresentedQuote::where('vendor_response_id', $response->id)->exists())->toBeTrue();
 });
