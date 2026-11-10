@@ -14,6 +14,13 @@
     picks a quote -- present as soon as one's been chosen, free or paid
     alike, so this guard is really just hasBeenPaid() with a defensive
     null-check against a request paid for before that column existed. --}}
+    @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+        <div class="mt-6 rounded-lg border border-sky-200 bg-sky-50 p-5">
+            <h2 class="text-sm font-semibold text-sky-900">{{ __('buyer.request_detail.awaiting_payment_heading') }}</h2>
+            <p class="mt-1 text-sm text-sky-800">{{ __('buyer.request_detail.awaiting_payment_body') }}</p>
+        </div>
+    @endif
+
     @if ($partRequest->hasBeenPaid() && $partRequest->shipping_method)
         <x-paid-status-banner
             :heading="$partRequest->is_free ? __('buyer.request_detail.paid_banner_heading_free') : __('buyer.request_detail.paid_banner_heading')"
@@ -131,7 +138,9 @@
 
         @if (count($options) > 0)
             <p class="mt-1 text-sm text-ink-muted">
-                @if ($partRequest->hasBeenPaid())
+                @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+                    {{ __('buyer.request_detail.quote_awaiting_payment_help') }}
+                @elseif ($partRequest->hasBeenPaid())
                     {{ $partRequest->is_free ? __('buyer.request_detail.quote_locked_help_free') : __('buyer.request_detail.quote_locked_help') }}
                 @else
                     {{ __('buyer.request_detail.quote_options_help') }}
@@ -165,7 +174,7 @@
                                 <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                     {{ __('buyer.request_detail.quote_selected_badge') }}
                                 </span>
-                            @elseif (! $partRequest->hasBeenPaid())
+                            @elseif (! $partRequest->quoteChoiceLocked())
                                 <button
                                     type="button"
                                     wire:click="selectQuote({{ $option['presented_quote_id'] }})"

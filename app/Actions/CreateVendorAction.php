@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\DeliveryMethod;
 use App\Enums\UserRole;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -36,8 +37,9 @@ class CreateVendorAction
         string $contactPerson,
         string $phone,
         string $notifyEmail,
+        DeliveryMethod $deliveryMethod,
     ): array {
-        $result = DB::transaction(function () use ($name, $email, $companyName, $contactPerson, $phone, $notifyEmail) {
+        $result = DB::transaction(function () use ($name, $email, $companyName, $contactPerson, $phone, $notifyEmail, $deliveryMethod) {
             $result = $this->createAdminManagedUser->execute($name, $email, UserRole::Vendor);
 
             $vendorProfile = VendorProfile::create([
@@ -46,6 +48,7 @@ class CreateVendorAction
                 'contact_person' => $contactPerson,
                 'phone' => $phone,
                 'notify_email' => $notifyEmail,
+                'delivery_method' => $deliveryMethod,
             ]);
 
             return [

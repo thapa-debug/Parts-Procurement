@@ -30,6 +30,7 @@
                     <th class="px-4 py-3">{{ __('admin.vendor_master.table.company') }}</th>
                     <th class="px-4 py-3">{{ __('admin.vendor_master.table.contact') }}</th>
                     <th class="px-4 py-3">{{ __('admin.vendor_master.table.email') }}</th>
+                    <th class="px-4 py-3">{{ __('admin.vendor_master.table.delivery_method') }}</th>
                     <th class="px-4 py-3">{{ __('admin.vendor_master.table.status') }}</th>
                     <th class="px-4 py-3">{{ __('admin.verification.column') }}</th>
                     <th class="px-4 py-3 text-right">{{ __('admin.vendor_master.table.actions') }}</th>
@@ -45,6 +46,7 @@
                         </td>
                         <td class="px-4 py-3 text-ink-muted">{{ $vendor->contact_person }}</td>
                         <td class="px-4 py-3 text-ink-muted">{{ $vendor->user->email }}</td>
+                        <td class="px-4 py-3 text-ink-muted">{{ __('enums.delivery_method.'.$vendor->delivery_method->value) }}</td>
                         <td class="px-4 py-3">
                             @if ($vendor->status === \App\Enums\VendorStatus::Active)
                                 <span class="inline-flex rounded-full bg-green-50 px-2 py-0.5 text-xs font-medium text-green-700">
@@ -126,7 +128,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-4 py-8 text-center text-ink-muted">
+                        <td colspan="7" class="px-4 py-8 text-center text-ink-muted">
                             {{ $search ? __('admin.vendor_master.empty_search') : __('admin.vendor_master.empty') }}
                         </td>
                     </tr>
@@ -246,6 +248,25 @@
                                 <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
                             @enderror
                         </div>
+                    </div>
+
+                    <div>
+                        <label for="delivery_method" class="block text-sm font-medium text-ink">
+                            {{ __('admin.vendor_master.create_form.delivery_method_label') }} <x-required-mark />
+                        </label>
+                        <select
+                            id="delivery_method"
+                            wire:model="delivery_method"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                            @foreach ($deliveryMethods as $method)
+                                <option value="{{ $method->value }}">{{ __('enums.delivery_method.'.$method->value) }}</option>
+                            @endforeach
+                        </select>
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.vendor_master.create_form.delivery_method_help') }}</p>
+                        @error('delivery_method')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
                     </div>
 
                     <div class="flex items-center justify-end gap-3 pt-2">

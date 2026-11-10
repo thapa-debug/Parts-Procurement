@@ -2,6 +2,7 @@
 
 use App\Actions\ResumeVendorAction;
 use App\Actions\SuspendVendorAction;
+use App\Enums\DeliveryMethod;
 use App\Enums\VendorStatus;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -18,6 +19,37 @@ it('casts status to the VendorStatus enum and belongs to a user', function () {
 
     expect($profile->status)->toBe(VendorStatus::Active)
         ->and($profile->user->is($vendor))->toBeTrue();
+});
+
+it('casts delivery_method to the DeliveryMethod enum', function () {
+    $profile = VendorProfile::factory()->create(['delivery_method' => DeliveryMethod::Carry]);
+
+    expect($profile->fresh()->delivery_method)->toBe(DeliveryMethod::Carry);
+});
+
+it('defaults delivery_method to both at the database level when not given', function () {
+    $vendor = User::factory()->vendor()->create();
+
+    $profile = VendorProfile::create([
+        'user_id' => $vendor->id,
+        'company_name' => 'Acme Dismantlers',
+        'contact_person' => 'Jane Doe',
+        'phone' => '090-0000-0000',
+        'notify_email' => 'jane-notify@example.com',
+    ]);
+
+    expect($profile->fresh()->delivery_method)->toBe(DeliveryMethod::Both);
+});
+
+it('logs delivery method changes to the activity log', function () {
+    $profile = VendorProfile::factory()->create(['delivery_method' => DeliveryMethod::Both]);
+
+    $profile->update(['delivery_method' => DeliveryMethod::Deliver]);
+
+    $activity = Activity::query()->where('subject_id', $profile->id)->where('event', 'updated')->latest()->first();
+
+    expect($activity)->not->toBeNull()
+        ->and($activity->attribute_changes['attributes']['delivery_method'])->toBe('deliver');
 });
 
 // --- policy: isolation (CLAUDE.md 4) ------------------------------------

@@ -30,4 +30,20 @@ class RequestList extends Component
             'requests' => $requests,
         ])->title(__('buyer.request_list.title'));
     }
+
+    public function check()
+    {
+        $user = auth()->user();
+
+        $requests = PartRequest::query()
+            ->select(['id', 'request_code', 'maker_id'])
+            ->with('maker')
+            ->where('buyer_id', $user->buyerProfile?->id)
+            ->orderByDesc('created_at')
+            ->get();
+
+        return view('livewire.buyer.request-list', [
+            'requests' => $requests,
+        ])->title('buyer.request_list.title');
+    }
 }

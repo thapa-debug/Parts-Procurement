@@ -26,16 +26,12 @@ use Stripe\StripeClient;
  * webhook's signature. Never the browser, never a redirect landing back on
  * our site, never this class. A client-side "it succeeded!" callback is
  * trivially fakeable (devtools, a tampered response, a replayed request);
- * a signature-verified webhook is not. This is exactly why
- * CheckoutAction's own gate (RequestStatus::Paid, set synchronously once
- * this method returns success) and the real payment gate
- * (ConfirmOrderToVendorAction, which separately requires a `confirmed`
- * Payment row) are allowed to disagree for a short window: a request can
- * legitimately read `paid` before its Payment row reads `confirmed` --
- * CheckoutAction is unchanged by this integration (the whole point of the
- * PaymentGateway abstraction, CLAUDE.md §14 Phase 4 slice 1), and the
- * admin-facing "can I confirm to the vendor yet" gate never opens on
- * `paid` status alone regardless.
+ * a signature-verified webhook is not. So once this method returns
+ * success, CheckoutAction leaves the request at `awaiting_payment`, and
+ * the same webhook-driven ConfirmStripePaymentAction moves it to `paid`
+ * only when it confirms the Payment row. The admin's "confirm to vendor"
+ * gate (ConfirmOrderToVendorAction) still checks for a `confirmed`
+ * Payment row itself, never the status column alone.
  *
  * Amounts: CLAUDE.md §6.1/§7 already stores money as integer yen, no
  * decimals -- and JPY is one of Stripe's own zero-decimal currencies, so

@@ -2,6 +2,7 @@
 
 use App\Actions\CreateVendorAction;
 use App\Actions\ResetTemporaryPasswordAction;
+use App\Enums\DeliveryMethod;
 use App\Enums\UserRole;
 use App\Http\Requests\CreateVendorRequest;
 use App\Models\User;
@@ -23,6 +24,7 @@ function vendorPayload(array $overrides = []): array
         'contact_person' => 'Jane Doe',
         'phone' => '090-0000-0000',
         'notify_email' => 'jane-notify@example.com',
+        'delivery_method' => 'carry',
     ], $overrides);
 }
 
@@ -40,6 +42,7 @@ it('creates a user and vendor profile together, atomically', function () {
         $payload['contact_person'],
         $payload['phone'],
         $payload['notify_email'],
+        DeliveryMethod::from($payload['delivery_method']),
     );
 
     expect($result['user']->role)->toBe(UserRole::Vendor)
@@ -47,6 +50,7 @@ it('creates a user and vendor profile together, atomically', function () {
         ->and($result['user']->hasVerifiedEmail())->toBeFalse()
         ->and($result['vendor_profile']->user_id)->toBe($result['user']->id)
         ->and($result['vendor_profile']->company_name)->toBe('Acme Dismantlers')
+        ->and($result['vendor_profile']->delivery_method)->toBe(DeliveryMethod::Carry)
         ->and(Hash::check($result['temporary_password'], $result['user']->password))->toBeTrue();
 
     expect(User::count())->toBe(1)
@@ -77,6 +81,7 @@ it('rolls back the entire transaction and creates zero users if the vendor profi
         $payload['contact_person'],
         $payload['phone'],
         $payload['notify_email'],
+        DeliveryMethod::from($payload['delivery_method']),
     );
 
     expect($attempt)->toThrow(RuntimeException::class);
@@ -96,7 +101,7 @@ it('requires every vendor creation field', function () {
 
     expect($validator->fails())->toBeTrue();
 
-    foreach (['name', 'email', 'company_name', 'contact_person', 'phone', 'notify_email'] as $field) {
+    foreach (['name', 'email', 'company_name', 'contact_person', 'phone', 'notify_email', 'delivery_method'] as $field) {
         expect($validator->errors()->has($field))->toBeTrue();
     }
 });
@@ -110,6 +115,15 @@ it('rejects a duplicate email', function () {
     );
 
     expect($validator->errors()->has('email'))->toBeTrue();
+});
+
+it('rejects a delivery method outside the DeliveryMethod enum', function () {
+    $validator = Validator::make(
+        vendorPayload(['delivery_method' => 'teleport']),
+        (new CreateVendorRequest)->rules(),
+    );
+
+    expect($validator->errors()->has('delivery_method'))->toBeTrue();
 });
 
 it('passes with a complete, unique payload', function () {

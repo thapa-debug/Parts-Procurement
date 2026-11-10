@@ -13,6 +13,11 @@ return [
         'responded_section' => 'Responded',
         'responded_empty' => "You haven't responded to anything yet.",
 
+        'confirmed_section' => 'Confirmed orders -- action needed',
+        'confirmed_help' => 'Your quote was selected for these. Please deliver the part and send us your invoice.',
+        'confirmed_badge' => 'Order confirmed',
+        'confirmed_hint' => 'Deliver the part, then send your invoice.',
+
         'no_stock_badge' => 'No stock',
         'view_link' => 'View',
 
@@ -86,6 +91,20 @@ return [
         'submitted_section' => 'Your response',
         'submitted_no_stock' => 'You reported no stock for this part.',
         'submitted_quote' => 'You quoted ¥:price, rank :rank, :lead_time.',
+
+        'confirmed_badge' => 'Order confirmed',
+        'confirmed_heading' => 'Your quote was selected -- this order is confirmed',
+        'confirmed_help' => 'Please arrange delivery of the part as below.',
+        'delivery_section' => 'Deliver to',
+        'next_steps_heading' => 'Next steps',
+        // Keyed by App\Enums\DeliveryMethod -- the vendor's own fixed method.
+        'next_step_deliver' => [
+            'carry' => 'Bring the part to the delivery address.',
+            'deliver' => 'Ship the part to the delivery address.',
+            'both' => 'Bring or ship the part to the delivery address.',
+        ],
+        'next_step_invoice' => 'Send us your invoice for this order (your quoted price: ¥:price).',
+        'next_step_reference' => 'Quote request code :request_code on the delivery note and the invoice.',
     ],
 
 ];

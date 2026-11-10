@@ -300,3 +300,43 @@ it('never sends any vendor\'s cost, identity, or comment to the browser, even wi
         ->assertDontSee('40,000')
         ->assertDontSee('60,000');
 });
+
+// --- awaiting_payment ------------------------------------------------------------------
+
+it('tells the buyer the payment is awaiting confirmation, never that it is paid, while awaiting_payment', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create([
+        'status' => RequestStatus::AwaitingPayment,
+        'buyer_price' => 54_000,
+        'shipping_method' => ShippingMethod::Standard,
+        'shipping_fee' => 8_000,
+    ]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.request_list.status.awaiting_payment'))
+        ->assertSee(__('buyer.request_detail.awaiting_payment_heading'))
+        ->assertSee(__('buyer.request_detail.awaiting_payment_body'))
+        ->assertDontSee(__('buyer.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('buyer.request_detail.payment_summary_section'))
+        ->assertDontSee(__('buyer.request_detail.checkout_button'));
+});
+
+it('locks the quote choice while awaiting payment -- no select buttons', function () {
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $vendor = VendorProfile::factory()->create();
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => $vendor->id, 'cost_price' => 45_000, 'weight_kg' => 12]);
+    $other = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id, 'cost_price' => 30_000, 'weight_kg' => 12]);
+    $quote = app(PresentQuoteAction::class)->execute($request, $response);
+    app(PresentQuoteAction::class)->execute($request->fresh(), $other);
+    app(SelectQuoteAction::class)->execute($request->fresh(), $quote);
+    $request->fresh()->update(['status' => RequestStatus::AwaitingPayment]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertDontSee(__('buyer.request_detail.select_quote_button'))
+        ->assertSee(__('buyer.request_detail.quote_awaiting_payment_help'));
+});

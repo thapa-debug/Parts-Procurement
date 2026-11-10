@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DeliveryMethod;
 use App\Livewire\Admin\VendorDetail;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -35,11 +36,14 @@ it('lets an admin mount the vendor detail component with current values pre-fill
         'contact_person' => 'Jane Doe',
         'phone' => '090-0000-0000',
         'notify_email' => 'jane-notify@example.com',
+        'delivery_method' => DeliveryMethod::Carry,
     ]);
 
     Livewire::actingAs($admin)
         ->test(VendorDetail::class, ['vendorProfile' => $profile])
         ->assertSee('Acme Dismantlers')
+        ->assertSee(__('admin.vendor_master.create_form.delivery_method_label'))
+        ->assertSet('delivery_method', 'carry')
         ->assertSet('company_name', 'Acme Dismantlers')
         ->assertSet('contact_person', 'Jane Doe')
         ->assertSet('phone', '090-0000-0000')
@@ -85,6 +89,7 @@ it('saves changes to the vendor profile', function () {
         ->set('contact_person', 'New Contact')
         ->set('phone', '080-1234-5678')
         ->set('notify_email', 'updated-notify@example.com')
+        ->set('delivery_method', 'deliver')
         ->call('save')
         ->assertDispatched('toast', message: __('admin.profile_edit.saved'), type: 'success');
 
@@ -93,7 +98,8 @@ it('saves changes to the vendor profile', function () {
     expect($profile->company_name)->toBe('Updated Motors')
         ->and($profile->contact_person)->toBe('New Contact')
         ->and($profile->phone)->toBe('080-1234-5678')
-        ->and($profile->notify_email)->toBe('updated-notify@example.com');
+        ->and($profile->notify_email)->toBe('updated-notify@example.com')
+        ->and($profile->delivery_method)->toBe(DeliveryMethod::Deliver);
 });
 
 // --- validation ------------------------------------------------------------
@@ -106,6 +112,7 @@ it('rejects empty required fields', function () {
         ->test(VendorDetail::class, ['vendorProfile' => $profile])
         ->set('company_name', '')
         ->set('notify_email', 'not-an-email')
+        ->set('delivery_method', 'teleport')
         ->call('save')
-        ->assertHasErrors(['company_name', 'notify_email']);
+        ->assertHasErrors(['company_name', 'notify_email', 'delivery_method']);
 });

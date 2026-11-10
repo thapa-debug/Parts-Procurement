@@ -6,6 +6,7 @@ use App\Models\BuyerProfile;
 use App\Models\PartRequest;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Livewire\Livewire;
 
 uses(RefreshDatabase::class);
@@ -100,6 +101,69 @@ it('shows a Free (無償) badge for a free request, but not for a regular paid o
         ->assertDontSee(__('admin.request_board.free_badge'));
 });
 
+// --- quotes received (vendor_inquiry) -------------------------------------------
+
+it('shows how many invited vendors have quoted on a vendor_inquiry row, noting no-stock replies separately', function () {
+    $admin = User::factory()->admin()->create();
+    // 5 invited: 3 quoted, 1 no stock, 1 not replied yet.
+    inquiryWithResponses(invited: 5, quotes: 3, noStock: 1);
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->assertSee('3 / 5 quotes received')
+        ->assertSee('1 no stock');
+});
+
+it('shows 0 of N, with no no-stock note, while nobody has replied', function () {
+    $admin = User::factory()->admin()->create();
+    inquiryWithResponses(invited: 2, quotes: 0, noStock: 0);
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->assertSee('0 / 2 quotes received')
+        ->assertDontSee(__('admin.request_board.no_stock_replies', ['count' => 0]));
+});
+
+it('never counts a no-stock reply as a quote', function () {
+    $admin = User::factory()->admin()->create();
+    inquiryWithResponses(invited: 3, quotes: 1, noStock: 2);
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->assertSee('1 / 3 quote received')
+        ->assertSee('2 no stock');
+});
+
+it('shows the quote count only at the vendor_inquiry stage', function () {
+    $admin = User::factory()->admin()->create();
+    inquiryWithResponses(invited: 2, quotes: 2, noStock: 0, attributes: ['status' => RequestStatus::Quoted]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestBoard::class)
+        ->assertDontSee('quotes received');
+});
+
+it('counts every row in the page query -- no extra query per inquiry row', function () {
+    $admin = User::factory()->admin()->create();
+    inquiryWithResponses(invited: 2, quotes: 1, noStock: 1);
+
+    $queriesFor = function () use ($admin) {
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        Livewire::actingAs($admin)->test(RequestBoard::class);
+        DB::disableQueryLog();
+
+        return count(DB::getQueryLog());
+    };
+
+    $queriesFor(); // warm-up: the first render also does one-off lookups
+    $withOne = $queriesFor();
+    inquiryWithResponses(invited: 3, quotes: 2, noStock: 0);
+    inquiryWithResponses(invited: 4, quotes: 0, noStock: 2);
+
+    expect($queriesFor())->toBe($withOne);
+});
+
 // --- status tabs -----------------------------------------------------------
 
 it('filters requests into the correct tab by status, with accurate counts', function () {
@@ -170,4 +234,18 @@ it('filters requests into the correct tab by status, with accurate counts', func
         ->and($procurementFailed->status)->toBe(RequestStatus::ProcurementFailed)
         ->and($shipped->status)->toBe(RequestStatus::Shipped)
         ->and($received->status)->toBe(RequestStatus::Received);
+});
+
+it('lists an awaiting_payment request under the quoted tab, labelled as awaiting payment -- not under order confirmed', function () {
+    $admin = User::factory()->admin()->create();
+    PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment, 'car_model' => 'Awaiting Model']);
+
+    $component = Livewire::actingAs($admin)->test(RequestBoard::class);
+
+    $component->set('tab', 'quoted')
+        ->assertSee('Awaiting Model')
+        ->assertSee(__('admin.request_board.status.awaiting_payment'));
+
+    $component->set('tab', 'order_confirmed')
+        ->assertDontSee('Awaiting Model');
 });

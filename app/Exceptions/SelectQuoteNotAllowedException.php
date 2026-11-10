@@ -19,6 +19,14 @@ class SelectQuoteNotAllowedException extends RuntimeException
         );
     }
 
+    public static function checkoutInProgress(PartRequest $partRequest): self
+    {
+        return new self(
+            "Request {$partRequest->request_code} is awaiting payment for the selected quote -- ".
+            'the selection can no longer be changed.'
+        );
+    }
+
     public static function responseMismatch(): self
     {
         return new self('The selected quote does not belong to this request.');

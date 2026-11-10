@@ -2,9 +2,11 @@
 
 namespace App\Http\Requests;
 
+use App\Enums\DeliveryMethod;
 use App\Models\VendorProfile;
 use Illuminate\Contracts\Validation\ValidationRule;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class CreateVendorRequest extends FormRequest
 {
@@ -30,6 +32,7 @@ class CreateVendorRequest extends FormRequest
             'contact_person' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
             'notify_email' => ['required', 'string', 'email', 'max:255'],
+            'delivery_method' => ['required', Rule::enum(DeliveryMethod::class)],
         ];
     }
 }

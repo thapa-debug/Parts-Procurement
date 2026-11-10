@@ -5,9 +5,19 @@
 
     <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
         <h1 class="text-2xl font-semibold text-ink">{{ $partRequest->request_code }}</h1>
-        <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
-            {{ __('admin.request_board.status.'.$partRequest->status->value) }}
-        </span>
+        <div class="flex flex-wrap items-center gap-1.5">
+            {{-- Same quote-progress chip as the request board. --}}
+            @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
+                <x-admin.quote-response-count
+                    :quotes="$partRequest->quotes_count"
+                    :invited="$partRequest->invited_vendors_count"
+                    :no-stock="$partRequest->no_stock_replies_count"
+                />
+            @endif
+            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
+                {{ __('admin.request_board.status.'.$partRequest->status->value) }}
+            </span>
+        </div>
     </div>
 
     {{-- shipping_method is only set once CheckoutAction has actually run --
@@ -52,6 +62,96 @@
                         @if ($partRequest->shipping_address_line2)
                             <br>{{ $partRequest->shipping_address_line2 }}
                         @endif
+                    </dd>
+                </div>
+            </dl>
+        </div>
+    @endif
+
+    @if ($awaitingVendorConfirmation)
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.confirm_order_section') }}</h2>
+            <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.confirm_order_help') }}</p>
+
+            <dl class="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.confirm_order_vendor_label') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">{{ $vendorToConfirm?->company_name ?? __('admin.request_detail.not_provided') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.confirm_order_delivery_method_label') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">
+                        {{ $vendorToConfirm ? __('enums.delivery_method.'.$vendorToConfirm->delivery_method->value) : __('admin.request_detail.not_provided') }}
+                    </dd>
+                </div>
+            </dl>
+
+            @unless ($paymentGateOpen)
+                <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {{ __('admin.request_detail.confirm_order_payment_pending') }}
+                </p>
+            @endunless
+
+            <div class="mt-4">
+                @if ($companyAddresses->isEmpty())
+                    <p class="text-sm text-ink-muted">
+                        {{ __('admin.request_detail.confirm_order_no_addresses') }}
+                        <a href="{{ route('admin.settings') }}" class="font-medium text-brand-700 hover:text-brand-800 hover:underline">
+                            {{ __('admin.request_detail.confirm_order_settings_link') }}
+                        </a>
+                    </p>
+                @else
+                    <label for="receivingAddressId" class="block text-sm font-medium text-ink">
+                        {{ __('admin.request_detail.confirm_order_address_label') }} <x-required-mark />
+                    </label>
+                    <select
+                        id="receivingAddressId"
+                        wire:model="receivingAddressId"
+                        class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 sm:max-w-md"
+                    >
+                        <option value="">{{ __('admin.request_detail.confirm_order_address_placeholder') }}</option>
+                        @foreach ($companyAddresses as $address)
+                            <option value="{{ $address->id }}">{{ $address->label }} -- {{ $address->prefecture }} {{ $address->city }}</option>
+                        @endforeach
+                    </select>
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.confirm_order_address_help') }}</p>
+                    @error('receivingAddressId')
+                        <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                    @enderror
+                @endif
+            </div>
+
+            <div class="mt-5">
+                <button
+                    type="button"
+                    class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    wire:click="confirmOrderToVendor"
+                    wire:confirm="{{ __('admin.request_detail.confirm_order_confirm') }}"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmOrderToVendor"
+                    @disabled(! $paymentGateOpen || $companyAddresses->isEmpty())
+                >
+                    {{ __('admin.request_detail.confirm_order_button') }}
+                </button>
+            </div>
+        </div>
+    @endif
+
+    {{-- receiving_label is only ever set by ConfirmOrderToVendorAction --
+    always read the snapshot, never the live CompanyAddress. --}}
+    @if ($partRequest->receiving_label)
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.order_confirmed_section') }}</h2>
+
+            <dl class="mt-4 grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.order_confirmed_vendor_label') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">{{ $confirmedVendor?->company_name ?? __('admin.request_detail.not_provided') }}</dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.order_confirmed_deliver_to_label') }}</dt>
+                    <dd class="mt-0.5 font-medium text-ink">
+                        <x-receiving-address :part-request="$partRequest" />
                     </dd>
                 </div>
             </dl>
@@ -214,9 +314,13 @@
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
             <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.compare_section') }}</h2>
             <p class="mt-1 text-sm text-ink-muted">
-                {{ $partRequest->hasBeenPaid()
-                    ? __('admin.request_detail.compare_locked_help')
-                    : __('admin.request_detail.compare_help') }}
+                @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+                    {{ __('admin.request_detail.compare_awaiting_payment_help') }}
+                @elseif ($partRequest->hasBeenPaid())
+                    {{ __('admin.request_detail.compare_locked_help') }}
+                @else
+                    {{ __('admin.request_detail.compare_help') }}
+                @endif
             </p>
 
             @error('presentQuote')
@@ -367,18 +471,18 @@
 
                             <div class="mt-3 flex flex-wrap items-center gap-3">
                                 @unless ($isPresented)
-                                    <label class="flex items-center gap-2 text-sm font-medium text-ink {{ $partRequest->hasBeenPaid() ? 'opacity-50' : '' }}">
+                                    <label class="flex items-center gap-2 text-sm font-medium text-ink {{ $partRequest->quoteChoiceLocked() ? 'opacity-50' : '' }}">
                                         <input
                                             type="checkbox"
                                             wire:model="selectedResponseIdsToPresent"
                                             value="{{ $response->id }}"
-                                            {{ $partRequest->hasBeenPaid() ? 'disabled' : '' }}
+                                            {{ $partRequest->quoteChoiceLocked() ? 'disabled' : '' }}
                                             class="rounded border-line text-brand-600 focus:ring-1 focus:ring-brand-500"
                                         >
                                         {{ __('admin.request_detail.present_checkbox_label') }}
                                     </label>
 
-                                    @unless ($partRequest->hasBeenPaid() || $presentAsFree)
+                                    @unless ($partRequest->quoteChoiceLocked() || $presentAsFree)
                                         <div class="mt-3 flex flex-wrap items-end gap-3">
                                             <div>
                                                 <label for="shipping-override-{{ $response->id }}" class="block text-xs font-medium text-ink-muted">
@@ -420,7 +524,7 @@
                 @endforeach
             </div>
 
-            @unless ($partRequest->hasBeenPaid())
+            @unless ($partRequest->quoteChoiceLocked())
                 @php
                     $hasSelectablePresentableQuotes = $vendorResponses
                         ->filter(fn ($response) => ! $response->is_no_stock && ! in_array($response->id, $presentedResponseIds, true))

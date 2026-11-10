@@ -5,10 +5,15 @@ namespace App\Livewire\Buyer;
 use App\Actions\CheckoutAction;
 use App\Actions\ConfirmFreeOrderAction;
 use App\Actions\CreateBuyerAddressAction;
+use App\Actions\ResumeStripePaymentAction;
+use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Exceptions\CheckoutNotAllowedException;
+use App\Exceptions\CheckoutTotalChangedException;
 use App\Exceptions\FreeOrderNotAllowedException;
 use App\Exceptions\PaymentFailedException;
+use App\Exceptions\PaymentResumeNotAllowedException;
 use App\Exceptions\ShippingAddressNotAllowedException;
 use App\Http\Requests\StoreBuyerAddressRequest;
 use App\Models\BuyerAddress;
@@ -18,6 +23,7 @@ use App\Models\PartRequest;
 use App\Models\Payment;
 use App\Models\User;
 use App\Payments\PaymentGateway;
+use App\Services\ShippingFeeService;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Log;
@@ -54,6 +60,13 @@ class Checkout extends Component
     public int $partRequestId;
 
     public ?int $selectedAddressId = null;
+
+    /**
+     * Regular by default. Bound .live so the server re-renders the fee and
+     * total for the current choice; the radios are disabled once the card
+     * form is mounted, so that re-render can never wipe it.
+     */
+    public string $shippingMethod = ShippingMethod::Standard->value;
 
     public bool $showNewAddressForm = false;
 
@@ -94,6 +107,7 @@ class Checkout extends Component
     {
         return [
             'selectedAddressId' => ['required', 'integer', Rule::exists('buyer_addresses', 'id')->where('buyer_id', $this->buyer()->id)],
+            'shippingMethod' => ['required', Rule::enum(ShippingMethod::class)],
         ];
     }
 
@@ -184,9 +198,13 @@ class Checkout extends Component
      * browser does with this client secret, ever marks the payment
      * confirmed itself.
      *
+     * $expectedTotal is the total the buyer is looking at when they click
+     * (read from the rendered page). CheckoutAction refuses to charge if
+     * it no longer matches the chosen shipping method's real total.
+     *
      * @return array{clientSecret: string, redirectUrl: string}|array{error: string}|null
      */
-    public function pay(CheckoutAction $action): ?array
+    public function pay(CheckoutAction $action, ?int $expectedTotal = null): ?array
     {
         $partRequest = PartRequest::findOrFail($this->partRequestId);
         $this->authorize('checkout', $partRequest);
@@ -196,7 +214,7 @@ class Checkout extends Component
         // -- $isFree is always false here since pay() is never
         // legitimately called against a free request, CheckoutAction
         // rejects that itself). Once this method succeeds, CheckoutAction
-        // has already flipped part_requests.status to `paid` -- if this
+        // has already moved part_requests.status to `awaiting_payment` -- if this
         // response were allowed to render normally, $isEligible in
         // render() below would immediately flip to false (it requires
         // status === quoted) and Livewire would morph the whole checkout
@@ -229,7 +247,7 @@ class Checkout extends Component
         $address = BuyerAddress::findOrFail($validated['selectedAddressId']);
 
         try {
-            $result = $action->execute($partRequest, $address);
+            $result = $action->execute($partRequest, $address, ShippingMethod::from($validated['shippingMethod']), $expectedTotal);
 
             if ($this->isStripeGateway()) {
                 $payment = Payment::query()
@@ -248,6 +266,10 @@ class Checkout extends Component
                     'redirectUrl' => route('buyer.requests.show', $result->id),
                 ];
             }
+        } catch (CheckoutTotalChangedException $e) {
+            report($e);
+
+            return $this->reportPayError(__('buyer.checkout.error_total_changed'), $protectCardForm);
         } catch (CheckoutNotAllowedException|ShippingAddressNotAllowedException $e) {
             report($e);
 
@@ -274,6 +296,43 @@ class Checkout extends Component
         $this->redirect(route('buyer.requests.show', $result->id));
 
         return null;
+    }
+
+    /**
+     * Resumes an abandoned Stripe checkout on the SAME PaymentIntent
+     * (ResumeStripePaymentAction) -- the server half of the resume form's
+     * card step, called by the same Alpine flow as pay(). Never re-runs
+     * CheckoutAction; the only time a new intent is created is when the old
+     * one is confirmed canceled at Stripe (see the action). Always
+     * skipRender()'d and always answers through the return value, same as
+     * pay() once the card form is in play: a re-render would wipe the
+     * Payment Element mount point out from under the buyer.
+     *
+     * @return array{clientSecret: string, redirectUrl: string}|array{error: string}
+     */
+    public function resumePayment(ResumeStripePaymentAction $action): array
+    {
+        $this->skipRender();
+
+        $partRequest = PartRequest::findOrFail($this->partRequestId);
+        $this->authorize('checkout', $partRequest);
+
+        try {
+            $clientSecret = $action->execute($partRequest);
+        } catch (PaymentResumeNotAllowedException $e) {
+            report($e);
+
+            return ['error' => $e->inProgress ? __('buyer.checkout.resume_in_progress') : __('buyer.checkout.resume_unavailable')];
+        } catch (Throwable $e) {
+            report($e);
+
+            return ['error' => __('buyer.checkout.error_generic')];
+        }
+
+        return [
+            'clientSecret' => $clientSecret,
+            'redirectUrl' => route('buyer.requests.show', $partRequest->id),
+        ];
     }
 
     /**
@@ -377,6 +436,29 @@ class Checkout extends Component
         return $this->isStripeGateway() && ! $isFree && $this->selectedAddressId !== null;
     }
 
+    /**
+     * Each method's fee for this request, keyed by method value. DHL is
+     * priced for the selected address (the real DHL rate will depend on
+     * it), so it stays null until one is selected.
+     *
+     * @return array<string, int|null>
+     */
+    protected function shippingFees(): array
+    {
+        $partRequest = PartRequest::findOrFail($this->partRequestId);
+        $fees = app(ShippingFeeService::class);
+
+        $address = $this->selectedAddressId === null
+            ? null
+            : $this->buyer()->addresses()->find($this->selectedAddressId);
+
+        if ($address === null) {
+            return [ShippingMethod::Standard->value => $fees->regularFee($partRequest), ShippingMethod::Dhl->value => null];
+        }
+
+        return $fees->feesFor($partRequest, $address);
+    }
+
     public function render(): View
     {
         // Fetched separately from the main query below, and never selected
@@ -396,17 +478,47 @@ class Checkout extends Component
         // shipping_fee (already fixed by SelectQuoteAction) are the only
         // price columns a buyer is ever allowed to see.
         $partRequest = PartRequest::query()
-            ->select(['id', 'request_code', 'status', 'buyer_price', 'shipping_fee', 'is_free'])
+            ->select([
+                'id', 'request_code', 'status', 'buyer_price', 'shipping_fee', 'shipping_method', 'is_free',
+                // The buyer's own snapshotted address -- shown read-only
+                // on the resume form (it's fixed once checkout started).
+                'shipping_recipient_name', 'shipping_postal_code', 'shipping_country',
+                'shipping_state', 'shipping_city', 'shipping_address_line1', 'shipping_address_line2',
+            ])
             ->findOrFail($this->partRequestId);
 
         $isStripeGateway = $this->isStripeGateway();
 
+        // An abandoned Stripe checkout the buyer can finish: a cheap DB
+        // check only -- whether Stripe still lets the intent be paid is
+        // decided by resumePayment() when the card form asks for it.
+        $canResumePayment = $isStripeGateway
+            && $partRequest->status === RequestStatus::AwaitingPayment
+            && ! $partRequest->is_free
+            && Payment::query()
+                ->where('part_request_id', $partRequest->id)
+                ->where('gateway', 'stripe')
+                ->whereIn('status', [PaymentStatus::Pending, PaymentStatus::Failed])
+                ->whereNotNull('gateway_reference')
+                ->exists();
+
+        $shippingFees = $isEligible && ! $partRequest->is_free ? $this->shippingFees() : [];
+        $chosenMethod = ShippingMethod::tryFrom($this->shippingMethod) ?? ShippingMethod::Standard;
+
         return view('livewire.buyer.checkout', [
             'partRequest' => $partRequest,
             'isEligible' => $isEligible,
+            // Fee per method (null = not known yet: DHL needs an address),
+            // and the fee/total for the buyer's current choice -- the
+            // total is also what the pay button sends back as
+            // $expectedTotal.
+            'shippingFees' => $shippingFees,
+            'chosenShippingFee' => $shippingFees[$chosenMethod->value] ?? null,
+            'checkoutTotal' => isset($shippingFees[$chosenMethod->value]) ? $partRequest->buyer_price + $shippingFees[$chosenMethod->value] : null,
             'addresses' => $this->addresses(),
             'countryOptions' => Country::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
             'isStripeGateway' => $isStripeGateway,
+            'canResumePayment' => $canResumePayment,
             // Everywhere the view needs to know whether the card step is
             // reachable (the address radios' binding mode, the form's
             // x-data, the card section itself, the submit button) reads

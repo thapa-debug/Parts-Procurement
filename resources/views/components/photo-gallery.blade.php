@@ -94,7 +94,6 @@
                     </div>
                 </template>
             </div>
-
             <template x-if="count > 1">
                 <div class="mt-2 flex gap-2 overflow-x-auto">
                     <template x-for="(photo, index) in photos" :key="index">

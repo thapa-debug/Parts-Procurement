@@ -2,6 +2,7 @@
 
 use App\Livewire\Admin\Settings;
 use App\Models\BuyerProfile;
+use App\Models\CompanyAddress;
 use App\Models\Country;
 use App\Models\Maker;
 use App\Models\PartRequest;
@@ -695,4 +696,138 @@ it('renumbers every bracket\'s order to match ascending weight after an add or d
 
     expect(ShippingWeightBracket::where('upper_kg', 5)->value('order'))->toBe(1)
         ->and($keep20->fresh()->order)->toBe(2);
+});
+
+// --- company receiving addresses (CLAUDE.md §14 Phase 4 slice 6) -----------
+
+/**
+ * @return array<string, string>
+ */
+function companyAddressForm(array $overrides = []): array
+{
+    return array_merge([
+        'company_address_label' => 'Chiba yard',
+        'company_address_recipient_name' => 'Receiving desk',
+        'company_address_phone' => '043-123-4567',
+        'company_address_postal_code' => '260-0001',
+        'company_address_prefecture' => 'Chiba',
+        'company_address_city' => 'Chiba-shi',
+        'company_address_line1' => '1-2-3 Chuo',
+        'company_address_line2' => 'Gate B',
+    ], $overrides);
+}
+
+it('lists every company receiving address in its own settings section', function () {
+    $admin = User::factory()->admin()->create();
+    CompanyAddress::factory()->create(['label' => 'Head office']);
+    CompanyAddress::factory()->create(['label' => 'Chiba yard']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('showSection', 'company_addresses')
+        ->assertSet('activeSection', 'company_addresses')
+        ->assertSee(__('admin.settings.company_addresses_section'))
+        ->assertSee(__('admin.settings.company_address_japanese_hint'))
+        ->assertSee('Head office')
+        ->assertSee('Chiba yard');
+});
+
+it('adds a company receiving address', function () {
+    $admin = User::factory()->admin()->create();
+
+    $component = Livewire::actingAs($admin)->test(Settings::class)->set('activeSection', 'company_addresses');
+
+    foreach (companyAddressForm() as $field => $value) {
+        $component->set($field, $value);
+    }
+
+    $component->call('saveCompanyAddress')
+        ->assertHasNoErrors()
+        ->assertSet('company_address_label', '');
+
+    $address = CompanyAddress::sole();
+
+    expect($address->label)->toBe('Chiba yard')
+        ->and($address->recipient_name)->toBe('Receiving desk')
+        ->and($address->phone)->toBe('043-123-4567')
+        ->and($address->postal_code)->toBe('260-0001')
+        ->and($address->prefecture)->toBe('Chiba')
+        ->and($address->city)->toBe('Chiba-shi')
+        ->and($address->address_line1)->toBe('1-2-3 Chuo')
+        ->and($address->address_line2)->toBe('Gate B');
+});
+
+it('requires the label and every core address field, but not the recipient or line 2', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('saveCompanyAddress')
+        ->assertHasErrors([
+            'company_address_label', 'company_address_phone', 'company_address_postal_code',
+            'company_address_prefecture', 'company_address_city', 'company_address_line1',
+        ])
+        ->assertHasNoErrors(['company_address_recipient_name', 'company_address_line2']);
+
+    expect(CompanyAddress::count())->toBe(0);
+});
+
+it('rejects a duplicate company address label', function () {
+    $admin = User::factory()->admin()->create();
+    CompanyAddress::factory()->create(['label' => 'Chiba yard']);
+
+    $component = Livewire::actingAs($admin)->test(Settings::class);
+
+    foreach (companyAddressForm() as $field => $value) {
+        $component->set($field, $value);
+    }
+
+    $component->call('saveCompanyAddress')->assertHasErrors(['company_address_label']);
+
+    expect(CompanyAddress::count())->toBe(1);
+});
+
+it('edits a company receiving address, keeping its own label valid', function () {
+    $admin = User::factory()->admin()->create();
+    $address = CompanyAddress::factory()->create(['label' => 'Chiba yard', 'city' => 'Old city']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCompanyAddress', $address->id)
+        ->assertSet('editingCompanyAddressId', $address->id)
+        ->assertSet('company_address_label', 'Chiba yard')
+        ->set('company_address_city', 'Chiba-shi')
+        ->call('saveCompanyAddress')
+        ->assertHasNoErrors()
+        ->assertSet('editingCompanyAddressId', null);
+
+    expect($address->fresh()->city)->toBe('Chiba-shi')
+        ->and($address->fresh()->label)->toBe('Chiba yard')
+        ->and(CompanyAddress::count())->toBe(1);
+});
+
+it('cancels editing a company address without saving', function () {
+    $admin = User::factory()->admin()->create();
+    $address = CompanyAddress::factory()->create(['city' => 'Old city']);
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('startEditingCompanyAddress', $address->id)
+        ->set('company_address_city', 'Changed')
+        ->call('cancelEditingCompanyAddress')
+        ->assertSet('editingCompanyAddressId', null)
+        ->assertSet('company_address_city', '');
+
+    expect($address->fresh()->city)->toBe('Old city');
+});
+
+it('deletes a company receiving address', function () {
+    $admin = User::factory()->admin()->create();
+    $address = CompanyAddress::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(Settings::class)
+        ->call('deleteCompanyAddress', $address->id);
+
+    expect(CompanyAddress::count())->toBe(0);
 });

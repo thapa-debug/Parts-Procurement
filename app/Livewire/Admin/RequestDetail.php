@@ -3,13 +3,16 @@
 namespace App\Livewire\Admin;
 
 use App\Actions\BroadcastRequestAction;
+use App\Actions\ConfirmOrderToVendorAction;
 use App\Actions\PresentQuoteAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\VendorStatus;
+use App\Exceptions\PaymentNotConfirmedException;
 use App\Exceptions\PresentQuoteNotAllowedException;
 use App\Exceptions\RequestCannotBeBroadcastException;
 use App\Exceptions\ShippingBracketNotConfiguredException;
+use App\Models\CompanyAddress;
 use App\Models\PartRequest;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
@@ -17,6 +20,7 @@ use App\Services\PricingService;
 use App\Services\ShippingCalculator;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class RequestDetail extends Component
@@ -79,6 +83,14 @@ class RequestDetail extends Component
      * that's forced to ¥0).
      */
     public bool $presentAsFree = false;
+
+    /**
+     * Which of the company's own receiving locations the vendor should
+     * deliver this part to -- chosen per order at confirmation time
+     * (CLAUDE.md §14 Phase 4 slice 6) and snapshotted by
+     * ConfirmOrderToVendorAction.
+     */
+    public ?int $receivingAddressId = null;
 
     public function mount(PartRequest $partRequest): void
     {
@@ -183,6 +195,35 @@ class RequestDetail extends Component
     }
 
     /**
+     * Confirms the vendor purchase to the chosen company receiving address.
+     * The view disables the button while the §6.3 payment gate is closed,
+     * but ConfirmOrderToVendorAction is the real guard -- a forced call is
+     * refused there and surfaced as an error toast.
+     */
+    public function confirmOrderToVendor(ConfirmOrderToVendorAction $action): void
+    {
+        $this->authorize('confirmOrderToVendor', $this->partRequest);
+
+        $this->validate([
+            'receivingAddressId' => ['required', 'integer', Rule::exists('company_addresses', 'id')],
+        ], [], [
+            'receivingAddressId' => __('admin.request_detail.confirm_order_address_label'),
+        ]);
+
+        try {
+            $this->partRequest = $action->execute($this->partRequest, CompanyAddress::findOrFail($this->receivingAddressId));
+        } catch (PaymentNotConfirmedException $e) {
+            report($e);
+            $this->dispatch('toast', message: __('admin.request_detail.confirm_order_payment_error'), type: 'error');
+
+            return;
+        }
+
+        $this->reset('receivingAddressId');
+        $this->dispatch('toast', message: __('admin.request_detail.order_confirmed_toast'), type: 'success');
+    }
+
+    /**
      * A reason is required precisely when that same response has a
      * non-blank override -- built dynamically since these are array-keyed
      * properties, one pair per currently-checked response.
@@ -246,6 +287,10 @@ class RequestDetail extends Component
                 }
             });
 
+        if ($this->partRequest->status === RequestStatus::VendorInquiry) {
+            $this->partRequest->loadCount(PartRequest::responseCounts());
+        }
+
         return view('livewire.admin.request-detail', [
             'activeVendors' => $this->activeVendors(),
             'invitedVendors' => $this->partRequest->status !== RequestStatus::New
@@ -273,6 +318,17 @@ class RequestDetail extends Component
             'confirmedPayment' => $this->partRequest->hasBeenPaid()
                 ? $this->partRequest->payments()->where('status', PaymentStatus::Confirmed)->latest('paid_at')->first()
                 : null,
+            // Confirm-order panel (CLAUDE.md §14 Phase 4 slice 6) -- only
+            // while the request sits at `paid`, waiting on that decision.
+            'awaitingVendorConfirmation' => $this->partRequest->status === RequestStatus::Paid,
+            'paymentGateOpen' => $this->partRequest->paymentGateOpen(),
+            'vendorToConfirm' => $this->partRequest->status === RequestStatus::Paid
+                ? $this->partRequest->selectedResponse?->vendor
+                : null,
+            'companyAddresses' => $this->partRequest->status === RequestStatus::Paid
+                ? CompanyAddress::query()->orderBy('label')->get()
+                : Collection::make(),
+            'confirmedVendor' => $this->partRequest->confirmedVendor,
         ])->title($this->partRequest->request_code);
     }
 }

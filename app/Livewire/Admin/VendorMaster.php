@@ -6,6 +6,7 @@ use App\Actions\CreateVendorAction;
 use App\Actions\ResetTemporaryPasswordAction;
 use App\Actions\ResumeVendorAction;
 use App\Actions\SuspendVendorAction;
+use App\Enums\DeliveryMethod;
 use App\Http\Requests\CreateVendorRequest;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -33,6 +34,8 @@ class VendorMaster extends Component
     public string $phone = '';
 
     public string $notify_email = '';
+
+    public string $delivery_method = DeliveryMethod::Both->value;
 
     public ?string $revealedPassword = null;
 
@@ -72,7 +75,7 @@ class VendorMaster extends Component
     {
         $this->authorize('create', VendorProfile::class);
 
-        $this->reset(['name', 'email', 'company_name', 'contact_person', 'phone', 'notify_email']);
+        $this->reset(['name', 'email', 'company_name', 'contact_person', 'phone', 'notify_email', 'delivery_method']);
         $this->resetErrorBag();
         $this->showCreateForm = true;
     }
@@ -95,6 +98,7 @@ class VendorMaster extends Component
             $validated['contact_person'],
             $validated['phone'],
             $validated['notify_email'],
+            DeliveryMethod::from($validated['delivery_method']),
         );
 
         $this->showCreateForm = false;
@@ -184,6 +188,7 @@ class VendorMaster extends Component
     {
         return view('livewire.admin.vendor-master', [
             'vendors' => $this->vendors(),
+            'deliveryMethods' => DeliveryMethod::cases(),
         ])->title(__('admin.vendor_master.title'));
     }
 }

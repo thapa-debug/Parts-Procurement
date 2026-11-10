@@ -102,3 +102,49 @@ it('only matches payments on the stripe gateway, never another gateway\'s row wi
 
     expect($stubPayment->refresh()->status)->toBe(PaymentStatus::Pending);
 });
+
+// --- request status: awaiting_payment -> paid, only here -------------------------
+
+it('moves the request from awaiting_payment to paid once the payment is confirmed', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_status_test',
+        'status' => PaymentStatus::Pending,
+    ]);
+
+    app(ConfirmStripePaymentAction::class)->execute('pi_status_test');
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid)
+        ->and($request->fresh()->paymentGateOpen())->toBeTrue();
+});
+
+it('moves a request whose earlier attempt failed to paid when the retried PaymentIntent succeeds', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_retry_test',
+        'status' => PaymentStatus::Failed,
+    ]);
+
+    app(ConfirmStripePaymentAction::class)->execute('pi_retry_test');
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('never moves a request backwards -- one already past awaiting_payment keeps its status', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::OrderedToVendor]);
+    $payment = Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_ordered_test',
+        'status' => PaymentStatus::Pending,
+    ]);
+
+    app(ConfirmStripePaymentAction::class)->execute('pi_ordered_test');
+
+    expect($payment->refresh()->status)->toBe(PaymentStatus::Confirmed)
+        ->and($request->fresh()->status)->toBe(RequestStatus::OrderedToVendor);
+});
