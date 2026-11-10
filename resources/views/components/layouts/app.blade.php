@@ -11,11 +11,15 @@
         @vite(['resources/css/app.css', 'resources/js/app.js'])
         @livewireStyles
     </head>
+    {{-- A data-dense page (e.g. admin request detail) can opt into a wider
+    container via ->layoutData(['wide' => true]); every other page keeps
+    max-w-6xl. Header, banner and main share it so they stay aligned. --}}
+    @php($containerWidth = ($wide ?? false) ? 'max-w-[96rem]' : 'max-w-6xl')
     <body class="min-h-screen bg-surface-muted text-ink antialiased">
         <x-toast-container />
 
         <header class="border-b border-line bg-surface">
-            <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+            <div class="mx-auto flex {{ $containerWidth }} items-center justify-between px-6 py-4">
                 <div class="flex items-center gap-8">
                     <span class="text-lg font-semibold text-brand-700">{{ __('app.name') }}</span>
 
@@ -74,7 +78,7 @@
         @auth
             @unless (auth()->user()->hasVerifiedEmail())
                 <div class="border-b border-amber-200 bg-amber-50">
-                    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-2 px-6 py-3 text-sm text-amber-800">
+                    <div class="mx-auto flex {{ $containerWidth }} flex-wrap items-center justify-between gap-2 px-6 py-3 text-sm text-amber-800">
                         <span>{{ __('auth.verification.banner') }}</span>
 
                         <form method="POST" action="{{ route('verification.send') }}">
@@ -88,7 +92,7 @@
             @endunless
         @endauth
 
-        <main class="mx-auto max-w-6xl px-6 py-10">
+        <main class="mx-auto {{ $containerWidth }} px-6 py-10">
             @if (session('status'))
                 <div class="mb-6 rounded-md border border-green-200 bg-green-50 p-4 text-sm text-green-700">
                     {{ session('status') }}

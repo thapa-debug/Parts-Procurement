@@ -1,4 +1,4 @@
-<div class="max-w-7xl">
+<div>
     @php
         // Display-only label over the real status (never a status of its
         // own): a vendor_inquiry request with at least one real quote in
