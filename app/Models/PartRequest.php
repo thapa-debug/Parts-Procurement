@@ -3,10 +3,13 @@
 namespace App\Models;
 
 use App\Enums\PartType;
+use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
+use Closure;
 use Database\Factories\PartRequestFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -22,6 +25,9 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'is_free', 'shipping_address_id', 'shipping_recipient_name', 'shipping_phone',
     'shipping_postal_code', 'shipping_country', 'shipping_state',
     'shipping_city', 'shipping_address_line1', 'shipping_address_line2',
+    'receiving_address_id', 'receiving_label', 'receiving_recipient_name',
+    'receiving_phone', 'receiving_postal_code', 'receiving_prefecture',
+    'receiving_city', 'receiving_address_line1', 'receiving_address_line2',
 ])]
 class PartRequest extends Model
 {
@@ -76,6 +82,24 @@ class PartRequest extends Model
     }
 
     /**
+     * The admin's "quotes received" tallies, in one place for the request
+     * board (withCount(), no N+1) and request detail (loadCount()). Adds
+     * invited_vendors_count (broadcast targets), quotes_count (real
+     * quotes) and no_stock_replies_count (one-tap "no stock" replies). A
+     * vendor can reply at most once per request, so each counts once.
+     *
+     * @return array<int|string, string|Closure>
+     */
+    public static function responseCounts(): array
+    {
+        return [
+            'vendors as invited_vendors_count',
+            'vendorResponses as quotes_count' => fn (Builder $query) => $query->where('is_no_stock', false),
+            'vendorResponses as no_stock_replies_count' => fn (Builder $query) => $query->where('is_no_stock', true),
+        ];
+    }
+
+    /**
      * @return HasMany<Payment, $this>
      */
     public function payments(): HasMany
@@ -96,6 +120,31 @@ class PartRequest extends Model
     public function shippingAddress(): BelongsTo
     {
         return $this->belongsTo(BuyerAddress::class, 'shipping_address_id');
+    }
+
+    /**
+     * The vendor the purchase was confirmed to (ConfirmOrderToVendorAction)
+     * -- admin-only context; never exposed to the buyer.
+     *
+     * @return BelongsTo<VendorProfile, $this>
+     */
+    public function confirmedVendor(): BelongsTo
+    {
+        return $this->belongsTo(VendorProfile::class, 'confirmed_vendor_id');
+    }
+
+    /**
+     * The live CompanyAddress this request's receiving_* snapshot columns
+     * were copied from at order confirmation (CLAUDE.md §14 Phase 4 slice
+     * 6) -- traceability only, exactly like shippingAddress() above: null
+     * once the address is deleted, and never the source of truth for where
+     * the vendor was told to deliver. Read the receiving_* columns for that.
+     *
+     * @return BelongsTo<CompanyAddress, $this>
+     */
+    public function receivingAddress(): BelongsTo
+    {
+        return $this->belongsTo(CompanyAddress::class, 'receiving_address_id');
     }
 
     /**
@@ -128,12 +177,9 @@ class PartRequest extends Model
     }
 
     /**
-     * The universal "still open to admin/buyer changes" gate (client
-     * revision): presenting, and selecting/re-selecting a quote, are both
-     * allowed until the request has actually been paid for. Phase 4 payment
-     * doesn't exist yet, so none of these statuses are reachable today --
-     * this reads gracefully as "always open" until that lands and starts
-     * setting one of them.
+     * Whether the buyer's payment has actually been confirmed -- every
+     * status from Paid onwards. AwaitingPayment is deliberately NOT paid:
+     * checkout started, but no money is confirmed yet.
      */
     public function hasBeenPaid(): bool
     {
@@ -143,6 +189,33 @@ class PartRequest extends Model
             RequestStatus::Shipped,
             RequestStatus::Received,
         ], true);
+    }
+
+    /**
+     * The universal "still open to admin/buyer changes" gate (client
+     * revision): presenting, and selecting/re-selecting a quote, are
+     * allowed until the buyer starts paying. Locked from AwaitingPayment
+     * on, not just once paid -- the payment was started for the selected
+     * quote's amount, so the selection must not change underneath it.
+     */
+    public function quoteChoiceLocked(): bool
+    {
+        return $this->status === RequestStatus::AwaitingPayment || $this->hasBeenPaid();
+    }
+
+    /**
+     * CLAUDE.md §6.3's hard payment gate: the vendor purchase may only be
+     * confirmed once the request is `paid` AND a payment is genuinely
+     * `confirmed`. The request only reaches `paid` once its payment is
+     * confirmed, but the gate still checks the payment record itself --
+     * defense in depth, never trusting the status column alone. ConfirmOrderToVendorAction enforces this; the
+     * admin view reads the same method to disable its button, so the two
+     * can never disagree.
+     */
+    public function paymentGateOpen(): bool
+    {
+        return $this->status === RequestStatus::Paid
+            && $this->payments()->where('status', PaymentStatus::Confirmed)->exists();
     }
 
     /**

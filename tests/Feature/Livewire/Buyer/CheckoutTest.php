@@ -4,6 +4,7 @@ use App\Actions\PresentQuoteAction;
 use App\Actions\SelectQuoteAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Livewire\Buyer\Checkout;
 use App\Models\BuyerAddress;
 use App\Models\BuyerProfile;
@@ -14,6 +15,7 @@ use App\Models\ShippingWeightBracket;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
+use App\Services\DhlRateCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
 use Stripe\ApiRequestor;
@@ -73,6 +75,19 @@ it('shows a not-eligible message when no quote has been selected yet', function 
         ->test(Checkout::class, ['partRequest' => $request])
         ->assertSee(__('buyer.checkout.not_eligible'))
         ->assertDontSee(__('buyer.checkout.pay_button'));
+});
+
+it('tells a buyer who returns mid-checkout that payment is already in progress -- no second card form', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+    $request->update(['status' => RequestStatus::AwaitingPayment]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.awaiting_payment'))
+        ->assertDontSee(__('buyer.checkout.not_eligible'))
+        ->assertDontSee(__('buyer.checkout.proceed_to_payment_button'));
 });
 
 it('shows a not-eligible message once the request has already been paid', function () {
@@ -405,9 +420,10 @@ it('pay() returns the PaymentIntent client secret instead of redirecting, when t
 
     // CheckoutAction already ran (the whole point) -- but the payment
     // itself stays pending. Only the webhook is ever allowed to confirm
-    // it (CLAUDE.md §14 stripe integration).
+    // it (CLAUDE.md §14 stripe integration). A buyer who stops here -- at
+    // the card form -- leaves an awaiting_payment request, not a "paid" one.
     $fresh = $request->fresh();
-    expect($fresh->status)->toBe(RequestStatus::Paid);
+    expect($fresh->status)->toBe(RequestStatus::AwaitingPayment);
 
     $payment = Payment::where('part_request_id', $request->id)->sole();
     expect($payment->status)->toBe(PaymentStatus::Pending)
@@ -531,4 +547,327 @@ it('adds a new address inline and auto-selects it', function () {
 
     $address = BuyerAddress::where('recipient_name', 'Inline Recipient')->sole();
     expect($address->buyer_id)->toBe(BuyerProfile::where('user_id', $owner->id)->value('id'));
+});
+
+// --- resuming an abandoned Stripe checkout -----------------------------------------
+
+/**
+ * Records every Stripe request, so these tests can prove resume never
+ * creates a second PaymentIntent.
+ */
+class RecordingFakeStripeHttpClientForCheckoutResume implements ClientInterface
+{
+    /** @var list<string> */
+    public array $methods = [];
+
+    /** @var list<array> */
+    private array $responseBodies;
+
+    /** Answers with these bodies in order, repeating the last one. */
+    public function __construct(array ...$responseBodies)
+    {
+        $this->responseBodies = $responseBodies;
+    }
+
+    public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+    {
+        $this->methods[] = strtolower($method);
+
+        $body = count($this->responseBodies) > 1 ? array_shift($this->responseBodies) : $this->responseBodies[0];
+
+        return [json_encode($body), 200, []];
+    }
+}
+
+/**
+ * A buyer who clicked "Proceed to payment" and then left the card form:
+ * awaiting_payment, one pending stripe Payment, shipping address snapshotted.
+ *
+ * @return array{0: User, 1: PartRequest}
+ */
+function abandonedCheckoutForResume(): array
+{
+    config(['payments.gateway' => 'stripe']);
+    [$owner, , $request] = checkoutEligibleRequest();
+    $request->update([
+        'status' => RequestStatus::AwaitingPayment,
+        'shipping_recipient_name' => 'Jane Doe',
+        'shipping_address_line1' => '123 Main St',
+    ]);
+    Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'amount' => $request->buyer_price + $request->shipping_fee,
+        'currency' => 'JPY',
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_resume_ui',
+        'status' => PaymentStatus::Pending,
+    ]);
+
+    return [$owner, $request->fresh()];
+}
+
+function fakeResumableIntent(PartRequest $request, string $status = 'requires_payment_method'): RecordingFakeStripeHttpClientForCheckoutResume
+{
+    $client = new RecordingFakeStripeHttpClientForCheckoutResume([
+        'id' => 'pi_resume_ui',
+        'object' => 'payment_intent',
+        'status' => $status,
+        'amount' => $request->buyer_price + $request->shipping_fee,
+        'currency' => 'jpy',
+        'client_secret' => 'pi_resume_ui_secret',
+    ]);
+    ApiRequestor::setHttpClient($client);
+
+    return $client;
+}
+
+it('shows a returning buyer the resume-payment form, with their snapshotted shipping address and the total', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.resume_help'))
+        ->assertSee('Jane Doe')
+        ->assertSee('123 Main St')
+        ->assertSee(number_format($request->buyer_price + $request->shipping_fee))
+        ->assertSee('js.stripe.com')
+        ->assertDontSee(__('buyer.checkout.awaiting_payment'))
+        ->assertDontSee(__('buyer.checkout.not_eligible'));
+});
+
+it('resumePayment() returns the SAME PaymentIntent\'s client secret and never creates a new intent or payment', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $stripe = fakeResumableIntent($request);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('resumePayment')
+        ->assertNoRedirect()
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_resume_ui_secret'
+            && $data['redirectUrl'] === route('buyer.requests.show', $request->id));
+
+    expect($stripe->methods)->toBe(['get'])
+        ->and(Payment::where('part_request_id', $request->id)->count())->toBe(1)
+        ->and($request->fresh()->status)->toBe(RequestStatus::AwaitingPayment);
+});
+
+it('tells the buyer their payment is already being processed when the intent is mid-payment', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    fakeResumableIntent($request, 'processing');
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('resumePayment')
+        ->assertReturned(fn ($data) => $data['error'] === __('buyer.checkout.resume_in_progress'));
+});
+
+it('lets the buyer pay on one replacement intent when the stored intent was canceled at Stripe', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $stripe = new RecordingFakeStripeHttpClientForCheckoutResume(
+        ['id' => 'pi_resume_ui', 'object' => 'payment_intent', 'status' => 'canceled', 'amount' => $total, 'currency' => 'jpy'],
+        ['id' => 'pi_resume_ui_new', 'object' => 'payment_intent', 'status' => 'requires_payment_method', 'amount' => $total, 'currency' => 'jpy', 'client_secret' => 'pi_resume_ui_new_secret'],
+    );
+    ApiRequestor::setHttpClient($stripe);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('resumePayment')
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_resume_ui_new_secret');
+
+    // One GET (the dead intent, already canceled) and exactly one create.
+    expect($stripe->methods)->toBe(['get', 'post'])
+        ->and(Payment::where('part_request_id', $request->id)->pluck('status', 'gateway_reference')->all())
+        ->toBe(['pi_resume_ui' => PaymentStatus::Failed, 'pi_resume_ui_new' => PaymentStatus::Pending]);
+});
+
+it('does not let another buyer resume someone else\'s payment', function () {
+    [, $request] = abandonedCheckoutForResume();
+    $intruder = User::factory()->buyer()->create();
+    BuyerProfile::factory()->for($intruder)->create();
+
+    Livewire::actingAs($intruder)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertForbidden();
+});
+
+it('shows the snapshotted shipping method on the resume form -- read-only', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $request->update(['shipping_method' => ShippingMethod::Dhl, 'shipping_fee' => DhlRateCalculator::DUMMY_FEE]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('enums.shipping_method.dhl'))
+        ->assertSee(number_format($request->buyer_price + DhlRateCalculator::DUMMY_FEE))
+        ->assertDontSee(__('buyer.checkout.shipping_method_section'));
+});
+
+// --- shipping method choice -----------------------------------------------------------
+
+/**
+ * Records each Stripe request's method and params, so a test can see the
+ * amount the PaymentIntent was created for.
+ */
+class ParamsRecordingFakeStripeHttpClientForCheckout implements ClientInterface
+{
+    /** @var list<array{method: string, params: array}> */
+    public array $requests = [];
+
+    public function __construct(private readonly array $responseBody) {}
+
+    public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+    {
+        $this->requests[] = ['method' => strtolower($method), 'params' => $params];
+
+        return [json_encode($this->responseBody), 200, []];
+    }
+}
+
+it('offers Regular (default) and DHL with their fees, and totals the Regular choice', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSet('shippingMethod', ShippingMethod::Standard->value)
+        ->assertSee(__('buyer.checkout.shipping_method_section'))
+        ->assertSee(__('enums.shipping_method.standard'))
+        ->assertSee(__('enums.shipping_method.dhl'))
+        ->assertSee(number_format(DhlRateCalculator::DUMMY_FEE))
+        ->assertViewHas('chosenShippingFee', 8_000)
+        ->assertViewHas('checkoutTotal', 54_000 + 8_000)
+        ->assertSeeHtml('data-checkout-total="'.(54_000 + 8_000).'"');
+});
+
+it('updates the fee and total live when the buyer switches to DHL', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', ShippingMethod::Dhl->value)
+        ->assertViewHas('chosenShippingFee', DhlRateCalculator::DUMMY_FEE)
+        ->assertViewHas('checkoutTotal', 54_000 + DhlRateCalculator::DUMMY_FEE)
+        ->assertSee(number_format(54_000 + DhlRateCalculator::DUMMY_FEE))
+        ->assertSeeHtml('wire:submit="pay('.(54_000 + DhlRateCalculator::DUMMY_FEE).')"');
+
+    // Nothing is saved by merely looking -- only checkout snapshots it.
+    expect($request->fresh()->shipping_method)->toBe(ShippingMethod::Standard);
+});
+
+it('pays with DHL: snapshots the method and fee and charges part price + DHL fee', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', ShippingMethod::Dhl->value)
+        ->call('pay', 54_000 + DhlRateCalculator::DUMMY_FEE)
+        ->assertHasNoErrors()
+        ->assertRedirect(route('buyer.requests.show', $request->id));
+
+    $fresh = $request->fresh();
+    expect($fresh->shipping_method)->toBe(ShippingMethod::Dhl)
+        ->and($fresh->shipping_fee)->toBe(DhlRateCalculator::DUMMY_FEE)
+        ->and(Payment::where('part_request_id', $request->id)->sole()->amount)->toBe(54_000 + DhlRateCalculator::DUMMY_FEE);
+});
+
+it('refuses to charge a total the buyer was not shown -- nothing is created', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    // The page still showed the Regular total when the buyer clicked.
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', ShippingMethod::Dhl->value)
+        ->call('pay', 54_000 + 8_000)
+        ->assertHasErrors(['pay'])
+        ->assertSee(__('buyer.checkout.error_total_changed'))
+        ->assertNoRedirect();
+
+    expect(Payment::where('part_request_id', $request->id)->exists())->toBeFalse()
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted);
+});
+
+it('creates the Stripe PaymentIntent for the chosen method\'s total -- the fee is settled before the intent exists', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    $stripe = new ParamsRecordingFakeStripeHttpClientForCheckout([
+        'id' => 'pi_dhl_test',
+        'object' => 'payment_intent',
+        'status' => 'requires_payment_method',
+        'client_secret' => 'pi_dhl_test_secret',
+    ]);
+    ApiRequestor::setHttpClient($stripe);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', ShippingMethod::Dhl->value)
+        ->call('pay', 54_000 + DhlRateCalculator::DUMMY_FEE)
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_dhl_test_secret');
+
+    $create = collect($stripe->requests)->firstWhere('method', 'post');
+    expect($create['params']['amount'])->toBe(54_000 + DhlRateCalculator::DUMMY_FEE)
+        ->and($request->fresh()->shipping_method)->toBe(ShippingMethod::Dhl);
+});
+
+it('reports a stale total through the return value once the Stripe card step is reached -- no intent created', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    $stripe = new ParamsRecordingFakeStripeHttpClientForCheckout(['id' => 'pi_never', 'object' => 'payment_intent']);
+    ApiRequestor::setHttpClient($stripe);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', ShippingMethod::Dhl->value)
+        ->call('pay', 54_000 + 8_000)
+        ->assertReturned(fn ($data) => $data['error'] === __('buyer.checkout.error_total_changed'));
+
+    expect($stripe->requests)->toBeEmpty()
+        ->and(Payment::where('part_request_id', $request->id)->exists())->toBeFalse();
+});
+
+it('locks the shipping-method radios once the card form is mounted', function () {
+    config(['payments.gateway' => 'stripe']);
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSeeHtml(':disabled="cardMounted || false"');
+});
+
+it('rejects a shipping method that does not exist', function () {
+    [$owner, $profile, $request] = checkoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->set('shippingMethod', 'teleport')
+        ->call('pay')
+        ->assertHasErrors(['shippingMethod']);
+
+    expect(Payment::where('part_request_id', $request->id)->exists())->toBeFalse();
+});
+
+it('asks for an address before pricing DHL', function () {
+    [$owner, , $request] = checkoutEligibleRequest();
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.shipping_fee_needs_address'))
+        ->assertViewHas('shippingFees', ['standard' => 8_000, 'dhl' => null]);
+});
+
+it('shows no shipping-method choice on a free (無償) order', function () {
+    [$owner, $profile, $request] = freeCheckoutEligibleRequest();
+    BuyerAddress::factory()->create(['buyer_id' => $profile->id, 'is_default' => true]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.checkout.shipping_method_section'));
 });

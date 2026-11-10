@@ -462,5 +462,192 @@
                 </div>
             </div>
         @endif
+
+        @if ($activeSection === 'company_addresses')
+            <div class="max-w-2xl space-y-6">
+                <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                    <h2 class="text-base font-semibold text-ink">{{ __('admin.settings.company_addresses_section') }}</h2>
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.company_addresses_help') }}</p>
+
+                    <ul class="mt-4 divide-y divide-line rounded-md border border-line">
+                        @forelse ($companyAddresses as $address)
+                            <li wire:key="company-address-{{ $address->id }}" class="flex flex-wrap items-start justify-between gap-3 px-4 py-3 text-sm {{ $editingCompanyAddressId === $address->id ? 'bg-brand-50' : '' }}">
+                                <div class="min-w-0">
+                                    <p class="font-medium text-ink">{{ $address->label }}</p>
+                                    <p class="mt-0.5 text-ink-muted">
+                                        〒{{ $address->postal_code }} {{ $address->prefecture }} {{ $address->city }} {{ $address->address_line1 }}@if ($address->address_line2) {{ $address->address_line2 }}@endif
+                                    </p>
+                                    <p class="text-ink-muted">
+                                        @if ($address->recipient_name){{ $address->recipient_name }} · @endif{{ $address->phone }}
+                                    </p>
+                                </div>
+                                <div class="shrink-0">
+                                    <button type="button" wire:click="startEditingCompanyAddress({{ $address->id }})" class="text-sm font-medium text-brand-700 hover:text-brand-800">
+                                        {{ __('admin.settings.edit_company_address_button') }}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        wire:click="deleteCompanyAddress({{ $address->id }})"
+                                        wire:confirm="{{ __('admin.settings.delete_company_address_confirm', ['label' => $address->label]) }}"
+                                        class="ml-3 text-sm font-medium text-red-600 hover:text-red-700"
+                                    >
+                                        {{ __('admin.settings.delete_company_address_button') }}
+                                    </button>
+                                </div>
+                            </li>
+                        @empty
+                            <li class="px-4 py-6 text-center text-sm text-ink-muted">{{ __('admin.settings.company_address_empty') }}</li>
+                        @endforelse
+                    </ul>
+                </div>
+
+                <form wire:submit="saveCompanyAddress" class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                    <h2 class="text-base font-semibold text-ink">
+                        {{ $editingCompanyAddressId ? __('admin.settings.company_address_edit_heading') : __('admin.settings.company_address_add_heading') }}
+                    </h2>
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.company_address_japanese_hint') }}</p>
+
+                    <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        <div class="sm:col-span-2">
+                            <label for="company_address_label" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_label_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_label"
+                                type="text"
+                                wire:model="company_address_label"
+                                placeholder="{{ __('admin.settings.company_address_label_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            <p class="mt-1 text-xs text-ink-muted">{{ __('admin.settings.company_address_label_help') }}</p>
+                            @error('company_address_label')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="company_address_recipient_name" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_recipient_name_label') }}
+                            </label>
+                            <input
+                                id="company_address_recipient_name"
+                                type="text"
+                                wire:model="company_address_recipient_name"
+                                placeholder="{{ __('admin.settings.company_address_recipient_name_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_recipient_name')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="company_address_phone" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_phone_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_phone"
+                                type="tel"
+                                wire:model="company_address_phone"
+                                placeholder="{{ __('admin.settings.company_address_phone_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_phone')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="company_address_postal_code" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_postal_code_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_postal_code"
+                                type="text"
+                                wire:model="company_address_postal_code"
+                                placeholder="{{ __('admin.settings.company_address_postal_code_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_postal_code')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="company_address_prefecture" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_prefecture_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_prefecture"
+                                type="text"
+                                wire:model="company_address_prefecture"
+                                placeholder="{{ __('admin.settings.company_address_prefecture_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_prefecture')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div>
+                            <label for="company_address_city" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_city_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_city"
+                                type="text"
+                                wire:model="company_address_city"
+                                placeholder="{{ __('admin.settings.company_address_city_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_city')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="company_address_line1" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_line1_label') }} <x-required-mark />
+                            </label>
+                            <input
+                                id="company_address_line1"
+                                type="text"
+                                wire:model="company_address_line1"
+                                placeholder="{{ __('admin.settings.company_address_line1_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_line1')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                        <div class="sm:col-span-2">
+                            <label for="company_address_line2" class="block text-sm font-medium text-ink">
+                                {{ __('admin.settings.company_address_line2_label') }}
+                            </label>
+                            <input
+                                id="company_address_line2"
+                                type="text"
+                                wire:model="company_address_line2"
+                                placeholder="{{ __('admin.settings.company_address_line2_placeholder') }}"
+                                class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                            >
+                            @error('company_address_line2')
+                                <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                            @enderror
+                        </div>
+                    </div>
+
+                    <div class="mt-5 flex items-center gap-3">
+                        <button
+                            type="submit"
+                            wire:loading.attr="disabled"
+                            wire:target="saveCompanyAddress"
+                            class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                            {{ $editingCompanyAddressId ? __('admin.settings.save_company_address_button') : __('admin.settings.add_company_address_button') }}
+                        </button>
+                        @if ($editingCompanyAddressId)
+                            <button type="button" wire:click="cancelEditingCompanyAddress" class="rounded-md border border-line px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink">
+                                {{ __('admin.settings.cancel_button') }}
+                            </button>
+                        @endif
+                    </div>
+                </form>
+            </div>
+        @endif
     </div>
 </div>

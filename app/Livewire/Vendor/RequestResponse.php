@@ -233,6 +233,22 @@ class RequestResponse extends Component
             ->with('maker')
             ->findOrFail($this->partRequestId);
 
+        // Where to deliver the part -- only for the vendor this order was
+        // actually confirmed to (CLAUDE.md §14 Phase 4 slice 6), and only
+        // the company receiving address snapshot. A separate, narrow query
+        // so another invited vendor's page never even loads these columns,
+        // and nothing about the buyer (shipping_*, buyer_id) is selected.
+        $deliveryAddress = PartRequest::query()
+            ->select([
+                'id', 'receiving_label', 'receiving_recipient_name', 'receiving_phone',
+                'receiving_postal_code', 'receiving_prefecture', 'receiving_city',
+                'receiving_address_line1', 'receiving_address_line2',
+            ])
+            ->whereKey($this->partRequestId)
+            ->where('confirmed_vendor_id', $this->vendorProfile()->id)
+            ->whereNotNull('receiving_label')
+            ->first();
+
         $myResponse = VendorResponse::query()
             ->with('photos')
             ->where('part_request_id', $this->partRequestId)
@@ -242,6 +258,10 @@ class RequestResponse extends Component
         return view('livewire.vendor.request-response', [
             'partRequest' => $partRequest,
             'myResponse' => $myResponse,
+            'deliveryAddress' => $deliveryAddress,
+            // The vendor's own fixed delivery method -- picks the "bring /
+            // ship / either" next-step line on a confirmed order.
+            'deliveryMethod' => $deliveryAddress ? $this->vendorProfile()->delivery_method : null,
             'maxPhotos' => $this->maxPhotos(),
         ])->title($partRequest->request_code);
     }

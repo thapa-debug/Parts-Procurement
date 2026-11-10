@@ -40,7 +40,9 @@ class RequestBoard extends Component
         return [
             'new' => [RequestStatus::New],
             'inquiring' => [RequestStatus::VendorInquiry],
-            'quoted' => [RequestStatus::Quoted],
+            // Awaiting payment stays with Quoted: the buyer has started
+            // checkout, but nothing is paid until the payment is confirmed.
+            'quoted' => [RequestStatus::Quoted, RequestStatus::AwaitingPayment],
             'order_confirmed' => [RequestStatus::Paid, RequestStatus::OrderedToVendor, RequestStatus::ProcurementFailed],
             'shipped' => [RequestStatus::Shipped],
             'completed' => [RequestStatus::Received],
@@ -71,6 +73,9 @@ class RequestBoard extends Component
 
         return PartRequest::query()
             ->with('buyer')
+            // Shown only on vendor_inquiry rows, but counted in the same
+            // query for every row -- three subqueries, never N+1.
+            ->withCount(PartRequest::responseCounts())
             ->when($statuses, fn ($query) => $query->whereIn('status', $statuses))
             ->when($this->search, function ($query) {
                 $query->where(function ($query) {

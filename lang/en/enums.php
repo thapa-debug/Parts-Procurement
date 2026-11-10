@@ -25,8 +25,17 @@ return [
     // §14 Phase 4) -- a shipping method means the same thing to either
     // viewer, unlike genuinely per-portal copy.
     'shipping_method' => [
-        'standard' => 'Standard shipment',
-        'dhl' => 'DHL / Express',
+        'standard' => 'Regular shipping',
+        'dhl' => 'DHL Express',
+    ],
+
+    // How a vendor gets a purchased part to the company (vendor_profiles.
+    // delivery_method) -- a fixed per-vendor property, shown wherever a
+    // vendor's profile is displayed.
+    'delivery_method' => [
+        'carry' => 'Brings to our office',
+        'deliver' => 'Ships / delivers',
+        'both' => 'Either (brings or ships)',
     ],
 
 ];

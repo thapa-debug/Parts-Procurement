@@ -12,6 +12,11 @@ enum RequestStatus: string
     case New = 'new';
     case VendorInquiry = 'vendor_inquiry';
     case Quoted = 'quoted';
+    // The buyer proceeded to checkout and a payment was started, but it is
+    // not confirmed yet (Stripe: PaymentIntent created, webhook pending --
+    // or the buyer abandoned the card form). Only a genuinely confirmed
+    // payment moves the request on to Paid.
+    case AwaitingPayment = 'awaiting_payment';
     case Paid = 'paid';
     case OrderedToVendor = 'ordered_to_vendor';
     case ProcurementFailed = 'procurement_failed';
@@ -28,6 +33,8 @@ enum RequestStatus: string
      * - New (新規依頼): nothing has happened yet -- orange.
      * - VendorInquiry (業者照会中) / Quoted (見積もり回答済み): progressing on
      *   its own, no admin action pending -- blue.
+     * - AwaitingPayment (決済待ち): waiting on the buyer's payment to be
+     *   confirmed -- sky, still "in flight" but visibly not yet paid.
      * - Paid (発注・検品中) / OrderedToVendor (発注確定): money has moved,
      *   fulfilment is committed -- indigo.
      * - ProcurementFailed: paid, but the vendor can't supply -- routes back
@@ -41,6 +48,7 @@ enum RequestStatus: string
         return match ($this) {
             self::New => 'bg-orange-50 text-orange-700',
             self::VendorInquiry, self::Quoted => 'bg-blue-50 text-blue-700',
+            self::AwaitingPayment => 'bg-sky-50 text-sky-700',
             self::Paid, self::OrderedToVendor => 'bg-indigo-50 text-indigo-700',
             self::ProcurementFailed => 'bg-red-50 text-red-700',
             self::Shipped => 'bg-teal-50 text-teal-700',

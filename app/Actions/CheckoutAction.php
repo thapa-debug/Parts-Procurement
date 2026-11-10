@@ -4,29 +4,40 @@ namespace App\Actions;
 
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Exceptions\CheckoutNotAllowedException;
+use App\Exceptions\CheckoutTotalChangedException;
 use App\Exceptions\PaymentFailedException;
 use App\Models\BuyerAddress;
 use App\Models\PartRequest;
 use App\Models\Payment;
 use App\Payments\PaymentGateway;
+use App\Services\ShippingFeeService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 
 /**
  * 有償 checkout (CLAUDE.md §14 Phase 4): the buyer's final step after
- * picking a presented quote -- choose a saved shipping address, pay, and
- * the request becomes `paid`.
+ * picking a presented quote -- choose a saved shipping address and start
+ * the payment. The request becomes `paid` only if the payment is already
+ * confirmed when charge() returns (the stub gateway, dev/test only).
+ * Otherwise -- Stripe, where charge() only creates a PaymentIntent -- it
+ * becomes `awaiting_payment`, and ConfirmStripePaymentAction moves it to
+ * `paid` once Stripe's signed webhook confirms the charge. A buyer who
+ * abandons at the card form is left at `awaiting_payment`, never `paid`.
  *
- * There is no shipping method/fee decision here any more (CLAUDE.md §14
- * Phase 4, rule-based shipping v1): SelectQuoteAction already copied the
- * fee ShippingCalculator computed at presentation time (or the admin's
- * override) onto part_requests.shipping_fee/shipping_method the moment
- * the buyer picked their quote. This action only ever reads that
- * already-fixed figure -- it never computes or accepts one.
+ * The buyer's shipping method is chosen here (Regular, the default, or
+ * DHL), and its fee comes from ShippingFeeService -- never from the
+ * browser. The method and fee are snapshotted onto the request BEFORE the
+ * payment row is created and charged, so the PaymentIntent is always
+ * created for the final total. Once this succeeds the request leaves
+ * `quoted`, so the method can't change any more (the same lock as the
+ * quote choice). $expectedTotal is the total the buyer was shown; if it
+ * no longer matches, nothing is charged.
  *
  * Everything -- the shipping-address snapshot
- * (SnapshotShippingAddressAction), the payment row, and the status
+ * (SnapshotShippingAddressAction), the shipping method/fee snapshot, the
+ * payment row, and the status
  * transition -- happens in one DB transaction (CLAUDE.md §8: wrap every
  * multi-write operation in a transaction). A failed charge rolls back all
  * of it: no partial snapshot, no status change, and no stray
@@ -44,10 +55,15 @@ class CheckoutAction
         private readonly PaymentGateway $gateway,
         private readonly SnapshotShippingAddressAction $snapshotShippingAddress,
         private readonly SendPaymentConfirmedNotificationsAction $sendPaymentConfirmedNotifications,
+        private readonly ShippingFeeService $shippingFees,
     ) {}
 
-    public function execute(PartRequest $partRequest, BuyerAddress $address): PartRequest
-    {
+    public function execute(
+        PartRequest $partRequest,
+        BuyerAddress $address,
+        ShippingMethod $shippingMethod = ShippingMethod::Standard,
+        ?int $expectedTotal = null,
+    ): PartRequest {
         if ($partRequest->is_free) {
             throw CheckoutNotAllowedException::isFreeRequest($partRequest);
         }
@@ -60,12 +76,26 @@ class CheckoutAction
             throw CheckoutNotAllowedException::shippingFeeMissing($partRequest);
         }
 
-        [$partRequest, $payment] = DB::transaction(function () use ($partRequest, $address) {
+        [$partRequest, $payment] = DB::transaction(function () use ($partRequest, $address, $shippingMethod, $expectedTotal): array {
+            // First, so the address is proven to be this buyer's before
+            // anything (e.g. a future DHL rate call) uses it.
             $this->snapshotShippingAddress->execute($partRequest, $address);
+
+            $shippingFee = $this->shippingFees->feeFor($partRequest, $shippingMethod, $address);
+            $total = $partRequest->buyer_price + $shippingFee;
+
+            if ($expectedTotal !== null && $expectedTotal !== $total) {
+                throw CheckoutTotalChangedException::forTotals($partRequest, $expectedTotal, $total);
+            }
+
+            $partRequest->update([
+                'shipping_method' => $shippingMethod,
+                'shipping_fee' => $shippingFee,
+            ]);
 
             $payment = Payment::create([
                 'part_request_id' => $partRequest->id,
-                'amount' => $partRequest->buyer_price + $partRequest->shipping_fee,
+                'amount' => $total,
                 'currency' => 'JPY',
                 'status' => PaymentStatus::Pending,
                 'gateway' => $this->gateway->name(),
@@ -85,12 +115,20 @@ class CheckoutAction
                 throw PaymentFailedException::chargeFailed($partRequest);
             }
 
-            $partRequest->update(['status' => RequestStatus::Paid]);
+            // charge() succeeding is not the same as being paid: re-read
+            // the payment, since only a synchronously-confirming gateway
+            // (the stub) has confirmed it by now.
+            $confirmed = $payment->fresh()->status === PaymentStatus::Confirmed;
 
-            Log::channel('payments')->info('Checkout payment confirmed', [
+            $partRequest->update([
+                'status' => $confirmed ? RequestStatus::Paid : RequestStatus::AwaitingPayment,
+            ]);
+
+            Log::channel('payments')->info($confirmed ? 'Checkout payment confirmed' : 'Checkout payment started, awaiting confirmation', [
                 'part_request_id' => $partRequest->id,
                 'payment_id' => $payment->id,
                 'amount' => $payment->amount,
+                'shipping_method' => $shippingMethod->value,
                 'gateway' => $this->gateway->name(),
             ]);
 

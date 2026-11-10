@@ -2,9 +2,11 @@
 
 namespace App\Livewire\Admin;
 
+use App\Enums\DeliveryMethod;
 use App\Models\User;
 use App\Models\VendorProfile;
 use Illuminate\Contracts\View\View;
+use Illuminate\Validation\Rule;
 use Livewire\Component;
 
 class VendorDetail extends Component
@@ -19,6 +21,8 @@ class VendorDetail extends Component
 
     public string $notify_email = '';
 
+    public string $delivery_method = '';
+
     public function mount(VendorProfile $vendorProfile): void
     {
         // Gated on 'update', not 'view' -- this page's whole purpose is
@@ -32,6 +36,7 @@ class VendorDetail extends Component
         $this->contact_person = $vendorProfile->contact_person;
         $this->phone = $vendorProfile->phone;
         $this->notify_email = $vendorProfile->notify_email;
+        $this->delivery_method = $vendorProfile->delivery_method->value;
     }
 
     /**
@@ -44,6 +49,7 @@ class VendorDetail extends Component
             'contact_person' => ['required', 'string', 'max:255'],
             'phone' => ['required', 'string', 'max:255'],
             'notify_email' => ['required', 'string', 'email', 'max:255'],
+            'delivery_method' => ['required', Rule::enum(DeliveryMethod::class)],
         ];
     }
 
@@ -69,6 +75,7 @@ class VendorDetail extends Component
                 ['name' => 'contact_person', 'label' => __('admin.vendor_master.create_form.contact_person_label'), 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.contact_person_placeholder'), 'help' => __('admin.vendor_master.create_form.contact_person_help')],
                 ['name' => 'phone', 'label' => __('admin.vendor_master.create_form.phone_label'), 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.phone_placeholder')],
                 ['name' => 'notify_email', 'label' => __('admin.vendor_master.create_form.notify_email_label'), 'type' => 'email', 'required' => true, 'placeholder' => __('admin.vendor_master.create_form.notify_email_placeholder'), 'help' => __('admin.vendor_master.create_form.notify_email_help')],
+                ['name' => 'delivery_method', 'label' => __('admin.vendor_master.create_form.delivery_method_label'), 'type' => 'select', 'required' => true, 'options' => collect(DeliveryMethod::cases())->mapWithKeys(fn (DeliveryMethod $method) => [$method->value => __('enums.delivery_method.'.$method->value)])->all(), 'help' => __('admin.vendor_master.create_form.delivery_method_help')],
             ],
             'accountFields' => [
                 ['label' => __('admin.profile_edit.name_label'), 'value' => $user->name],

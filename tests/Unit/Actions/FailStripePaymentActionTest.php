@@ -2,6 +2,8 @@
 
 use App\Actions\FailStripePaymentAction;
 use App\Enums\PaymentStatus;
+use App\Enums\RequestStatus;
+use App\Models\PartRequest;
 use App\Models\Payment;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -37,4 +39,18 @@ it('does nothing, and does not throw, for a PaymentIntent that does not match an
 
     expect($attempt)->not->toThrow(Throwable::class);
     expect(Payment::count())->toBe(0);
+});
+
+it('leaves the request awaiting_payment after a declined attempt -- never paid', function () {
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'gateway' => 'stripe',
+        'gateway_reference' => 'pi_declined_test',
+        'status' => PaymentStatus::Pending,
+    ]);
+
+    app(FailStripePaymentAction::class)->execute('pi_declined_test');
+
+    expect($request->fresh()->status)->toBe(RequestStatus::AwaitingPayment);
 });

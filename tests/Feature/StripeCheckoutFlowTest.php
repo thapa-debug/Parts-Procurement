@@ -9,6 +9,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Exceptions\PaymentNotConfirmedException;
 use App\Models\BuyerAddress;
+use App\Models\CompanyAddress;
 use App\Models\PartRequest;
 use App\Models\Payment;
 use App\Models\ShippingWeightBracket;
@@ -85,7 +86,9 @@ it('opens the payment gate only after the webhook confirms -- never at checkout 
     // reads `paid` -- but nothing has actually been charged yet.
     $result = app(CheckoutAction::class)->execute($request, $address);
 
-    expect($result->status)->toBe(RequestStatus::Paid);
+    // Proceeding to payment only created the PaymentIntent -- the request
+    // reads awaiting_payment, never paid, until Stripe confirms.
+    expect($result->status)->toBe(RequestStatus::AwaitingPayment);
 
     $payment = Payment::where('part_request_id', $request->id)->sole();
     expect($payment->status)->toBe(PaymentStatus::Pending)
@@ -94,7 +97,7 @@ it('opens the payment gate only after the webhook confirms -- never at checkout 
 
     // Step 2: the buyer never actually paid -- no webhook has arrived.
     // The admin must not be able to confirm the vendor purchase.
-    $attempt = fn () => app(ConfirmOrderToVendorAction::class)->execute($result);
+    $attempt = fn () => app(ConfirmOrderToVendorAction::class)->execute($result, CompanyAddress::factory()->create());
     expect($attempt)->toThrow(PaymentNotConfirmedException::class);
 
     // Step 3: Stripe's webhook confirms the PaymentIntent actually
@@ -102,10 +105,11 @@ it('opens the payment gate only after the webhook confirms -- never at checkout 
     // from the browser).
     app(ConfirmStripePaymentAction::class)->execute('pi_e2e_test');
 
-    expect($payment->refresh()->status)->toBe(PaymentStatus::Confirmed);
+    expect($payment->refresh()->status)->toBe(PaymentStatus::Confirmed)
+        ->and($result->fresh()->status)->toBe(RequestStatus::Paid);
 
     // Step 4: only now does the gate open.
-    $confirmed = app(ConfirmOrderToVendorAction::class)->execute($result->fresh());
+    $confirmed = app(ConfirmOrderToVendorAction::class)->execute($result->fresh(), CompanyAddress::factory()->create());
 
     expect($confirmed->status)->toBe(RequestStatus::OrderedToVendor);
 });

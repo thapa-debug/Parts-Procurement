@@ -7,6 +7,7 @@ use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
 use App\Exceptions\CheckoutNotAllowedException;
+use App\Exceptions\CheckoutTotalChangedException;
 use App\Exceptions\PaymentFailedException;
 use App\Exceptions\ShippingAddressNotAllowedException;
 use App\Models\BuyerAddress;
@@ -21,6 +22,7 @@ use App\Notifications\PaymentConfirmedAdminNotification;
 use App\Notifications\PaymentConfirmedNotification;
 use App\Payments\PaymentGateway;
 use App\Payments\PaymentResult;
+use App\Services\DhlRateCalculator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
 
@@ -56,6 +58,29 @@ function checkoutReadyRequest(int $costPrice = 45_000): array
     $address = BuyerAddress::factory()->create(['buyer_id' => $request->buyer_id]);
 
     return [$request->fresh(), $address];
+}
+
+/**
+ * A gateway shaped like Stripe: charge() succeeds (the PaymentIntent was
+ * created) but never confirms the payment itself -- only a later webhook
+ * does that.
+ */
+function fakeDeferredConfirmationGateway(): PaymentGateway
+{
+    return new class implements PaymentGateway
+    {
+        public function charge(Payment $payment): PaymentResult
+        {
+            $payment->update(['gateway_reference' => 'pi_deferred_test']);
+
+            return PaymentResult::success('pi_deferred_test');
+        }
+
+        public function name(): string
+        {
+            return 'fake-deferred';
+        }
+    };
 }
 
 function fakeFailingGateway(): PaymentGateway
@@ -160,6 +185,7 @@ it('refuses checkout from any status other than quoted', function (RequestStatus
 })->with([
     'new' => RequestStatus::New,
     'vendor inquiry' => RequestStatus::VendorInquiry,
+    'awaiting payment (a checkout already started)' => RequestStatus::AwaitingPayment,
     'already paid' => RequestStatus::Paid,
     'ordered to vendor' => RequestStatus::OrderedToVendor,
 ]);
@@ -236,4 +262,149 @@ it('lets only the owning buyer check out their own request', function () {
         ->and($buyerB->can('checkout', $request))->toBeFalse()
         ->and($admin->can('checkout', $request))->toBeFalse()
         ->and($vendor->can('checkout', $request))->toBeFalse();
+});
+
+// --- awaiting_payment: never "paid" before the payment is confirmed -------------
+
+it('leaves the request awaiting_payment, not paid, when the gateway has not confirmed the charge yet', function () {
+    app()->instance(PaymentGateway::class, fakeDeferredConfirmationGateway());
+    [$request, $address] = checkoutReadyRequest();
+    Notification::fake();
+
+    $result = app(CheckoutAction::class)->execute($request, $address);
+
+    $payment = Payment::where('part_request_id', $request->id)->sole();
+
+    expect($result->status)->toBe(RequestStatus::AwaitingPayment)
+        ->and($result->hasBeenPaid())->toBeFalse()
+        ->and($result->paymentGateOpen())->toBeFalse()
+        ->and($payment->status)->toBe(PaymentStatus::Pending)
+        ->and($payment->paid_at)->toBeNull();
+
+    // Nothing is confirmed yet, so nobody is told it is.
+    Notification::assertNothingSent();
+});
+
+it('refuses a second checkout while the first is still awaiting payment -- never a second PaymentIntent for one request', function () {
+    app()->instance(PaymentGateway::class, fakeDeferredConfirmationGateway());
+    [$request, $address] = checkoutReadyRequest();
+
+    app(CheckoutAction::class)->execute($request, $address);
+
+    expect(fn () => app(CheckoutAction::class)->execute($request->fresh(), $address))
+        ->toThrow(CheckoutNotAllowedException::class);
+    expect(Payment::where('part_request_id', $request->id)->count())->toBe(1);
+});
+
+// --- shipping method choice ---------------------------------------------------------
+
+it('snapshots DHL and its fee when the buyer picks DHL, and charges part price + the DHL fee', function () {
+    [$request, $address] = checkoutReadyRequest();
+
+    $result = app(CheckoutAction::class)->execute($request, $address, ShippingMethod::Dhl);
+
+    expect($result->shipping_method)->toBe(ShippingMethod::Dhl)
+        ->and($result->shipping_fee)->toBe(DhlRateCalculator::DUMMY_FEE);
+
+    expect(Payment::where('part_request_id', $request->id)->sole()->amount)
+        ->toBe($result->buyer_price + DhlRateCalculator::DUMMY_FEE);
+});
+
+it('settles the shipping method and fee BEFORE the gateway is charged -- the intent is created for the final total', function () {
+    [$request, $address] = checkoutReadyRequest();
+
+    $gateway = new class implements PaymentGateway
+    {
+        /** @var array<string, mixed>|null */
+        public ?array $seenAtCharge = null;
+
+        public function charge(Payment $payment): PaymentResult
+        {
+            $partRequest = $payment->partRequest()->first();
+            $this->seenAtCharge = [
+                'amount' => $payment->amount,
+                'shipping_method' => $partRequest->shipping_method,
+                'shipping_fee' => $partRequest->shipping_fee,
+            ];
+            $payment->update(['gateway_reference' => 'pi_order_test']);
+
+            return PaymentResult::success('pi_order_test');
+        }
+
+        public function name(): string
+        {
+            return 'fake-deferred';
+        }
+    };
+    app()->instance(PaymentGateway::class, $gateway);
+
+    $result = app(CheckoutAction::class)->execute($request, $address, ShippingMethod::Dhl);
+
+    expect($gateway->seenAtCharge)->toBe([
+        'amount' => $result->buyer_price + DhlRateCalculator::DUMMY_FEE,
+        'shipping_method' => ShippingMethod::Dhl,
+        'shipping_fee' => DhlRateCalculator::DUMMY_FEE,
+    ]);
+});
+
+it('refuses to charge when the total no longer matches what the buyer was shown -- nothing changes', function () {
+    [$request, $address] = checkoutReadyRequest();
+    $regularTotal = $request->buyer_price + 8_000;
+
+    // The buyer saw the Regular total, but DHL is what reached the server.
+    $attempt = fn () => app(CheckoutAction::class)->execute($request, $address, ShippingMethod::Dhl, $regularTotal);
+
+    expect($attempt)->toThrow(CheckoutTotalChangedException::class);
+
+    $fresh = $request->fresh();
+    expect(Payment::where('part_request_id', $request->id)->count())->toBe(0)
+        ->and($fresh->status)->toBe(RequestStatus::Quoted)
+        ->and($fresh->shipping_method)->toBe(ShippingMethod::Standard)
+        ->and($fresh->shipping_fee)->toBe(8_000)
+        ->and($fresh->shipping_address_id)->toBeNull();
+});
+
+it('charges when the total matches what the buyer was shown', function (ShippingMethod $method, int $fee) {
+    [$request, $address] = checkoutReadyRequest();
+
+    app(CheckoutAction::class)->execute($request, $address, $method, $request->buyer_price + $fee);
+
+    expect(Payment::where('part_request_id', $request->id)->sole()->amount)->toBe($request->buyer_price + $fee);
+})->with([
+    'regular' => [ShippingMethod::Standard, 8_000],
+    'dhl' => [ShippingMethod::Dhl, DhlRateCalculator::DUMMY_FEE],
+]);
+
+it('locks the shipping method once the intent exists -- a later checkout with another method is refused and changes nothing', function () {
+    app()->instance(PaymentGateway::class, fakeDeferredConfirmationGateway());
+    [$request, $address] = checkoutReadyRequest();
+
+    app(CheckoutAction::class)->execute($request, $address, ShippingMethod::Dhl);
+
+    expect(fn () => app(CheckoutAction::class)->execute($request->fresh(), $address, ShippingMethod::Standard))
+        ->toThrow(CheckoutNotAllowedException::class);
+
+    $fresh = $request->fresh();
+    expect($fresh->shipping_method)->toBe(ShippingMethod::Dhl)
+        ->and($fresh->shipping_fee)->toBe(DhlRateCalculator::DUMMY_FEE)
+        ->and(Payment::where('part_request_id', $request->id)->sole()->amount)->toBe($fresh->buyer_price + DhlRateCalculator::DUMMY_FEE);
+});
+
+it('Regular charges the admin\'s overridden fee from the presented quote, not the weight bracket', function () {
+    ShippingWeightBracket::query()->delete();
+    ShippingWeightBracket::factory()->catchAll()->create(['fee' => 8_000, 'order' => 1]);
+    $request = PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => VendorProfile::factory()->create()->id,
+        'cost_price' => 45_000,
+        'weight_kg' => 12,
+    ]);
+    $quote = app(PresentQuoteAction::class)->execute($request, $response, 5_500, 'Consolidated with another shipment');
+    app(SelectQuoteAction::class)->execute($request->fresh(), $quote);
+    $address = BuyerAddress::factory()->create(['buyer_id' => $request->buyer_id]);
+
+    $result = app(CheckoutAction::class)->execute($request->fresh(), $address, ShippingMethod::Standard);
+
+    expect($result->shipping_fee)->toBe(5_500);
 });

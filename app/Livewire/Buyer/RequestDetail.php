@@ -134,7 +134,6 @@ class RequestDetail extends Component
                 'photos' => $vendorResponses[$presentedQuote->vendor_response_id]->photos->map(fn ($photo) => $photo->url())->all(),
                 'is_selected' => $presentedQuote->vendor_response_id === $selectedResponseId,
                 'is_free' => $presentedQuote->is_free,
-            ])
-            ->all();
+            ])->all();
     }
 }

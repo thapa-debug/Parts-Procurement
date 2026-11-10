@@ -4,6 +4,7 @@ namespace Database\Seeders;
 
 use App\Enums\VendorStatus;
 use App\Models\BuyerProfile;
+use App\Models\CompanyAddress;
 use App\Models\Country;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -46,6 +47,28 @@ class DemoSeeder extends Seeder
         // buyer-approval gate: gives the (upcoming) approval-queue screen
         // something real to show.
         $this->buyer('Andes Auto Traders', 'Sofia Herrera', 'buyer4@demo.test', '+56-32-000-1004', 'Chile', pending: true);
+
+        // Company receiving addresses -- an order can't be confirmed to a
+        // vendor without at least one (CLAUDE.md §14 Phase 4 slice 6).
+        CompanyAddress::factory()->create([
+            'label' => 'Head office',
+            'recipient_name' => 'Receiving desk',
+            'phone' => '03-0000-0001',
+            'postal_code' => '100-0001',
+            'prefecture' => 'Tokyo',
+            'city' => 'Chiyoda-ku',
+            'address_line1' => '1-1-1 Marunouchi',
+        ]);
+        CompanyAddress::factory()->create([
+            'label' => 'Chiba yard',
+            'recipient_name' => 'Yard office',
+            'phone' => '043-000-0002',
+            'postal_code' => '260-0001',
+            'prefecture' => 'Chiba',
+            'city' => 'Chiba-shi Chuo-ku',
+            'address_line1' => '2-3-4 Minato',
+            'address_line2' => 'Gate B',
+        ]);
     }
 
     private function vendor(string $companyName, string $contactPerson, string $email, string $phone): void

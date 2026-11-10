@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\DeliveryMethod;
 use App\Enums\LeadTime;
 use App\Enums\QualityRank;
+use App\Enums\RequestStatus;
 use App\Livewire\Vendor\RequestResponse;
 use App\Models\BuyerProfile;
 use App\Models\PartRequest;
@@ -342,4 +344,95 @@ it('never shows the buyer\'s identity or another vendor\'s response', function (
         ->assertDontSee('99,999')
         ->assertDontSee('Vendor A secret comment')
         ->assertSee(__('vendor.request_response.submit_button'));
+});
+
+// --- confirmed order: company receiving address (CLAUDE.md §14 Phase 4 slice 6)
+
+it('shows the confirmed vendor where to deliver the part', function () {
+    [$request, $confirmedUser] = confirmedOrderWithTwoVendors();
+
+    Livewire::actingAs($confirmedUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertSee(__('vendor.request_response.delivery_section'))
+        ->assertSee('Chiba yard')
+        ->assertSee('Receiving desk')
+        ->assertSee('043-123-4567')
+        ->assertSee('260-0001')
+        ->assertSee('Chiba-shi')
+        ->assertSee('1-2-3 Chuo');
+});
+
+it('never shows the delivery address to another invited vendor who was not confirmed', function () {
+    [$request, , $otherUser] = confirmedOrderWithTwoVendors();
+
+    Livewire::actingAs($otherUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertDontSee(__('vendor.request_response.delivery_section'))
+        ->assertDontSee('Chiba yard')
+        ->assertDontSee('1-2-3 Chuo');
+});
+
+it('never shows the confirmed vendor the buyer\'s identity or shipping address -- isolation (CLAUDE.md §4)', function () {
+    [$request, $confirmedUser] = confirmedOrderWithTwoVendors();
+
+    $component = Livewire::actingAs($confirmedUser)->test(RequestResponse::class, ['partRequest' => $request]);
+
+    // Rendered HTML AND the Livewire snapshot -- not just what the view
+    // happens to print today.
+    expect($component->html())->not->toContain('Secret Buyer Co')
+        ->and($component->html())->not->toContain('Buyer Recipient Person')
+        ->and($component->html())->not->toContain('42 Buyer Street')
+        ->and(json_encode($component->snapshot))->not->toContain('Secret Buyer Co')
+        ->and(json_encode($component->snapshot))->not->toContain('42 Buyer Street')
+        ->and(json_encode($component->snapshot))->not->toContain('Chiba yard');
+});
+
+it('does not show a delivery section before the order is confirmed', function () {
+    $vendorUser = User::factory()->vendor()->create();
+    $vendor = VendorProfile::factory()->for($vendorUser)->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Paid]);
+    $request->vendors()->attach($vendor->id, ['invited_at' => now()]);
+
+    Livewire::actingAs($vendorUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertDontSee(__('vendor.request_response.delivery_section'))
+        ->assertDontSee(__('vendor.request_response.confirmed_heading'));
+});
+
+// --- confirmed order: prominent status + next steps ------------------------------
+
+it('shows the confirmed vendor a prominent confirmed status with the next steps', function () {
+    [$request, $confirmedUser] = confirmedOrderWithTwoVendors();
+    $myPrice = VendorResponse::query()->where('part_request_id', $request->id)
+        ->where('vendor_id', $confirmedUser->vendorProfile->id)->value('cost_price');
+
+    Livewire::actingAs($confirmedUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertSeeInOrder([
+            __('vendor.request_response.confirmed_badge'),
+            __('vendor.request_response.confirmed_heading'),
+            __('vendor.request_response.delivery_section'),
+            'Chiba yard',
+            __('vendor.request_response.next_steps_heading'),
+        ])
+        ->assertSee(__('vendor.request_response.next_step_invoice', ['price' => number_format($myPrice)]))
+        ->assertSee(__('vendor.request_response.next_step_reference', ['request_code' => $request->request_code]));
+});
+
+it('tells the confirmed vendor how to get the part there, from their own delivery method', function (DeliveryMethod $method) {
+    [$request, $confirmedUser] = confirmedOrderWithTwoVendors($method);
+
+    Livewire::actingAs($confirmedUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertSee(__('vendor.request_response.next_step_deliver.'.$method->value));
+})->with([DeliveryMethod::Carry, DeliveryMethod::Deliver, DeliveryMethod::Both]);
+
+it('never shows the confirmed status to another invited vendor', function () {
+    [$request, , $otherUser] = confirmedOrderWithTwoVendors();
+
+    Livewire::actingAs($otherUser)
+        ->test(RequestResponse::class, ['partRequest' => $request])
+        ->assertDontSee(__('vendor.request_response.confirmed_badge'))
+        ->assertDontSee(__('vendor.request_response.confirmed_heading'))
+        ->assertDontSee(__('vendor.request_response.next_steps_heading'));
 });

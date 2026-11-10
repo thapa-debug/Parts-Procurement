@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\DeliveryMethod;
 use App\Enums\VendorStatus;
 use Database\Factories\VendorProfileFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -11,7 +12,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Spatie\Activitylog\Models\Concerns\LogsActivity;
 use Spatie\Activitylog\Support\LogOptions;
 
-#[Fillable(['user_id', 'company_name', 'contact_person', 'phone', 'notify_email', 'status'])]
+#[Fillable(['user_id', 'company_name', 'contact_person', 'phone', 'notify_email', 'delivery_method', 'status'])]
 class VendorProfile extends Model
 {
     /** @use HasFactory<VendorProfileFactory> */
@@ -24,6 +25,7 @@ class VendorProfile extends Model
      */
     protected $casts = [
         'status' => VendorStatus::class,
+        'delivery_method' => DeliveryMethod::class,
     ];
 
     /**
@@ -36,6 +38,6 @@ class VendorProfile extends Model
 
     public function getActivitylogOptions(): LogOptions
     {
-        return LogOptions::defaults()->logOnly(['status']);
+        return LogOptions::defaults()->logOnly(['status', 'delivery_method']);
     }
 }

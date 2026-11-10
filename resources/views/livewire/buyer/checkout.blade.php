@@ -15,9 +15,87 @@
 
     <h1 class="mt-2 text-2xl font-semibold text-ink">{{ __('buyer.checkout.heading', ['code' => $partRequest->request_code]) }}</h1>
 
-    @unless ($isEligible)
+    @if ($canResumePayment)
+        {{-- Abandoned checkout, resumed on the SAME PaymentIntent
+        (Checkout::resumePayment / ResumeStripePaymentAction). Same Alpine
+        component as the normal card step, in resume mode: it fetches the
+        existing intent's client secret on load and mounts the card form
+        against it -- never a new intent. The address is shown read-only:
+        it was snapshotted when checkout started. --}}
+        <form
+            x-data="stripeCheckoutForm({
+                publishableKey: @js($stripePublishableKey),
+                resume: true,
+            })"
+            x-init="init()"
+            @submit.prevent="cardMounted ? submit() : proceedToPayment()"
+            class="mt-6 space-y-6"
+        >
+            <div class="rounded-lg border border-sky-200 bg-sky-50 p-4">
+                <p class="text-sm text-sky-800">{{ __('buyer.checkout.resume_help') }}</p>
+            </div>
+
+            <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.resume_shipping_to') }}</h2>
+                <p class="mt-2 text-sm text-ink">
+                    <span class="font-medium">{{ $partRequest->shipping_recipient_name }}</span><br>
+                    <span class="text-ink-muted">
+                        {{ $partRequest->shipping_postal_code }}, {{ $partRequest->shipping_country }}@if ($partRequest->shipping_state), {{ $partRequest->shipping_state }}@endif, {{ $partRequest->shipping_city }}, {{ $partRequest->shipping_address_line1 }}@if ($partRequest->shipping_address_line2), {{ $partRequest->shipping_address_line2 }}@endif
+                    </span>
+                </p>
+            </div>
+
+            <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.summary_section') }}</h2>
+                <dl class="mt-4 space-y-2 text-sm">
+                    <div class="flex items-center justify-between">
+                        <dt class="text-ink-muted">{{ __('buyer.checkout.summary_part_price') }}</dt>
+                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
+                    </div>
+                    {{-- Read-only: the method and its fee were snapshotted
+                    when checkout started, and the intent was created for
+                    exactly this total. --}}
+                    <div class="flex items-center justify-between">
+                        <dt class="text-ink-muted">
+                            {{ __('buyer.checkout.summary_shipping_fee') }}
+                            @if ($partRequest->shipping_method)
+                                <span class="text-xs">({{ __('enums.shipping_method.'.$partRequest->shipping_method->value) }})</span>
+                            @endif
+                        </dt>
+                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->shipping_fee) }}</dd>
+                    </div>
+                    <div class="flex items-center justify-between border-t border-line pt-2 text-base font-semibold">
+                        <dt class="text-ink">{{ __('buyer.checkout.summary_total') }}</dt>
+                        <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
+                    </div>
+                </dl>
+            </div>
+
+            <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.card_section') }}</h2>
+                <p x-show="!cardMounted && !errorMessage" class="mt-2 text-sm text-ink-muted">{{ __('buyer.checkout.resume_loading') }}</p>
+                <div x-show="cardMounted">
+                    <p class="mt-1 text-xs text-ink-muted">{{ __('buyer.checkout.card_section_help') }}</p>
+                    <div x-ref="paymentElement" class="mt-4"></div>
+                </div>
+                <p x-show="errorMessage" x-cloak x-text="errorMessage" class="mt-2 text-sm text-red-600" role="alert"></p>
+            </div>
+
+            <button
+                type="submit"
+                x-show="cardMounted"
+                :disabled="processing"
+                x-text="processing ? @js(__('buyer.checkout.processing_button')) : @js(__('buyer.checkout.pay_button'))"
+                class="w-full rounded-md bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+            >{{ __('buyer.checkout.pay_button') }}</button>
+        </form>
+    @elseif (! $isEligible)
         <div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
-            <p class="text-sm text-amber-800">{{ __('buyer.checkout.not_eligible') }}</p>
+            <p class="text-sm text-amber-800">
+                {{ $partRequest->status === \App\Enums\RequestStatus::AwaitingPayment
+                    ? __('buyer.checkout.awaiting_payment')
+                    : __('buyer.checkout.not_eligible') }}
+            </p>
         </div>
     @else
         {{-- The Alpine/Stripe.js-driven form only takes over once an
@@ -40,7 +118,10 @@
                 x-init="init()"
                 @submit.prevent="cardMounted ? submit() : proceedToPayment()"
             @else
-                wire:submit="{{ $partRequest->is_free ? 'confirmFree' : 'pay' }}"
+                {{-- pay() is handed the total the buyer is looking at
+                (re-rendered on every shipping-method change), so it can
+                refuse rather than charge anything else. --}}
+                wire:submit="{{ $partRequest->is_free ? 'confirmFree' : 'pay('.($checkoutTotal ?? 'null').')' }}"
             @endif
             class="mt-6 space-y-6"
         >
@@ -206,8 +287,49 @@
                     <p class="text-sm text-emerald-800">{{ __('buyer.checkout.free_order_note') }}</p>
                 </div>
             @else
-                {{-- Fee breakdown --}}
+                {{-- Shipping method -- chosen before "Proceed to payment",
+                because the PaymentIntent is created for the total that
+                includes this fee. wire:model.live: each change re-renders
+                the fee and total from the server (ShippingFeeService),
+                safe because nothing is mounted yet. Once the card form is
+                mounted (cardMounted) the method is already snapshotted
+                and the radios are disabled -- the same lock as the
+                address radios above. --}}
                 <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
+                    <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.shipping_method_section') }}</h2>
+
+                    <div class="mt-4 space-y-2">
+                        @foreach (\App\Enums\ShippingMethod::cases() as $method)
+                            @php($fee = $shippingFees[$method->value] ?? null)
+                            <label wire:key="shipping-method-{{ $method->value }}" class="flex cursor-pointer items-start justify-between gap-3 rounded-md border border-line p-3 text-sm has-checked:border-brand-500 has-checked:bg-brand-50 has-disabled:cursor-not-allowed has-disabled:opacity-60">
+                                <span class="flex items-start gap-3">
+                                    <input
+                                        type="radio"
+                                        name="shippingMethod"
+                                        wire:model.live="shippingMethod"
+                                        value="{{ $method->value }}"
+                                        class="mt-0.5 text-brand-600 focus:ring-brand-500"
+                                        @if ($cardStepReady) :disabled="cardMounted || @js($fee === null)" @elseif ($fee === null) disabled @endif
+                                    >
+                                    <span>
+                                        <span class="font-medium text-ink">{{ __('enums.shipping_method.'.$method->value) }}</span>
+                                        <br>
+                                        <span class="text-ink-muted">{{ __('buyer.checkout.shipping_method_help.'.$method->value) }}</span>
+                                    </span>
+                                </span>
+                                <span class="shrink-0 font-mono text-ink">
+                                    {{ $fee === null ? __('buyer.checkout.shipping_fee_needs_address') : '¥'.number_format($fee) }}
+                                </span>
+                            </label>
+                        @endforeach
+                    </div>
+                    @error('shippingMethod') <p class="mt-2 text-sm text-red-600">{{ $message }}</p> @enderror
+                </div>
+
+                {{-- Fee breakdown -- always the server's figures for the
+                current choice. data-checkout-total is what the card flow
+                sends to pay() as the total the buyer saw. --}}
+                <div class="rounded-lg border border-line bg-surface p-6 shadow-sm" wire:loading.class="opacity-60" wire:target="shippingMethod">
                     <h2 class="text-base font-semibold text-ink">{{ __('buyer.checkout.summary_section') }}</h2>
 
                     <dl class="mt-4 space-y-2 text-sm">
@@ -216,15 +338,18 @@
                             <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
                         </div>
                         <div class="flex items-center justify-between">
-                            <dt class="text-ink-muted">{{ __('buyer.checkout.summary_shipping_fee') }}</dt>
-                            <dd class="font-mono text-ink">¥{{ number_format($partRequest->shipping_fee) }}</dd>
+                            <dt class="text-ink-muted">
+                                {{ __('buyer.checkout.summary_shipping_fee') }}
+                                <span class="text-xs">({{ __('enums.shipping_method.'.$shippingMethod) }})</span>
+                            </dt>
+                            <dd class="font-mono text-ink">{{ $chosenShippingFee === null ? '—' : '¥'.number_format($chosenShippingFee) }}</dd>
                         </div>
                         <div class="flex items-center justify-between border-t border-line pt-2 text-base font-semibold">
                             <dt class="text-ink">{{ __('buyer.checkout.summary_total') }}</dt>
-                            <dd class="font-mono text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->shipping_fee) }}</dd>
+                            <dd class="font-mono text-ink" data-checkout-total="{{ $checkoutTotal }}">{{ $checkoutTotal === null ? '—' : '¥'.number_format($checkoutTotal) }}</dd>
                         </div>
                     </dl>
-                    <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.shipping_fee_note') }}</p>
+                    {{-- <p class="mt-3 text-xs text-ink-muted">{{ __('buyer.checkout.shipping_fee_note') }}</p> --}}
                 </div>
 
                 @if ($isStripeGateway)
@@ -274,10 +399,15 @@
                 type="submit"
                 @if ($cardStepReady)
                     :disabled="processing"
+                    {{-- Also briefly disabled while a shipping-method change
+                    is re-rendering the total, so the buyer clicks on the
+                    figure they'll be charged. --}}
+                    wire:loading.attr="disabled"
+                    wire:target="shippingMethod"
                     x-text="processing ? @js(__('buyer.checkout.processing_button')) : (cardMounted ? @js(__('buyer.checkout.pay_button')) : @js(__('buyer.checkout.proceed_to_payment_button')))"
                 @else
                     wire:loading.attr="disabled"
-                    wire:target="{{ $partRequest->is_free ? 'confirmFree' : 'pay' }}"
+                    wire:target="{{ $partRequest->is_free ? 'confirmFree' : 'pay,shippingMethod' }}"
                     {{-- Stripe + no address yet: block the pay step itself
                     rather than let the buyer submit into a late
                     "select an address" error (see the Card details
@@ -287,7 +417,7 @@
                 class="w-full rounded-md bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >{{ $partRequest->is_free ? __('buyer.checkout.confirm_free_button') : ($cardStepReady ? __('buyer.checkout.proceed_to_payment_button') : __('buyer.checkout.pay_button')) }}</button>
         </form>
-    @endunless
+    @endif
 
     {{-- Kept inside the single root <div> for the same reason as the
     Stripe.js <script src> above -- see that comment. --}}
@@ -310,9 +440,14 @@
 
                     init() {
                         this.stripe = Stripe(config.publishableKey);
-                        // Deliberately nothing else here -- see
-                        // proceedToPayment()'s own comment for why
-                        // Elements isn't created until the buyer commits.
+                        // A fresh checkout creates nothing until the buyer
+                        // commits (see proceedToPayment()'s own comment).
+                        // A resumed checkout already committed: fetch the
+                        // existing intent and mount the card form right
+                        // away -- resumePayment() only ever retrieves.
+                        if (config.resume) {
+                            this.proceedToPayment();
+                        }
                     },
 
                     // Step 1 of 2, triggered by the buyer's own submit
@@ -344,8 +479,8 @@
                     //
                     // This step is exactly the buyer's own "commit to
                     // paying" moment, not a side effect of merely loading
-                    // the page (CheckoutAction flips part_requests.status
-                    // to `paid` synchronously) -- deliberately gated
+                    // the page (CheckoutAction moves part_requests.status
+                    // to `awaiting_payment`) -- deliberately gated
                     // behind this explicit click rather than running from
                     // init(), so a buyer who never gets this far never
                     // triggers a charge attempt at all.
@@ -359,7 +494,12 @@
 
                         let result;
                         try {
-                            result = await this.$wire.pay();
+                            // Resume mode re-fetches the SAME
+                            // PaymentIntent; it never runs CheckoutAction.
+                            // A fresh checkout sends the total the buyer
+                            // is looking at, so pay() can refuse to
+                            // create an intent for any other amount.
+                            result = config.resume ? await this.$wire.resumePayment() : await this.$wire.pay(this.shownTotal());
                         } catch (e) {
                             this.errorMessage = @js(__('buyer.checkout.error_generic'));
                             this.processing = false;
@@ -393,6 +533,14 @@
                         this.elements.create('payment').mount(this.$refs.paymentElement);
                         this.cardMounted = true;
                         this.processing = false;
+                    },
+
+                    // The total currently rendered in the order summary
+                    // (server-computed for the chosen shipping method).
+                    shownTotal() {
+                        const total = this.$root.querySelector('[data-checkout-total]')?.dataset.checkoutTotal;
+
+                        return total ? Number(total) : null;
                     },
 
                     // Step 2 of 2, triggered by the buyer's own submit

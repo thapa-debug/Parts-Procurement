@@ -2,6 +2,7 @@
 
 namespace App\Actions;
 
+use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
 use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
@@ -22,9 +23,9 @@ use Throwable;
  * though nothing about their shape changed from Phase 2. Same for
  * shipping_fee (CLAUDE.md §14 Phase 4 rule-based shipping v1): copied here,
  * not computed at checkout, so it's already fixed by the time the buyer
- * reaches CheckoutAction -- shipping_method is set to Standard alongside
- * it (the only method a presented quote's fee can represent today; Dhl
- * isn't wired into this flow yet).
+ * reaches CheckoutAction -- shipping_method is set to Standard (Regular)
+ * alongside it, the default. The buyer may still switch to DHL at
+ * checkout; CheckoutAction then snapshots that method and its fee instead.
  *
  * Callable repeatedly: the buyer may change their mind and re-select a
  * different still-presented quote for as long as the request hasn't been
@@ -45,7 +46,11 @@ class SelectQuoteAction
 {
     public function execute(PartRequest $partRequest, PresentedQuote $presentedQuote): PartRequest
     {
-        if ($partRequest->hasBeenPaid()) {
+        if ($partRequest->status === RequestStatus::AwaitingPayment) {
+            throw SelectQuoteNotAllowedException::checkoutInProgress($partRequest);
+        }
+
+        if ($partRequest->quoteChoiceLocked()) {
             throw SelectQuoteNotAllowedException::alreadyPaid($partRequest);
         }
 

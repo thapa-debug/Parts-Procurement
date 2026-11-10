@@ -2,6 +2,7 @@
 
 namespace Database\Factories;
 
+use App\Enums\DeliveryMethod;
 use App\Enums\VendorStatus;
 use App\Models\User;
 use App\Models\VendorProfile;
@@ -25,6 +26,7 @@ class VendorProfileFactory extends Factory
             'contact_person' => fake()->name(),
             'phone' => fake()->phoneNumber(),
             'notify_email' => fake()->unique()->safeEmail(),
+            'delivery_method' => DeliveryMethod::Both,
             'status' => VendorStatus::Active,
         ];
     }

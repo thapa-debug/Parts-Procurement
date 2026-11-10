@@ -3,10 +3,11 @@
 namespace App\Enums;
 
 /**
- * CLAUDE.md §14 Phase 4: rule-based shipping v1 is a single calculated
- * method -- Standard -- so there's no longer a buyer-facing choice between
- * Vehicle/Container (removed). Dhl remains for the future second method,
- * not yet built.
+ * The buyer's shipping choice at checkout (CLAUDE.md §14 Phase 4).
+ * Standard is shown to buyers as "Regular": the rule-based weight-bracket
+ * fee fixed at quote presentation, and the default. Dhl's fee comes from
+ * DhlRateCalculator (a dummy fixed fee until the real DHL API is wired).
+ * Vehicle/Container were removed in rule-based shipping v1.
  */
 enum ShippingMethod: string
 {

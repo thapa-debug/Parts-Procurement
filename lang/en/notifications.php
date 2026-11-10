@@ -18,6 +18,7 @@ return [
     // pre-formats buyer_price with thousands separators before this runs).
     'types' => [
         'request_broadcast' => 'New inquiry: :part_name (:request_code).',
+        'order_confirmed_to_vendor' => 'Order confirmed: :part_name (:request_code) -- please deliver to :receiving_label.',
         'vendor_response_submitted' => ':vendor_company_name responded to :request_code.',
         'quote_presented' => 'A new quote is available for :request_code -- ¥:buyer_price.',
         'quote_selected' => ':buyer_company_name selected a quote for :request_code.',
@@ -42,6 +43,26 @@ return [
             'subject' => 'New inquiry: :part_name',
             'line' => 'A new part request needs your quote: :part_name (:request_code).',
             'action' => 'View request',
+        ],
+
+        'order_confirmed_to_vendor' => [
+            'subject' => 'Order confirmed: :part_name (:request_code)',
+            'line' => 'Your quote for :part_name (request :request_code) has been selected, and we are placing the order with you.',
+            // Keyed by App\Enums\DeliveryMethod -- the vendor's own fixed
+            // delivery method (vendor_profiles.delivery_method).
+            'instruction' => [
+                'carry' => 'Please bring the part to the delivery address below.',
+                'deliver' => 'Please ship the part to the delivery address below.',
+                'both' => 'Please bring or ship the part to the delivery address below.',
+            ],
+            'address_heading' => 'Delivery address: :label',
+            'address' => ':postal_code :prefecture :city :address_line1',
+            'contact' => 'Contact: :recipient_name / Tel: :phone',
+            'phone_only' => 'Tel: :phone',
+            'action' => 'View order',
+            // Replaces the shared no_reply_notice -- there's nothing for the
+            // vendor to respond to on an order confirmation.
+            'closing' => 'This is an automated notification and replies are not monitored. If you have any questions, please contact us via the portal.',
         ],
 
         'vendor_response_submitted' => [

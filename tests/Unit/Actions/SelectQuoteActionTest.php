@@ -132,6 +132,9 @@ it('refuses to select once the request has already been paid for', function (Req
     expect($attempt)->toThrow(SelectQuoteNotAllowedException::class);
     expect($request->fresh()->selected_response_id)->toBeNull();
 })->with([
+    // A checkout already started: the PaymentIntent was created for the
+    // selected quote's amount, so the selection must not change under it.
+    'awaiting payment' => RequestStatus::AwaitingPayment,
     'paid' => RequestStatus::Paid,
     'ordered to vendor' => RequestStatus::OrderedToVendor,
     'shipped' => RequestStatus::Shipped,

@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\UserRole;
 use Database\Factories\UserFactory;
 use Illuminate\Contracts\Auth\MustVerifyEmail;
+use Illuminate\Contracts\Translation\HasLocalePreference;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Builder;
@@ -17,7 +18,7 @@ use Spatie\Permission\Traits\HasRoles;
 
 #[Fillable(['name', 'email', 'password', 'role', 'is_active', 'must_change_password'])]
 #[Hidden(['password', 'remember_token'])]
-class User extends Authenticatable implements MustVerifyEmail
+class User extends Authenticatable implements HasLocalePreference, MustVerifyEmail
 {
     /** @use HasFactory<UserFactory> */
     use HasFactory, HasRoles, Notifiable, SoftDeletes;
@@ -48,6 +49,19 @@ class User extends Authenticatable implements MustVerifyEmail
     public function isVendor(): bool
     {
         return $this->role === UserRole::Vendor;
+    }
+
+    /**
+     * HasLocalePreference: Laravel renders every notification sent to this
+     * user inside this locale, then restores the app locale. Vendors are
+     * Japanese dismantlers, so their email (打診, verification, ...) comes
+     * from lang/ja + lang/ja.json; buyers and admins return null and get the
+     * app locale (en). The in-app UI is unaffected -- database notifications
+     * store raw data and are rendered at view time in the app locale.
+     */
+    public function preferredLocale(): ?string
+    {
+        return $this->isVendor() ? 'ja' : null;
     }
 
     /**

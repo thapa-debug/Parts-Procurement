@@ -1,11 +1,14 @@
 <?php
 
 use App\Actions\PresentQuoteAction;
+use App\Enums\DeliveryMethod;
 use App\Enums\LeadTime;
+use App\Enums\PaymentStatus;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
 use App\Livewire\Admin\RequestDetail;
+use App\Models\CompanyAddress;
 use App\Models\PartRequest;
 use App\Models\Payment;
 use App\Models\PresentedQuote;
@@ -513,4 +516,203 @@ it('does not show a payment summary before the request has been paid', function 
     Livewire::actingAs($admin)
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->assertDontSee(__('admin.request_detail.payment_summary_section'));
+});
+
+// --- confirm order to vendor (CLAUDE.md §6.3, §14 Phase 4 slice 6) ---------
+
+// The confirm button carrying a real `disabled` attribute -- not merely a
+// `disabled:` Tailwind variant in its class list.
+const CONFIRM_ORDER_BUTTON_DISABLED = '/<button[^>]*wire:click="confirmOrderToVendor"[^>]*\\sdisabled(?=[\\s>=])/s';
+
+/**
+ * A request sitting at `paid`, with its selected vendor response and a
+ * payment in the given status -- Confirmed opens the §6.3 gate; Pending is
+ * the Stripe window where the request reads `paid` but no webhook has
+ * confirmed the charge yet.
+ */
+function paidRequestForConfirmation(PaymentStatus $paymentStatus = PaymentStatus::Confirmed, ?VendorProfile $vendor = null): PartRequest
+{
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Paid]);
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => ($vendor ?? VendorProfile::factory()->create())->id,
+    ]);
+    $request->update(['selected_response_id' => $response->id]);
+    Payment::factory()->create(['part_request_id' => $request->id, 'status' => $paymentStatus]);
+
+    return $request->fresh();
+}
+
+it('confirms the order to the vendor with the chosen company receiving address', function () {
+    $admin = User::factory()->admin()->create();
+    $vendor = VendorProfile::factory()->create(['company_name' => 'Acme Dismantlers']);
+    $request = paidRequestForConfirmation(vendor: $vendor);
+    $address = CompanyAddress::factory()->create(['label' => 'Chiba yard']);
+
+    $component = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.confirm_order_section'))
+        ->assertSee('Chiba yard');
+
+    expect($component->html())->not->toMatch(CONFIRM_ORDER_BUTTON_DISABLED);
+
+    $component
+        ->set('receivingAddressId', $address->id)
+        ->call('confirmOrderToVendor')
+        ->assertHasNoErrors()
+        ->assertDispatched('toast', type: 'success')
+        ->assertSee(__('admin.request_detail.order_confirmed_section'));
+
+    $request->refresh();
+
+    expect($request->status)->toBe(RequestStatus::OrderedToVendor)
+        ->and($request->confirmed_vendor_id)->toBe($vendor->id)
+        ->and($request->receiving_address_id)->toBe($address->id)
+        ->and($request->receiving_label)->toBe('Chiba yard');
+});
+
+it('shows the chosen vendor and their fixed delivery method in the confirm panel', function () {
+    $admin = User::factory()->admin()->create();
+    $vendor = VendorProfile::factory()->create(['company_name' => 'Acme Dismantlers', 'delivery_method' => DeliveryMethod::Carry]);
+    $request = paidRequestForConfirmation(vendor: $vendor);
+    CompanyAddress::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeInOrder([__('admin.request_detail.confirm_order_section'), 'Acme Dismantlers', __('enums.delivery_method.carry')]);
+});
+
+it('requires a company receiving address to confirm the order', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidRequestForConfirmation();
+    CompanyAddress::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->call('confirmOrderToVendor')
+        ->assertHasErrors(['receivingAddressId']);
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('rejects a company address id that does not exist', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidRequestForConfirmation();
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('receivingAddressId', 999_999)
+        ->call('confirmOrderToVendor')
+        ->assertHasErrors(['receivingAddressId']);
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('disables the confirm button while the payment is still pending, and refuses a forced call -- the §6.3 gate', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidRequestForConfirmation(PaymentStatus::Pending);
+    $address = CompanyAddress::factory()->create();
+
+    $component = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.confirm_order_payment_pending'));
+
+    expect($component->html())->toMatch(CONFIRM_ORDER_BUTTON_DISABLED);
+
+    $component->set('receivingAddressId', $address->id)
+        ->call('confirmOrderToVendor')
+        ->assertDispatched('toast', type: 'error');
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid)
+        ->and($request->fresh()->receiving_address_id)->toBeNull();
+});
+
+it('points the admin to Settings when no company receiving address exists yet', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidRequestForConfirmation();
+
+    $component = Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.confirm_order_no_addresses'));
+
+    expect($component->html())->toMatch(CONFIRM_ORDER_BUTTON_DISABLED);
+});
+
+it('never shows the confirm panel before the request is paid', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Quoted]);
+    CompanyAddress::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('admin.request_detail.confirm_order_section'));
+});
+
+it('shows the snapshotted receiving address once confirmed, even after the company address changes', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidRequestForConfirmation();
+    $address = CompanyAddress::factory()->create(['label' => 'Chiba yard', 'address_line1' => '1-2-3 Chuo']);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->set('receivingAddressId', $address->id)
+        ->call('confirmOrderToVendor');
+
+    $address->update(['label' => 'Renamed yard', 'address_line1' => '9-9-9 Elsewhere']);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('admin.request_detail.order_confirmed_section'))
+        ->assertSee('Chiba yard')
+        ->assertSee('1-2-3 Chuo')
+        ->assertDontSee('9-9-9 Elsewhere')
+        ->assertDontSee(__('admin.request_detail.confirm_order_section'));
+});
+
+// --- awaiting_payment -----------------------------------------------------------------
+
+it('shows awaiting payment to the admin, with no paid banner and no confirm-order panel', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    Payment::factory()->create(['part_request_id' => $request->id, 'status' => PaymentStatus::Pending]);
+    CompanyAddress::factory()->create();
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_board.status.awaiting_payment'))
+        ->assertDontSee(__('admin.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('admin.request_detail.confirm_order_section'));
+});
+
+it('locks presenting further quotes while the buyer is mid-checkout', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::AwaitingPayment]);
+    VendorResponse::factory()->create(['part_request_id' => $request->id, 'cost_price' => 45_000, 'weight_kg' => 12]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.compare_awaiting_payment_help'))
+        ->assertDontSee(__('admin.request_detail.compare_help'))
+        ->assertDontSee(__('admin.request_detail.compare_locked_help'));
+});
+
+// --- quotes received (vendor_inquiry) -------------------------------------------
+
+it('shows the quotes-received count on a vendor_inquiry request', function () {
+    $admin = User::factory()->admin()->create();
+    $request = inquiryWithResponses(invited: 5, quotes: 3, noStock: 1);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee('3 / 5 quotes received')
+        ->assertSee('1 no stock');
+});
+
+it('does not show the quotes-received count once the request has moved past vendor_inquiry', function () {
+    $admin = User::factory()->admin()->create();
+    $request = inquiryWithResponses(invited: 2, quotes: 2, noStock: 0, attributes: ['status' => RequestStatus::Quoted]);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee('quotes received');
 });

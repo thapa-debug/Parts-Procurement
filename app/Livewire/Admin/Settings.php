@@ -2,6 +2,7 @@
 
 namespace App\Livewire\Admin;
 
+use App\Models\CompanyAddress;
 use App\Models\Country;
 use App\Models\Maker;
 use App\Models\Setting;
@@ -38,6 +39,7 @@ class Settings extends Component
             'countries' => __('admin.settings.nav.countries'),
             'makers' => __('admin.settings.nav.makers'),
             'shipping_brackets' => __('admin.settings.nav.shipping_brackets'),
+            'company_addresses' => __('admin.settings.nav.company_addresses'),
         ];
     }
 
@@ -105,6 +107,34 @@ class Settings extends Component
     public string $editing_bracket_upper_kg = '';
 
     public string $editing_bracket_fee = '';
+
+    /**
+     * Company receiving addresses (CLAUDE.md §14 Phase 4 slice 6): the
+     * company's own locations a vendor delivers a purchased part TO --
+     * chosen per order in ConfirmOrderToVendorAction. Same reuse of
+     * SettingPolicy as the sections above. One form serves both add and
+     * edit (an address has too many fields for an inline table-row edit):
+     * $editingCompanyAddressId null means "add". A real delete is safe,
+     * same as brackets -- confirmed orders keep their own receiving_*
+     * snapshot, not a live reference.
+     */
+    public ?int $editingCompanyAddressId = null;
+
+    public string $company_address_label = '';
+
+    public string $company_address_recipient_name = '';
+
+    public string $company_address_phone = '';
+
+    public string $company_address_postal_code = '';
+
+    public string $company_address_prefecture = '';
+
+    public string $company_address_city = '';
+
+    public string $company_address_line1 = '';
+
+    public string $company_address_line2 = '';
 
     public function mount(): void
     {
@@ -408,12 +438,109 @@ class Settings extends Component
         return ShippingWeightBracket::query()->orderBy('order')->get();
     }
 
+    public function startEditingCompanyAddress(int $companyAddressId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $address = CompanyAddress::findOrFail($companyAddressId);
+
+        $this->resetErrorBag();
+        $this->editingCompanyAddressId = $address->id;
+        $this->company_address_label = $address->label;
+        $this->company_address_recipient_name = (string) $address->recipient_name;
+        $this->company_address_phone = $address->phone;
+        $this->company_address_postal_code = $address->postal_code;
+        $this->company_address_prefecture = $address->prefecture;
+        $this->company_address_city = $address->city;
+        $this->company_address_line1 = $address->address_line1;
+        $this->company_address_line2 = (string) $address->address_line2;
+    }
+
+    public function cancelEditingCompanyAddress(): void
+    {
+        $this->resetCompanyAddressForm();
+    }
+
+    /**
+     * Adds a new address, or saves the one being edited -- see
+     * $editingCompanyAddressId.
+     */
+    public function saveCompanyAddress(): void
+    {
+        $this->authorize('update', Setting::class);
+
+        $validated = $this->validate([
+            'company_address_label' => [
+                'required', 'string', 'max:255',
+                Rule::unique('company_addresses', 'label')->ignore($this->editingCompanyAddressId),
+            ],
+            'company_address_recipient_name' => ['nullable', 'string', 'max:255'],
+            'company_address_phone' => ['required', 'string', 'max:255'],
+            'company_address_postal_code' => ['required', 'string', 'max:20'],
+            'company_address_prefecture' => ['required', 'string', 'max:255'],
+            'company_address_city' => ['required', 'string', 'max:255'],
+            'company_address_line1' => ['required', 'string', 'max:255'],
+            'company_address_line2' => ['nullable', 'string', 'max:255'],
+        ], [], [
+            'company_address_label' => __('admin.settings.company_address_label_label'),
+            'company_address_recipient_name' => __('admin.settings.company_address_recipient_name_label'),
+            'company_address_phone' => __('admin.settings.company_address_phone_label'),
+            'company_address_postal_code' => __('admin.settings.company_address_postal_code_label'),
+            'company_address_prefecture' => __('admin.settings.company_address_prefecture_label'),
+            'company_address_city' => __('admin.settings.company_address_city_label'),
+            'company_address_line1' => __('admin.settings.company_address_line1_label'),
+            'company_address_line2' => __('admin.settings.company_address_line2_label'),
+        ]);
+
+        $attributes = [
+            'label' => $validated['company_address_label'],
+            'recipient_name' => $validated['company_address_recipient_name'] ?: null,
+            'phone' => $validated['company_address_phone'],
+            'postal_code' => $validated['company_address_postal_code'],
+            'prefecture' => $validated['company_address_prefecture'],
+            'city' => $validated['company_address_city'],
+            'address_line1' => $validated['company_address_line1'],
+            'address_line2' => $validated['company_address_line2'] ?: null,
+        ];
+
+        if ($this->editingCompanyAddressId === null) {
+            CompanyAddress::create($attributes);
+        } else {
+            CompanyAddress::findOrFail($this->editingCompanyAddressId)->update($attributes);
+        }
+
+        $this->resetCompanyAddressForm();
+        $this->dispatch('toast', message: __('admin.settings.company_address_saved'), type: 'success');
+    }
+
+    public function deleteCompanyAddress(int $companyAddressId): void
+    {
+        $this->authorize('update', Setting::class);
+
+        CompanyAddress::findOrFail($companyAddressId)->delete();
+
+        if ($this->editingCompanyAddressId === $companyAddressId) {
+            $this->resetCompanyAddressForm();
+        }
+    }
+
+    protected function resetCompanyAddressForm(): void
+    {
+        $this->reset(
+            'editingCompanyAddressId', 'company_address_label', 'company_address_recipient_name',
+            'company_address_phone', 'company_address_postal_code', 'company_address_prefecture',
+            'company_address_city', 'company_address_line1', 'company_address_line2',
+        );
+        $this->resetErrorBag();
+    }
+
     public function render(): View
     {
         return view('livewire.admin.settings', [
             'countries' => $this->countries(),
             'makers' => $this->makers(),
             'brackets' => $this->brackets(),
+            'companyAddresses' => CompanyAddress::query()->orderBy('label')->get(),
         ])->title(__('admin.settings.title'));
     }
 }

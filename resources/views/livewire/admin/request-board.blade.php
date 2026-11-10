@@ -71,6 +71,17 @@
                                     {{ __('admin.request_board.status.'.$request->status->value) }}
                                 </span>
 
+                                {{-- How many invited vendors have quoted so
+                                far -- at-a-glance triage for which inquiries
+                                are ready to present. --}}
+                                @if ($request->status === \App\Enums\RequestStatus::VendorInquiry)
+                                    <x-admin.quote-response-count
+                                        :quotes="$request->quotes_count"
+                                        :invited="$request->invited_vendors_count"
+                                        :no-stock="$request->no_stock_replies_count"
+                                    />
+                                @endif
+
                                 {{-- is_free (CLAUDE.md §14 Phase 4 slice 5) is set once the
                                 buyer selects a free presented quote -- shown here so the
                                 admin can spot a free order while scanning the list, not

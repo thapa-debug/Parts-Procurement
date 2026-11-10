@@ -1,5 +1,6 @@
 <?php
 
+use App\Enums\DeliveryMethod;
 use App\Enums\UserRole;
 use App\Enums\VendorStatus;
 use App\Livewire\Admin\VendorMaster;
@@ -117,6 +118,7 @@ it('creates a vendor and reveals the temporary password', function () {
         ->set('contact_person', 'Jane Doe')
         ->set('phone', '090-0000-0000')
         ->set('notify_email', 'jane-notify@example.com')
+        ->set('delivery_method', 'carry')
         ->call('createVendor')
         ->assertSet('showCreateForm', false)
         ->assertSet('revealedContext', 'created')
@@ -130,7 +132,7 @@ it('creates a vendor and reveals the temporary password', function () {
     $user = User::where('email', 'jane@example.com')->firstOrFail();
 
     expect($user->must_change_password)->toBeTrue()
-        ->and(VendorProfile::where('user_id', $user->id)->exists())->toBeTrue();
+        ->and(VendorProfile::where('user_id', $user->id)->firstOrFail()->delivery_method)->toBe(DeliveryMethod::Carry);
 
     Notification::assertSentTo($user, VerifyEmail::class);
 });
@@ -145,6 +147,38 @@ it('clears the verification-sent notice on a password reset -- it does not apply
         ->assertSet('revealedContext', 'reset')
         ->assertSet('revealedVerificationEmail', null)
         ->assertDontSee(__('admin.reveal.verification_sent', ['email' => $profile->user->email]));
+});
+
+it('preselects the default delivery method each time the create form opens', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->set('delivery_method', 'carry')
+        ->call('openCreateForm')
+        ->assertSet('delivery_method', DeliveryMethod::Both->value)
+        ->assertSee(__('admin.vendor_master.create_form.delivery_method_label'));
+});
+
+it('rejects an invalid delivery method on creation', function () {
+    $admin = User::factory()->admin()->create();
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->call('openCreateForm')
+        ->set('delivery_method', 'teleport')
+        ->call('createVendor')
+        ->assertHasErrors(['delivery_method']);
+});
+
+it('shows each vendor\'s delivery method in the list', function () {
+    $admin = User::factory()->admin()->create();
+    VendorProfile::factory()->create(['delivery_method' => DeliveryMethod::Carry]);
+
+    Livewire::actingAs($admin)
+        ->test(VendorMaster::class)
+        ->assertSee(__('admin.vendor_master.table.delivery_method'))
+        ->assertSee(__('enums.delivery_method.carry'));
 });
 
 it('rejects an incomplete vendor creation form', function () {

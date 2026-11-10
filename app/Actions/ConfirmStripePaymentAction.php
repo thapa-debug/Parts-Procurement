@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Enums\PaymentStatus;
+use App\Enums\RequestStatus;
 use App\Models\Payment;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -23,6 +24,11 @@ use Illuminate\Support\Facades\Log;
  * on a retried payment method (the same Stripe object, confirmed again) --
  * so the guard is simply "not already confirmed", not "must currently be
  * pending".
+ *
+ * Also the only thing that moves a Stripe-paid request from
+ * `awaiting_payment` to `paid`, in the same transaction as the payment
+ * itself -- so the request never reads `paid` before the money is
+ * confirmed. A request already past `awaiting_payment` is never moved.
  *
  * The buyer/admin payment-confirmed notifications (SendPaymentConfirmed
  * NotificationsAction) fire only from the genuinely-new-confirmation path
@@ -71,6 +77,18 @@ class ConfirmStripePaymentAction
                 'status' => PaymentStatus::Confirmed,
                 'paid_at' => now(),
             ]);
+
+            $partRequest = $payment->partRequest;
+
+            if ($partRequest?->status === RequestStatus::AwaitingPayment) {
+                $partRequest->update(['status' => RequestStatus::Paid]);
+            } else {
+                Log::channel('payments')->warning('Stripe webhook: payment confirmed for a request not awaiting payment, status left unchanged', [
+                    'payment_id' => $payment->id,
+                    'part_request_id' => $payment->part_request_id,
+                    'request_status' => $partRequest?->status?->value,
+                ]);
+            }
 
             Log::channel('payments')->info('Stripe webhook: payment confirmed', [
                 'payment_id' => $payment->id,
