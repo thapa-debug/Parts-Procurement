@@ -716,3 +716,60 @@ it('does not show the quotes-received count once the request has moved past vend
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->assertDontSee('quotes received');
 });
+
+// --- header + lifecycle stepper (restyle) ----------------------------------------
+
+it('heads the page with the part name, request code, buyer, country, vehicle and VIN', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['part_name' => 'Headlight assembly (L)', 'vin' => 'NT31-215448']);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeInOrder([$request->request_code, 'Headlight assembly (L)', $request->buyer->company_name])
+        ->assertSee($request->maker->name)
+        ->assertSee('NT31-215448')
+        ->assertSee(__('admin.request_detail.received_at', ['date' => $request->created_at->format('Y-m-d H:i')]));
+});
+
+it('labels a vendor_inquiry request with at least one quote "Quotes to review" -- the real status is unchanged', function () {
+    $admin = User::factory()->admin()->create();
+    $request = inquiryWithResponses(invited: 3, quotes: 1, noStock: 0);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.quotes_to_review'));
+
+    expect($request->fresh()->status)->toBe(RequestStatus::VendorInquiry);
+});
+
+it('keeps the plain "Vendor inquiry" label while no real quote is in -- no-stock replies do not count', function () {
+    $admin = User::factory()->admin()->create();
+    $request = inquiryWithResponses(invited: 3, quotes: 0, noStock: 2);
+
+    Livewire::actingAs($admin)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('admin.request_detail.quotes_to_review'))
+        ->assertSee(__('admin.request_board.status.vendor_inquiry'));
+});
+
+it('marks the current lifecycle stage in the stepper', function (RequestStatus $status, string $currentLabel) {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => $status]);
+
+    $html = Livewire::actingAs($admin)->test(RequestDetail::class, ['partRequest' => $request])->html();
+
+    expect($html)->toMatch('/aria-current="step"[\s\S]*?'.preg_quote($currentLabel, '/').'/');
+})->with([
+    'new' => [RequestStatus::New, 'New'],
+    'awaiting payment' => [RequestStatus::AwaitingPayment, 'Awaiting payment'],
+    'ordered to vendor' => [RequestStatus::OrderedToVendor, 'Order confirmed'],
+]);
+
+it('shows procurement_failed in red on the "Order confirmed" step', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::ProcurementFailed]);
+
+    $html = Livewire::actingAs($admin)->test(RequestDetail::class, ['partRequest' => $request])->html();
+
+    expect($html)->toMatch('/aria-current="step"[\s\S]*?text-red-700">Order confirmed[\s\S]*?Procurement failed/');
+});

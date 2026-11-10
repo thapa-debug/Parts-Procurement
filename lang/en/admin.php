@@ -348,7 +348,16 @@ return [
     ],
 
     'request_detail' => [
-        'back_link' => 'Back to requests',
+        'breadcrumb_label' => 'Breadcrumb',
+        'received_at' => 'Received :date',
+        // Display-only label for a vendor_inquiry request with at least one
+        // real quote in -- not a status of its own.
+        'quotes_to_review' => 'Quotes to review',
+        'status_title' => 'Status: :status',
+        'stepper' => [
+            'aria_label' => 'Request progress',
+            'order_confirmed' => 'Order confirmed',
+        ],
 
         'details_section' => 'Request details',
         'buyer_label' => 'Buyer',
