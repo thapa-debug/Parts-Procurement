@@ -1,24 +1,65 @@
-<div class="max-w-3xl">
-    <a href="{{ route('admin.requests.index') }}" class="text-sm text-ink-muted hover:text-ink">
-        &larr; {{ __('admin.request_detail.back_link') }}
-    </a>
+<div class="max-w-7xl">
+    @php
+        // Display-only label over the real status (never a status of its
+        // own): a vendor_inquiry request with at least one real quote in
+        // reads "Quotes to review". quotes_count is only loaded at
+        // vendor_inquiry (RequestDetail::render()).
+        $quotesToReview = $partRequest->status === \App\Enums\RequestStatus::VendorInquiry
+            && ($partRequest->quotes_count ?? 0) > 0;
+    @endphp
 
-    <div class="mt-2 flex flex-wrap items-center justify-between gap-3">
-        <h1 class="text-2xl font-semibold text-ink">{{ $partRequest->request_code }}</h1>
-        <div class="flex flex-wrap items-center gap-1.5">
-            {{-- Same quote-progress chip as the request board. --}}
-            @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
-                <x-admin.quote-response-count
-                    :quotes="$partRequest->quotes_count"
-                    :invited="$partRequest->invited_vendors_count"
-                    :no-stock="$partRequest->no_stock_replies_count"
-                />
-            @endif
-            <span class="inline-flex rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
+    {{-- Header: breadcrumb, part name + status pill, request meta. --}}
+    <nav class="flex items-center gap-1.5 text-xs text-ink-muted" aria-label="{{ __('admin.request_detail.breadcrumb_label') }}">
+        <a href="{{ route('admin.requests.index') }}" class="hover:text-ink hover:underline">{{ __('admin.request_board.title') }}</a>
+        <span aria-hidden="true">/</span>
+        <span class="font-mono text-ink">{{ $partRequest->request_code }}</span>
+    </nav>
+
+    <div class="mt-2 flex flex-wrap items-center gap-x-3 gap-y-2">
+        <h1 class="text-2xl font-semibold text-ink">{{ $partRequest->part_name }}</h1>
+
+        @if ($quotesToReview)
+            <span
+                class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700"
+                title="{{ __('admin.request_detail.status_title', ['status' => __('admin.request_board.status.'.$partRequest->status->value)]) }}"
+            >
+                <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
+                {{ __('admin.request_detail.quotes_to_review') }}
+            </span>
+        @else
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
+                <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>
                 {{ __('admin.request_board.status.'.$partRequest->status->value) }}
             </span>
-        </div>
+        @endif
+
+        {{-- Same quote-progress chip as the request board. --}}
+        @if ($partRequest->status === \App\Enums\RequestStatus::VendorInquiry)
+            <x-admin.quote-response-count
+                :quotes="$partRequest->quotes_count"
+                :invited="$partRequest->invited_vendors_count"
+                :no-stock="$partRequest->no_stock_replies_count"
+            />
+        @endif
     </div>
+
+    <p class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
+        <span>
+            <span class="font-medium text-ink">{{ $partRequest->buyer->company_name }}</span>
+            @if ($partRequest->buyer->country)
+                &middot; {{ $partRequest->buyer->country->name }}
+            @endif
+        </span>
+        <span>{{ $partRequest->maker->name }} {{ $partRequest->car_model }}</span>
+        <span class="font-mono text-xs">{{ $partRequest->vin }}</span>
+        <span>{{ __('admin.request_detail.received_at', ['date' => $partRequest->created_at->format('Y-m-d H:i')]) }}</span>
+    </p>
+
+    <x-admin.request-stepper class="mt-5" :status="$partRequest->status" :quotes-to-review="$quotesToReview" />
+
+    {{-- Stage 1 of the restyle: the sections below keep their existing
+    layout until the quote columns / sidebar stages re-lay them out. --}}
+    <div class="max-w-3xl">
 
     {{-- shipping_method is only set once CheckoutAction has actually run --
     a confirmed payment alone isn't enough (e.g. a future free/無償 request
@@ -560,4 +601,5 @@
             @endif
         </div>
     @endif
+    </div>
 </div>
