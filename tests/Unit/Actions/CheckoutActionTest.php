@@ -296,6 +296,24 @@ it('refuses a second checkout while the first is still awaiting payment -- never
     expect(Payment::where('part_request_id', $request->id)->count())->toBe(1);
 });
 
+it('refuses a concurrent second checkout that read the request before the first one committed -- never a second PaymentIntent', function () {
+    app()->instance(PaymentGateway::class, fakeDeferredConfirmationGateway());
+    [$request, $address] = checkoutReadyRequest();
+
+    // Two requests load the same `quoted` request; the first checks out.
+    $staleCopy = PartRequest::findOrFail($request->id);
+    app(CheckoutAction::class)->execute($request, $address);
+
+    // The second still holds its stale in-memory `quoted` copy -- exactly
+    // what a near-simultaneous second "Proceed to payment" sees. It must
+    // re-check the locked, current row and refuse.
+    expect($staleCopy->status)->toBe(RequestStatus::Quoted);
+    expect(fn () => app(CheckoutAction::class)->execute($staleCopy, $address))
+        ->toThrow(CheckoutNotAllowedException::class);
+
+    expect(Payment::where('part_request_id', $request->id)->count())->toBe(1);
+});
+
 // --- shipping method choice ---------------------------------------------------------
 
 it('snapshots DHL and its fee when the buyer picks DHL, and charges part price + the DHL fee', function () {
