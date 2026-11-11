@@ -64,19 +64,16 @@ class CheckoutAction
         ShippingMethod $shippingMethod = ShippingMethod::Standard,
         ?int $expectedTotal = null,
     ): PartRequest {
-        if ($partRequest->is_free) {
-            throw CheckoutNotAllowedException::isFreeRequest($partRequest);
-        }
-
-        if ($partRequest->status !== RequestStatus::Quoted || $partRequest->selected_response_id === null) {
-            throw CheckoutNotAllowedException::noQuoteSelected($partRequest);
-        }
-
-        if ($partRequest->shipping_fee === null) {
-            throw CheckoutNotAllowedException::shippingFeeMissing($partRequest);
-        }
-
         [$partRequest, $payment] = DB::transaction(function () use ($partRequest, $address, $shippingMethod, $expectedTotal): array {
+            // One chargeable PaymentIntent per request: lock the row and
+            // re-check it fresh. Two near-simultaneous "Proceed to payment"
+            // requests may both have loaded it as `quoted`; checking the
+            // caller's copy would let both through and create two intents.
+            // With the lock, the second waits for the first to commit, then
+            // sees `awaiting_payment` and is refused.
+            $partRequest = PartRequest::query()->lockForUpdate()->findOrFail($partRequest->id);
+            $this->ensureCanCheckOut($partRequest);
+
             // First, so the address is proven to be this buyer's before
             // anything (e.g. a future DHL rate call) uses it.
             $this->snapshotShippingAddress->execute($partRequest, $address);
@@ -146,5 +143,23 @@ class CheckoutAction
         }
 
         return $partRequest;
+    }
+
+    /**
+     * Only ever called on the locked, freshly read row (see execute()).
+     */
+    private function ensureCanCheckOut(PartRequest $partRequest): void
+    {
+        if ($partRequest->is_free) {
+            throw CheckoutNotAllowedException::isFreeRequest($partRequest);
+        }
+
+        if ($partRequest->status !== RequestStatus::Quoted || $partRequest->selected_response_id === null) {
+            throw CheckoutNotAllowedException::noQuoteSelected($partRequest);
+        }
+
+        if ($partRequest->shipping_fee === null) {
+            throw CheckoutNotAllowedException::shippingFeeMissing($partRequest);
+        }
     }
 }
