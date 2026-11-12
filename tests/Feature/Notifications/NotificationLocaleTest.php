@@ -19,7 +19,15 @@ uses(RefreshDatabase::class);
 // (User::preferredLocale()). Buyers and admins stay on the app locale
 // (en). No Notification::fake() here on purpose -- the locale switch
 // happens inside Laravel's real NotificationSender, so only a real send
-// through the 'array' mailer (phpunit.xml) proves the rendered email.
+// through the 'array' mailer proves the rendered email.
+//
+// Pinned here rather than trusted from phpunit.xml: CI's test job sets its
+// own MAIL_MAILER (log) and QUEUE_CONNECTION (redis), which override
+// phpunit.xml -- the (ShouldQueue) notifications would then be queued or
+// logged, never reaching the array mailer these tests read.
+beforeEach(function () {
+    config(['mail.default' => 'array', 'queue.default' => 'sync']);
+});
 
 /**
  * @return array{subject: string, html: string}
