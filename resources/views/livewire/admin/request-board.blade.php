@@ -91,6 +91,24 @@
                                         {{ __('admin.request_board.free_badge') }}
                                     </span>
                                 @endif
+
+                                {{-- Reference-URL flow: a `new` request with a URL can be
+                                sourced directly (only while still `new`, the same
+                                eligibility SetUrlPriceAction enforces); once it has
+                                been, it reads URL-sourced, like the detail page. --}}
+                                @if ($request->is_url_sourced)
+                                    <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">
+                                        {{ __('admin.request_board.url_sourced_badge') }}
+                                    </span>
+                                @elseif ($request->status === \App\Enums\RequestStatus::New && filled($request->reference_url))
+                                    <span
+                                        class="inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-surface px-2 py-0.5 text-xs font-medium text-indigo-700"
+                                        title="{{ __('admin.request_board.reference_url_badge_title') }}"
+                                    >
+                                        <svg class="size-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M12.232 4.232a2.5 2.5 0 0 1 3.536 3.536l-1.225 1.224a.75.75 0 0 0 1.061 1.06l1.224-1.224a4 4 0 0 0-5.656-5.656l-3 3a4 4 0 0 0 .225 5.865.75.75 0 0 0 .977-1.138 2.5 2.5 0 0 1-.142-3.667l3-3Z"/><path d="M11.603 7.963a.75.75 0 0 0-.977 1.138 2.5 2.5 0 0 1 .142 3.667l-3 3a2.5 2.5 0 0 1-3.536-3.536l1.225-1.224a.75.75 0 0 0-1.061-1.06l-1.224 1.224a4 4 0 1 0 5.656 5.656l3-3a4 4 0 0 0-.225-5.865Z"/></svg>
+                                        {{ __('admin.request_board.reference_url_badge') }}
+                                    </span>
+                                @endif
                             </div>
                         </td>
                         <td class="px-4 py-3 text-right">

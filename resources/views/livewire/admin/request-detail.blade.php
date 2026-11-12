@@ -50,7 +50,7 @@
         <span>{{ __('admin.request_detail.received_at', ['date' => $partRequest->created_at->format('Y-m-d H:i')]) }}</span>
     </p>
 
-    <x-admin.request-stepper class="mt-5" :status="$partRequest->status" :quotes-to-review="$quotesToReview" />
+    <x-admin.request-stepper class="mt-5" :status="$partRequest->status" :quotes-to-review="$quotesToReview" :url-sourced="$partRequest->is_url_sourced" />
 
     {{-- Two-column body: main (actions + quotes) and a right sidebar
     (request info + vendor inquiry). The main column is min-w-0 so the

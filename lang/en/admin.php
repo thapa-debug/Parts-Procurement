@@ -368,6 +368,11 @@ return [
         ],
 
         'free_badge' => 'Free (無償)',
+        // A `new` request with a reference URL -- the admin can source it
+        // directly (SetUrlPriceAction) instead of sending it to vendors.
+        'reference_url_badge' => 'Reference URL',
+        'reference_url_badge_title' => 'Has a reference URL -- can be sourced directly instead of sent to vendors',
+        'url_sourced_badge' => 'URL-sourced',
         'view_link' => 'View',
 
         // Vendor-inquiry progress: real quotes out of the vendors invited.
@@ -386,6 +391,7 @@ return [
         'stepper' => [
             'aria_label' => 'Request progress',
             'order_confirmed' => 'Order confirmed',
+            'skipped_url_sourced' => 'Skipped -- sourced from URL',
         ],
 
         'buyer_label' => 'Buyer',

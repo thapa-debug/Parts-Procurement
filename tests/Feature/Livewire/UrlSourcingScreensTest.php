@@ -4,6 +4,7 @@ use App\Actions\CheckoutAction;
 use App\Actions\SetUrlPriceAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
+use App\Livewire\Admin\RequestBoard;
 use App\Livewire\Admin\RequestDetail as AdminRequestDetail;
 use App\Livewire\Buyer\Checkout;
 use App\Livewire\Buyer\RequestDetail as BuyerRequestDetail;
@@ -359,4 +360,49 @@ it('lets the buyer check out and pay a URL-priced request', function () {
     expect($fresh->status)->toBe(RequestStatus::Paid)
         ->and($fresh->shipping_address_id)->toBe($address->id)
         ->and(Payment::where('part_request_id', $request->id)->sole()->amount)->toBe(62_000);
+});
+
+// --- admin: progress stepper ----------------------------------------------------------------
+
+it('shows Vendor inquiry as skipped, not completed, on a URL-sourced request', function () {
+    $admin = User::factory()->admin()->create();
+    [$request] = urlPricedRequestOnScreen();
+
+    Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('admin.request_detail.stepper.skipped_url_sourced'));
+});
+
+it('never shows the skipped caption on a vendor-flow request', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Quoted]);
+
+    Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('admin.request_detail.stepper.skipped_url_sourced'));
+});
+
+// --- admin: request board badges ------------------------------------------------------------
+
+it('flags a new request with a reference URL on the board, and only that one', function () {
+    $admin = User::factory()->admin()->create();
+    newUrlRequestOnScreen();
+    PartRequest::factory()->create(['status' => RequestStatus::New, 'reference_url' => null]);
+    // Already sent to vendors: it can no longer be sourced from its URL.
+    PartRequest::factory()->create(['status' => RequestStatus::VendorInquiry, 'reference_url' => 'https://example.com/other']);
+
+    $html = Livewire::actingAs($admin)->test(RequestBoard::class)->html();
+
+    expect(substr_count($html, __('admin.request_board.reference_url_badge_title')))->toBe(1)
+        ->and($html)->not->toContain(__('admin.request_board.url_sourced_badge'));
+});
+
+it('shows URL-sourced, not the reference-URL badge, once a request has been priced from its URL', function () {
+    $admin = User::factory()->admin()->create();
+    urlPricedRequestOnScreen();
+
+    $html = Livewire::actingAs($admin)->test(RequestBoard::class)->html();
+
+    expect(substr_count($html, __('admin.request_board.url_sourced_badge')))->toBe(1)
+        ->and($html)->not->toContain(__('admin.request_board.reference_url_badge_title'));
 });

@@ -3,8 +3,10 @@ stage highlighted. Display only -- it reads the real status and never sets
 one. procurement_failed has no step of its own: it shows in red on
 "Order confirmed", the step it failed at. $quotesToReview adds the
 derived "Quotes to review" caption under Vendor inquiry (a label over the
-real status, not a status). --}}
-@props(['status', 'quotesToReview' => false])
+real status, not a status). $urlSourced marks Vendor inquiry as skipped
+rather than done: a reference-URL request is priced straight from its URL
+(SetUrlPriceAction) and never goes to vendors. --}}
+@props(['status', 'quotesToReview' => false, 'urlSourced' => false])
 
 @php
     $steps = [
@@ -27,7 +29,8 @@ real status, not a status). --}}
     <ol class="flex min-w-max items-center gap-2 text-xs">
         @foreach ($steps as $index => $step)
             @php
-                $isDone = $index < $currentIndex;
+                $isSkipped = $urlSourced && $step['status'] === \App\Enums\RequestStatus::VendorInquiry;
+                $isDone = $index < $currentIndex && ! $isSkipped;
                 $isCurrent = $index === $currentIndex;
                 $isFailed = $isCurrent && $failed;
             @endphp
@@ -46,9 +49,12 @@ real status, not a status). --}}
                     'bg-brand-600 text-white' => $isDone,
                     'border-2 border-brand-600 bg-surface text-brand-700' => $isCurrent && ! $isFailed,
                     'bg-red-600 text-white' => $isFailed,
-                    'bg-surface-muted text-ink-muted' => ! $isDone && ! $isCurrent,
+                    'border border-dashed border-line bg-surface text-ink-muted' => $isSkipped,
+                    'bg-surface-muted text-ink-muted' => ! $isDone && ! $isCurrent && ! $isSkipped,
                 ])>
-                    @if ($isDone)
+                    @if ($isSkipped)
+                        <svg class="size-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M4 10a1 1 0 0 1 1-1h10a1 1 0 1 1 0 2H5a1 1 0 0 1-1-1Z" clip-rule="evenodd"/></svg>
+                    @elseif ($isDone)
                         <svg class="size-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path fill-rule="evenodd" d="M16.7 5.3a1 1 0 0 1 0 1.4l-8 8a1 1 0 0 1-1.4 0l-4-4a1 1 0 1 1 1.4-1.4L8 12.6l7.3-7.3a1 1 0 0 1 1.4 0Z" clip-rule="evenodd"/></svg>
                     @elseif ($isFailed)
                         <svg class="size-3" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true"><path d="M6.3 5.3a1 1 0 0 0-1.4 1.4L8.6 10l-3.7 3.3a1 1 0 1 0 1.4 1.4L10 11.4l3.3 3.3a1 1 0 0 0 1.4-1.4L11.4 10l3.3-3.3a1 1 0 0 0-1.4-1.4L10 8.6 6.3 5.3Z"/></svg>
@@ -62,9 +68,12 @@ real status, not a status). --}}
                         'font-semibold text-ink' => $isCurrent && ! $isFailed,
                         'font-semibold text-red-700' => $isFailed,
                         'font-medium text-ink' => $isDone,
-                        'text-ink-muted' => ! $isDone && ! $isCurrent,
+                        'text-ink-muted line-through' => $isSkipped,
+                        'text-ink-muted' => ! $isDone && ! $isCurrent && ! $isSkipped,
                     ])>{{ $step['label'] }}</span>
-                    @if ($isFailed)
+                    @if ($isSkipped)
+                        <span class="whitespace-nowrap text-[11px] text-indigo-700">{{ __('admin.request_detail.stepper.skipped_url_sourced') }}</span>
+                    @elseif ($isFailed)
                         <span class="whitespace-nowrap text-[11px] text-red-600">{{ __('admin.request_board.status.procurement_failed') }}</span>
                     @elseif ($isCurrent && $quotesToReview && $step['status'] === \App\Enums\RequestStatus::VendorInquiry)
                         <span class="whitespace-nowrap text-[11px] text-amber-700">{{ __('admin.request_detail.quotes_to_review') }}</span>
