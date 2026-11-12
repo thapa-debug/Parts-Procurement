@@ -550,12 +550,15 @@ class Checkout extends Component
         // onto the $partRequest passed to the view -- same discipline as
         // RequestDetail: a raw internal FK to a vendor_response row has no
         // reason to ever reach the buyer's browser.
-        $isEligible = PartRequest::query()
-            ->where('id', $this->partRequestId)
-            ->where('status', RequestStatus::Quoted)
-            ->whereNotNull('selected_response_id')
-            ->whereNotNull('shipping_fee')
-            ->exists();
+        // hasPricedQuote() is CheckoutAction's own rule: a selected
+        // presented quote, or the admin's reference-URL price (which has
+        // no selected response at all).
+        $eligibility = PartRequest::query()
+            ->select(['id', 'status', 'selected_response_id', 'is_url_sourced', 'buyer_price', 'shipping_fee'])
+            ->findOrFail($this->partRequestId);
+        $isEligible = $eligibility->status === RequestStatus::Quoted
+            && $eligibility->hasPricedQuote()
+            && $eligibility->shipping_fee !== null;
 
         // Explicit column allowlist -- cost_price, applied_rate,
         // applied_min_fee, and selected_response_id are deliberately

@@ -108,7 +108,10 @@ class RequestDetail extends Component
         // onto the $partRequest passed to the view: a raw internal FK to a
         // vendor_response row has no reason to ever reach the buyer's
         // browser, even though it isn't "vendor identity" by itself.
-        $selectedResponseId = PartRequest::query()->where('id', $this->partRequestId)->value('selected_response_id');
+        $internal = PartRequest::query()
+            ->select(['id', 'selected_response_id', 'is_url_sourced', 'buyer_price'])
+            ->findOrFail($this->partRequestId);
+        $selectedResponseId = $internal->selected_response_id;
 
         // Explicit column allowlist -- cost_price, applied_rate,
         // applied_min_fee, and selected_response_id are deliberately absent.
@@ -134,6 +137,13 @@ class RequestDetail extends Component
         return view('livewire.buyer.request-detail', [
             'partRequest' => $partRequest,
             'options' => $options,
+            // A request the admin priced directly from its reference URL
+            // (SetUrlPriceAction) has one fixed quote and nothing to choose
+            // between. Passed as a plain flag -- never is_url_sourced
+            // itself: the buyer isn't told how the part was sourced
+            // (same wording as a presented quote, see
+            // UrlQuotePricedNotification).
+            'hasSingleQuote' => $internal->is_url_sourced && $internal->buyer_price !== null,
             // The "Complete payment" entry point: shown exactly when the
             // checkout page would show its resume form (same condition as
             // Checkout::render()'s $canResumePayment).

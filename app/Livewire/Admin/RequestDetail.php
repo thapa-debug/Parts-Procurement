@@ -4,7 +4,9 @@ namespace App\Livewire\Admin;
 
 use App\Actions\BroadcastRequestAction;
 use App\Actions\ConfirmOrderToVendorAction;
+use App\Actions\MarkPurchasedFromUrlAction;
 use App\Actions\PresentQuoteAction;
+use App\Actions\SetUrlPriceAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\VendorStatus;
@@ -12,6 +14,7 @@ use App\Exceptions\PaymentNotConfirmedException;
 use App\Exceptions\PresentQuoteNotAllowedException;
 use App\Exceptions\RequestCannotBeBroadcastException;
 use App\Exceptions\ShippingBracketNotConfiguredException;
+use App\Exceptions\UrlSourcingNotAllowedException;
 use App\Models\CompanyAddress;
 use App\Models\PartRequest;
 use App\Models\VendorProfile;
@@ -91,6 +94,27 @@ class RequestDetail extends Component
      * ConfirmOrderToVendorAction.
      */
     public ?int $receivingAddressId = null;
+
+    /**
+     * Reference-URL (admin-sourced) pricing form -- the alternative to
+     * broadcasting a `new` request to vendors (SetUrlPriceAction). Kept as
+     * strings, like the shipping-override inputs above, so a half-typed
+     * value never breaks the live preview; urlPriceRules() validates them.
+     */
+    public string $urlCost = '';
+
+    public string $urlWeightKg = '';
+
+    public string $urlShippingFeeOverride = '';
+
+    public string $urlShippingFeeOverrideReason = '';
+
+    /**
+     * The admin's optional note when marking a URL-sourced request
+     * purchased (the site's order number, a receipt reference, ...) --
+     * admin-internal, never shown to the buyer.
+     */
+    public string $urlPurchaseReference = '';
 
     public function mount(PartRequest $partRequest): void
     {
@@ -224,6 +248,136 @@ class RequestDetail extends Component
     }
 
     /**
+     * Prices a `new` request straight from its reference URL instead of
+     * broadcasting it (CONVENTIONS.md "Reference-URL flow"). Confirmed
+     * client-side first -- like presenting, it notifies the buyer and is
+     * final. SetUrlPriceAction is the real guard (status, reference URL,
+     * one-shot); a refusal is surfaced as an error toast.
+     */
+    public function setUrlPrice(SetUrlPriceAction $action): void
+    {
+        $this->authorize('setUrlPrice', $this->partRequest);
+
+        $this->validate($this->urlPriceRules(), [], $this->urlPriceAttributes());
+
+        $override = $this->urlShippingFeeOverride === '' ? null : (int) $this->urlShippingFeeOverride;
+
+        try {
+            $this->partRequest = $action->execute(
+                $this->partRequest,
+                (int) $this->urlCost,
+                (float) $this->urlWeightKg,
+                $override,
+                $override !== null ? $this->urlShippingFeeOverrideReason : null,
+            );
+        } catch (UrlSourcingNotAllowedException $e) {
+            report($e);
+            $this->dispatch('toast', message: __('admin.request_detail.url_price_error'), type: 'error');
+
+            return;
+        } catch (ShippingBracketNotConfiguredException $e) {
+            report($e);
+            $this->addError('urlWeightKg', __('admin.request_detail.url_price_no_bracket'));
+            $this->dispatch('toast', message: __('admin.request_detail.url_price_no_bracket'), type: 'error');
+
+            return;
+        }
+
+        $this->reset('urlCost', 'urlWeightKg', 'urlShippingFeeOverride', 'urlShippingFeeOverrideReason');
+        $this->dispatch('toast', message: __('admin.request_detail.url_priced_toast'), type: 'success');
+    }
+
+    /**
+     * The URL flow's counterpart of confirmOrderToVendor(): no vendor, no
+     * receiving address. The view disables the button while the §6.3
+     * payment gate is closed; MarkPurchasedFromUrlAction is the real guard.
+     */
+    public function markPurchasedFromUrl(MarkPurchasedFromUrlAction $action): void
+    {
+        $this->authorize('markPurchasedFromUrl', $this->partRequest);
+
+        $this->validate([
+            'urlPurchaseReference' => ['nullable', 'string', 'max:1000'],
+        ], [], [
+            'urlPurchaseReference' => __('admin.request_detail.url_purchase_reference_label'),
+        ]);
+
+        try {
+            $this->partRequest = $action->execute($this->partRequest, $this->urlPurchaseReference);
+        } catch (PaymentNotConfirmedException $e) {
+            report($e);
+            $this->dispatch('toast', message: __('admin.request_detail.confirm_order_payment_error'), type: 'error');
+
+            return;
+        } catch (UrlSourcingNotAllowedException $e) {
+            report($e);
+            $this->dispatch('toast', message: __('admin.request_detail.url_purchase_error'), type: 'error');
+
+            return;
+        }
+
+        $this->reset('urlPurchaseReference');
+        $this->dispatch('toast', message: __('admin.request_detail.url_purchased_toast'), type: 'success');
+    }
+
+    /**
+     * Same rule as overrideRules(): a reason is required exactly when a
+     * shipping override is entered.
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    protected function urlPriceRules(): array
+    {
+        return [
+            'urlCost' => ['required', 'integer', 'min:1'],
+            'urlWeightKg' => ['required', 'numeric', 'gt:0', 'max:999999.99'],
+            'urlShippingFeeOverride' => ['nullable', 'integer', 'min:0'],
+            'urlShippingFeeOverrideReason' => [filled($this->urlShippingFeeOverride) ? 'required' : 'nullable', 'string', 'max:1000'],
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    protected function urlPriceAttributes(): array
+    {
+        return [
+            'urlCost' => __('admin.request_detail.url_cost_label'),
+            'urlWeightKg' => __('admin.request_detail.url_weight_label'),
+            'urlShippingFeeOverride' => __('admin.request_detail.shipping_override_label'),
+            'urlShippingFeeOverrideReason' => __('admin.request_detail.shipping_override_reason_label'),
+        ];
+    }
+
+    /**
+     * The live "what will the buyer see" preview under the URL pricing
+     * form -- the same PricingService/ShippingCalculator SetUrlPriceAction
+     * will use, so the admin sees the real figure before confirming. Null
+     * parts while an input is blank/invalid, or no bracket covers the
+     * weight; never throws, so a half-typed value can't break the page.
+     *
+     * @return array{pricing: array{cost_price: int, applied_rate: int, applied_min_fee: int, margin: int, buyer_price: int}|null, shipping: int|null}
+     */
+    protected function urlPricePreview(): array
+    {
+        $pricing = ctype_digit($this->urlCost) && (int) $this->urlCost > 0
+            ? app(PricingService::class)->calculate((int) $this->urlCost)
+            : null;
+
+        $shipping = null;
+
+        if (is_numeric($this->urlWeightKg) && (float) $this->urlWeightKg > 0) {
+            try {
+                $shipping = app(ShippingCalculator::class)->calculate((float) $this->urlWeightKg);
+            } catch (ShippingBracketNotConfiguredException) {
+                $shipping = null;
+            }
+        }
+
+        return ['pricing' => $pricing, 'shipping' => $shipping];
+    }
+
+    /**
      * A reason is required precisely when that same response has a
      * non-blank override -- built dynamically since these are array-keyed
      * properties, one pair per currently-checked response.
@@ -291,6 +445,15 @@ class RequestDetail extends Component
             $this->partRequest->loadCount(PartRequest::responseCounts());
         }
 
+        $isUrlSourced = $this->partRequest->is_url_sourced;
+        $isPaid = $this->partRequest->status === RequestStatus::Paid;
+
+        // The URL pricing form is offered alongside the vendor broadcast
+        // only while the request is still `new` and has a URL to source
+        // from -- the same eligibility SetUrlPriceAction enforces.
+        $canSourceFromUrl = $this->partRequest->status === RequestStatus::New
+            && filled($this->partRequest->reference_url);
+
         return view('livewire.admin.request-detail', [
             'activeVendors' => $this->activeVendors(),
             'invitedVendors' => $this->partRequest->status !== RequestStatus::New
@@ -320,12 +483,20 @@ class RequestDetail extends Component
                 : null,
             // Confirm-order panel (CLAUDE.md §14 Phase 4 slice 6) -- only
             // while the request sits at `paid`, waiting on that decision.
-            'awaitingVendorConfirmation' => $this->partRequest->status === RequestStatus::Paid,
+            // A URL-sourced request has no vendor: it gets the
+            // mark-purchased panel instead (MarkPurchasedFromUrlAction).
+            'awaitingVendorConfirmation' => $isPaid && ! $isUrlSourced,
+            'awaitingUrlPurchase' => $isPaid && $isUrlSourced,
+            'urlPurchased' => $isUrlSourced && in_array($this->partRequest->status, [
+                RequestStatus::OrderedToVendor, RequestStatus::Shipped, RequestStatus::Received,
+            ], true),
+            'canSourceFromUrl' => $canSourceFromUrl,
+            'urlPricePreview' => $canSourceFromUrl ? $this->urlPricePreview() : null,
             'paymentGateOpen' => $this->partRequest->paymentGateOpen(),
-            'vendorToConfirm' => $this->partRequest->status === RequestStatus::Paid
+            'vendorToConfirm' => $isPaid && ! $isUrlSourced
                 ? $this->partRequest->selectedResponse?->vendor
                 : null,
-            'companyAddresses' => $this->partRequest->status === RequestStatus::Paid
+            'companyAddresses' => $isPaid && ! $isUrlSourced
                 ? CompanyAddress::query()->orderBy('label')->get()
                 : Collection::make(),
             'confirmedVendor' => $this->partRequest->confirmedVendor,

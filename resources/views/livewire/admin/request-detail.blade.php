@@ -32,6 +32,10 @@
                 {{ __('admin.request_board.status.'.$partRequest->status->value) }}
             </span>
         @endif
+
+        @if ($partRequest->is_url_sourced)
+            <span class="inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700">{{ __('admin.request_detail.url_priced_badge') }}</span>
+        @endif
     </div>
 
     <p class="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-ink-muted">
@@ -171,6 +175,72 @@
         </div>
     @endif
 
+    {{-- Reference-URL flow: the counterpart of the confirm-to-vendor panel
+    above -- no vendor, no receiving address, the same §6.3 gate. --}}
+    @if ($awaitingUrlPurchase)
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.url_purchase_section') }}</h2>
+            <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.url_purchase_help') }}</p>
+
+            @if ($partRequest->reference_url)
+                <a href="{{ $partRequest->reference_url }}" target="_blank" rel="noopener noreferrer" class="mt-3 inline-flex max-w-full items-center gap-1 truncate text-sm font-medium text-brand-700 hover:underline" title="{{ $partRequest->reference_url }}">
+                    {{ __('admin.request_detail.url_source_open_link') }} <span aria-hidden="true">&nearr;</span>
+                </a>
+            @endif
+
+            @unless ($paymentGateOpen)
+                <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+                    {{ __('admin.request_detail.confirm_order_payment_pending') }}
+                </p>
+            @endunless
+
+            <div class="mt-4">
+                <label for="urlPurchaseReference" class="block text-sm font-medium text-ink">
+                    {{ __('admin.request_detail.url_purchase_reference_label') }}
+                </label>
+                <input
+                    id="urlPurchaseReference"
+                    type="text"
+                    wire:model="urlPurchaseReference"
+                    placeholder="{{ __('admin.request_detail.url_purchase_reference_placeholder') }}"
+                    class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 sm:max-w-md"
+                >
+                <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.url_purchase_reference_help') }}</p>
+                @error('urlPurchaseReference')
+                    <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                @enderror
+            </div>
+
+            <div class="mt-5">
+                <button
+                    type="button"
+                    class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    wire:click="markPurchasedFromUrl"
+                    wire:confirm="{{ __('admin.request_detail.url_purchase_confirm') }}"
+                    wire:loading.attr="disabled"
+                    wire:target="markPurchasedFromUrl"
+                    @disabled(! $paymentGateOpen)
+                >
+                    {{ __('admin.request_detail.url_purchase_button') }}
+                </button>
+            </div>
+        </div>
+    @endif
+
+    @if ($urlPurchased)
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.url_purchased_section') }}</h2>
+
+            <dl class="mt-4 text-sm">
+                <dt class="text-ink-muted">
+                    {{ __('admin.request_detail.url_purchased_reference_label') }}
+                    <span class="text-[11px]">({{ __('admin.request_detail.admin_only_hint') }})</span>
+                </dt>
+                <dd class="mt-0.5 whitespace-pre-line break-words font-medium text-ink">{{ $partRequest->url_purchase_reference ?? __('admin.request_detail.not_provided') }}</dd>
+            </dl>
+        </div>
+    @endif
+
     {{-- receiving_label is only ever set by ConfirmOrderToVendorAction --
     always read the snapshot, never the live CompanyAddress. --}}
     @if ($partRequest->receiving_label)
@@ -254,12 +324,237 @@
         </div>
     @endif
 
+    {{-- Reference-URL flow: the alternative to the broadcast above, for a
+    `new` request with a reference URL (SetUrlPriceAction). The preview is
+    the same PricingService/ShippingCalculator the action uses. --}}
+    @if ($canSourceFromUrl)
+        @php
+            $previewPricing = $urlPricePreview['pricing'];
+            $previewShipping = filled($urlShippingFeeOverride) && ctype_digit($urlShippingFeeOverride)
+                ? (int) $urlShippingFeeOverride
+                : $urlPricePreview['shipping'];
+            $previewWeightEntered = is_numeric($urlWeightKg) && (float) $urlWeightKg > 0;
+        @endphp
+        <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <div class="flex flex-wrap items-start justify-between gap-3">
+                <div class="max-w-2xl">
+                    <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.url_source_section') }}</h2>
+                    <p class="mt-1 text-sm text-ink-muted">{{ __('admin.request_detail.url_source_help') }}</p>
+                </div>
+                <a href="{{ $partRequest->reference_url }}" target="_blank" rel="noopener noreferrer" class="inline-flex shrink-0 items-center gap-1 text-sm font-medium text-brand-700 hover:underline" title="{{ $partRequest->reference_url }}">
+                    {{ __('admin.request_detail.url_source_open_link') }} <span aria-hidden="true">&nearr;</span>
+                </a>
+            </div>
+
+            <div class="mt-4 grid grid-cols-1 gap-6 md:grid-cols-[minmax(0,1fr)_16rem]">
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <div>
+                        <label for="urlCost" class="block text-sm font-medium text-ink">
+                            {{ __('admin.request_detail.url_cost_label') }} <x-required-mark />
+                        </label>
+                        <input
+                            id="urlCost"
+                            type="number"
+                            min="1"
+                            step="1"
+                            inputmode="numeric"
+                            wire:model.live.debounce.400ms="urlCost"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.url_cost_help') }}</p>
+                        @error('urlCost')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="urlWeightKg" class="block text-sm font-medium text-ink">
+                            {{ __('admin.request_detail.url_weight_label') }} <x-required-mark />
+                        </label>
+                        <input
+                            id="urlWeightKg"
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            inputmode="decimal"
+                            wire:model.live.debounce.400ms="urlWeightKg"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                        <p class="mt-1 text-xs text-ink-muted">{{ __('admin.request_detail.url_weight_help') }}</p>
+                        @error('urlWeightKg')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="urlShippingFeeOverride" class="block text-sm font-medium text-ink">
+                            {{ __('admin.request_detail.shipping_override_label') }}
+                        </label>
+                        <input
+                            id="urlShippingFeeOverride"
+                            type="number"
+                            min="0"
+                            step="1"
+                            inputmode="numeric"
+                            wire:model.live.debounce.400ms="urlShippingFeeOverride"
+                            placeholder="{{ $urlPricePreview['shipping'] !== null ? number_format($urlPricePreview['shipping']) : '' }}"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 font-mono text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                        @error('urlShippingFeeOverride')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    <div>
+                        <label for="urlShippingFeeOverrideReason" class="block text-sm font-medium text-ink">
+                            {{ __('admin.request_detail.shipping_override_reason_label') }}
+                        </label>
+                        <input
+                            id="urlShippingFeeOverrideReason"
+                            type="text"
+                            wire:model="urlShippingFeeOverrideReason"
+                            placeholder="{{ __('admin.request_detail.shipping_override_reason_placeholder') }}"
+                            class="mt-1.5 block w-full rounded-md border border-line bg-surface px-3 py-2 text-sm text-ink shadow-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500"
+                        >
+                        @error('urlShippingFeeOverrideReason')
+                            <p class="mt-1.5 text-sm text-red-600">{{ $message }}</p>
+                        @enderror
+                    </div>
+                </div>
+
+                {{-- Live preview: what the buyer will be shown. --}}
+                <div class="rounded-md border border-line bg-surface-muted p-4 text-sm" wire:loading.class="opacity-60" wire:target="urlCost,urlWeightKg,urlShippingFeeOverride">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-ink-muted">{{ __('admin.request_detail.url_preview_heading') }}</p>
+
+                    @if ($previewPricing === null || ($previewShipping === null && ! $previewWeightEntered))
+                        <p class="mt-2 text-ink-muted">{{ __('admin.request_detail.url_preview_incomplete') }}</p>
+                    @endif
+
+                    <dl class="mt-2 space-y-1.5">
+                        @if ($previewPricing !== null)
+                            <div class="flex items-baseline justify-between gap-2">
+                                <dt class="text-ink-muted">{{ __('admin.request_detail.markup_row') }}</dt>
+                                <dd class="text-right text-xs text-ink-muted">
+                                    <span class="font-mono">{{ $previewPricing['applied_rate'] }} %</span>
+                                    &middot; {{ __('admin.request_detail.margin_amount', ['amount' => number_format($previewPricing['margin'])]) }}
+                                    @if ($previewPricing['margin'] === $previewPricing['applied_min_fee'])
+                                        ({{ __('admin.request_detail.min_fee_applied') }})
+                                    @endif
+                                </dd>
+                            </div>
+                            <div class="flex items-baseline justify-between gap-2">
+                                <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_price_column') }}</dt>
+                                <dd class="font-mono font-semibold text-ink">¥{{ number_format($previewPricing['buyer_price']) }}</dd>
+                            </div>
+                        @endif
+
+                        @if ($previewShipping !== null)
+                            <div class="flex items-baseline justify-between gap-2">
+                                <dt class="text-ink-muted">{{ __('admin.request_detail.shipping_fee_column') }}</dt>
+                                <dd class="font-mono text-ink">
+                                    ¥{{ number_format($previewShipping) }}
+                                    @if (filled($urlShippingFeeOverride))
+                                        <span class="font-sans text-xs text-ink-muted">({{ __('admin.request_detail.shipping_overridden_note') }})</span>
+                                    @endif
+                                </dd>
+                            </div>
+                        @elseif ($previewWeightEntered)
+                            <p class="text-xs text-amber-700">{{ __('admin.request_detail.url_preview_no_bracket') }}</p>
+                        @endif
+
+                        @if ($previewPricing !== null && $previewShipping !== null)
+                            <div class="flex items-baseline justify-between gap-2 border-t border-line pt-1.5">
+                                <dt class="font-medium text-ink">{{ __('admin.request_detail.buyer_total_row') }}</dt>
+                                <dd class="font-mono text-base font-semibold text-ink">¥{{ number_format($previewPricing['buyer_price'] + $previewShipping) }}</dd>
+                            </div>
+                        @endif
+                    </dl>
+                </div>
+            </div>
+
+            <div class="mt-5">
+                <button
+                    type="button"
+                    wire:click="setUrlPrice"
+                    wire:confirm="{{ __('admin.request_detail.url_price_confirm') }}"
+                    wire:loading.attr="disabled"
+                    wire:target="setUrlPrice"
+                    class="rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                    {{ __('admin.request_detail.url_price_button') }}
+                </button>
+            </div>
+        </div>
+    @endif
+
+    {{-- A URL-sourced request has no vendor quotes: its frozen price
+    snapshot (§6.2) is shown here instead of the comparison table. --}}
+    @if ($partRequest->is_url_sourced)
+        @php
+            $urlMargin = $partRequest->buyer_price - $partRequest->cost_price;
+        @endphp
+        <section class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
+            <div class="flex flex-wrap items-center gap-2">
+                <h2 class="text-base font-semibold text-ink">{{ __('admin.request_detail.url_priced_section') }}</h2>
+                <span class="inline-flex rounded-full bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700">{{ __('admin.request_detail.url_priced_badge') }}</span>
+            </div>
+            <p class="mt-1 text-sm text-ink-muted">{{ __('admin.request_detail.url_priced_help') }}</p>
+
+            <dl class="mt-4 grid grid-cols-2 gap-4 text-sm sm:grid-cols-3">
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.cost_price_column') }} <span class="text-[11px]">({{ __('admin.request_detail.admin_only_hint') }})</span></dt>
+                    <dd class="mt-0.5 font-mono font-semibold text-ink">¥{{ number_format($partRequest->cost_price) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.markup_row') }}</dt>
+                    <dd class="mt-0.5 text-ink">
+                        <span class="font-mono">{{ $partRequest->applied_rate }} %</span>
+                        <span class="text-xs text-ink-muted">
+                            &middot; {{ __('admin.request_detail.margin_amount', ['amount' => number_format($urlMargin)]) }}
+                            @if ($urlMargin === $partRequest->applied_min_fee)
+                                ({{ __('admin.request_detail.min_fee_applied') }})
+                            @endif
+                        </span>
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_price_column') }}</dt>
+                    <dd class="mt-0.5 font-mono text-base font-semibold text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.weight_column') }}</dt>
+                    <dd class="mt-0.5 font-mono text-ink">{{ rtrim(rtrim(number_format((float) $partRequest->url_weight_kg, 2, '.', ''), '0'), '.') }} kg</dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.shipping_fee_column') }} <span class="text-[11px]">({{ __('enums.shipping_method.standard') }})</span></dt>
+                    <dd class="mt-0.5 font-mono text-ink">
+                        ¥{{ number_format($partRequest->url_shipping_fee) }}
+                        @if ($partRequest->url_shipping_fee_overridden)
+                            <span class="font-sans text-xs text-ink-muted">({{ __('admin.request_detail.shipping_overridden_note') }})</span>
+                        @endif
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-ink-muted">{{ __('admin.request_detail.buyer_total_row') }}</dt>
+                    <dd class="mt-0.5 font-mono font-semibold text-ink">¥{{ number_format($partRequest->buyer_price + $partRequest->url_shipping_fee) }}</dd>
+                </div>
+                @if ($partRequest->url_shipping_fee_overridden)
+                    <div class="col-span-2 sm:col-span-3">
+                        <dt class="text-ink-muted">{{ __('admin.request_detail.url_override_reason_label') }}</dt>
+                        <dd class="mt-0.5 whitespace-pre-line break-words text-ink">{{ $partRequest->url_shipping_fee_override_reason }}</dd>
+                    </div>
+                @endif
+            </dl>
+        </section>
+    @endif
+
     {{-- Vendor quotes: one column per real quote, full page width,
     scrolling sideways when there are many vendors. Restyle only -- every
     input keeps its original wire: binding and the conditions it rendered
     under before. Vendor name and cost are shown here because this is the
-    admin's own screen; the buyer side builds its own isolated data. --}}
-    @if ($partRequest->status !== \App\Enums\RequestStatus::New)
+    admin's own screen; the buyer side builds its own isolated data. A
+    URL-sourced request was never broadcast, so it has no quotes table. --}}
+    @if ($partRequest->status !== \App\Enums\RequestStatus::New && ! $partRequest->is_url_sourced)
         @php
             $quoteResponses = $vendorResponses->reject(fn ($response) => $response->is_no_stock)->values();
             $noStockResponses = $vendorResponses->filter(fn ($response) => $response->is_no_stock)->values();

@@ -91,6 +91,7 @@ return [
 
         'quote_section' => 'Your quote',
         'quote_options_help' => "Compare the options below and select the one you'd like to purchase. You can change your selection any time before you pay.",
+        'quote_single_help' => 'Your quote is ready. Proceed to checkout to choose shipping and pay.',
         'quote_locked_help' => 'You\'ve paid for the option below -- it can no longer be changed.',
         'quote_awaiting_payment_help' => 'Payment for the option below has been started -- it can no longer be changed.',
         'quote_locked_help_free' => 'This free (無償) option is confirmed -- it can no longer be changed.',

@@ -429,6 +429,42 @@ return [
         'order_confirmed_vendor_label' => 'Vendor',
         'order_confirmed_deliver_to_label' => 'Vendor delivers to',
 
+        // Reference-URL (admin-sourced) flow -- an alternative to the
+        // vendor broadcast, only for a `new` request with a reference URL.
+        'url_source_section' => 'Or: source from the reference URL',
+        'url_source_help' => 'Buy this part from the buyer\'s own reference URL instead of sending it to vendors. Enter what it costs there and its weight; the buyer is shown the marked-up price straight away. This replaces the vendor inquiry -- it can\'t be undone.',
+        'url_source_open_link' => 'Open reference URL',
+        'url_cost_label' => 'URL cost (¥)',
+        'url_cost_help' => 'What the part costs at the URL, in yen. Admin only -- never shown to the buyer.',
+        'url_weight_label' => 'Weight (kg)',
+        'url_weight_help' => 'Used to calculate Regular shipping from the weight brackets in Settings.',
+        'url_preview_heading' => 'Buyer will see',
+        'url_preview_incomplete' => 'Enter the cost and weight to preview the price.',
+        'url_preview_no_bracket' => 'No shipping bracket covers this weight -- check Settings.',
+        'url_price_button' => 'Price & send to buyer',
+        'url_price_confirm' => 'Price this request from its reference URL and send the quote to the buyer? It will no longer be sent to vendors, and the price can\'t be changed afterwards.',
+        'url_price_error' => 'This request can\'t be priced from its URL any more -- it may already be priced or sent to vendors. Please refresh the page.',
+        'url_price_no_bracket' => 'No shipping weight bracket covers this weight. Add one in Settings, or enter a shipping override.',
+        'url_priced_toast' => 'Priced from the reference URL. The buyer has been notified.',
+
+        'url_priced_section' => 'Priced from reference URL',
+        'url_priced_help' => 'Sourced directly from the buyer\'s reference URL -- no vendors were involved.',
+        'url_priced_badge' => 'URL-sourced',
+        'url_override_reason_label' => 'Override reason (admin only)',
+
+        'url_purchase_section' => 'Mark purchased from URL',
+        'url_purchase_help' => 'Buy the part from the reference URL, then record it here. Shipping to the buyer follows as for any order.',
+        'url_purchase_reference_label' => 'Purchase reference',
+        'url_purchase_reference_placeholder' => 'e.g. the site\'s order number (optional)',
+        'url_purchase_reference_help' => 'Admin only -- never shown to the buyer.',
+        'url_purchase_button' => 'Mark as purchased',
+        'url_purchase_confirm' => 'Mark this part as purchased from the reference URL? This can\'t be undone.',
+        'url_purchase_error' => 'This request isn\'t sourced from its reference URL. Please refresh the page.',
+        'url_purchased_toast' => 'Marked as purchased from the reference URL.',
+
+        'url_purchased_section' => 'Purchased from reference URL',
+        'url_purchased_reference_label' => 'Purchase reference',
+
         'broadcast_section' => 'Send to vendors (打診)',
         'broadcast_help' => 'Select which active vendors should receive this inquiry. Suspended vendors are never shown here and can\'t be selected.',
         'select_all_button' => 'Select all',

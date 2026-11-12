@@ -166,17 +166,31 @@
             <p class="mt-2 text-sm text-red-600">{{ $message }}</p>
         @enderror
 
-        @if (count($options) > 0)
+        @if (count($options) > 0 || $hasSingleQuote)
             <p class="mt-1 text-sm text-ink-muted">
                 @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
                     {{ __('buyer.request_detail.quote_awaiting_payment_help') }}
                 @elseif ($partRequest->hasBeenPaid())
                     {{ $partRequest->is_free ? __('buyer.request_detail.quote_locked_help_free') : __('buyer.request_detail.quote_locked_help') }}
+                @elseif ($hasSingleQuote)
+                    {{ __('buyer.request_detail.quote_single_help') }}
                 @else
                     {{ __('buyer.request_detail.quote_options_help') }}
                 @endif
             </p>
 
+            @if ($hasSingleQuote)
+                {{-- One fixed quote, nothing to choose between: just the
+                marked-up price (the only price a buyer ever sees). --}}
+                <div class="mt-4 max-w-sm rounded-md border border-brand-500 bg-brand-50 p-4">
+                    <dl class="text-sm">
+                        <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_price_label') }}</dt>
+                        <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
+                    </dl>
+                </div>
+            @endif
+
+            @if (count($options) > 0)
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 @foreach ($options as $option)
                     <div class="rounded-md border p-4 {{ $option['is_selected'] ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
@@ -220,10 +234,11 @@
                     </div>
                 @endforeach
             </div>
+            @endif
 
             <p class="mt-4 max-w-md text-xs text-ink-muted">{{ __('buyer.request_detail.quote_price_excludes_shipping') }}</p>
 
-            @if ($partRequest->status === \App\Enums\RequestStatus::Quoted && collect($options)->contains('is_selected', true))
+            @if ($partRequest->status === \App\Enums\RequestStatus::Quoted && ($hasSingleQuote || collect($options)->contains('is_selected', true)))
                 <div class="mt-4">
                     <a
                         href="{{ route('buyer.requests.checkout', $partRequest->id) }}"
