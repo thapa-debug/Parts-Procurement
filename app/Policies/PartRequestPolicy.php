@@ -57,6 +57,16 @@ class PartRequestPolicy
     }
 
     /**
+     * The admin dashboard's sales/margin KPIs. Admin-only today. Margin is
+     * exactly what CLAUDE.md §4's staff tier must NOT see, so this is where
+     * the Phase 2 owner/manager-only permission check slots in.
+     */
+    public function viewDashboard(User $user): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * The admin sees any request; a buyer sees only their own. A vendor
      * never sees a part_request directly through this policy -- CLAUDE.md
      * §4 isolation, and the (held-back) vendor-inquiry workflow will expose

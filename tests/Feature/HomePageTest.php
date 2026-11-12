@@ -22,11 +22,17 @@ it('redirects a logged-in vendor from the home page straight to their inbox', fu
         ->assertRedirect(route('vendor.inbox'));
 });
 
-it('does not redirect an admin or buyer away from the generic home page', function () {
+it('redirects a logged-in admin from the home page to the admin dashboard', function () {
     $admin = User::factory()->admin()->create();
+
+    $this->actingAs($admin)
+        ->get('/')
+        ->assertRedirect(route('admin.dashboard'));
+});
+
+it('does not redirect a buyer away from the generic home page', function () {
     $buyer = User::factory()->buyer()->create();
 
-    $this->actingAs($admin)->get('/')->assertOk();
     $this->actingAs($buyer)->get('/')->assertOk();
 });
 

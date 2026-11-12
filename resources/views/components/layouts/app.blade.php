@@ -27,6 +27,9 @@
                         <nav class="flex items-center gap-1 text-sm">
                             {{-- Role-specific nav links (admin/buyer/vendor portals) are added here as each is built. --}}
                             @if (auth()->user()->isAdmin())
+                                <x-nav-link :href="route('admin.dashboard')" :active="request()->routeIs('admin.dashboard')">
+                                    {{ __('app.nav.dashboard') }}
+                                </x-nav-link>
                                 <x-nav-link :href="route('admin.requests.index')" :active="request()->routeIs('admin.requests.*')">
                                     {{ __('app.nav.requests') }}
                                 </x-nav-link>
