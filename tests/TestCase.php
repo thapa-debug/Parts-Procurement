@@ -9,8 +9,8 @@ use RuntimeException;
 abstract class TestCase extends BaseTestCase
 {
     /**
-     * Refuses to run any test unless it is genuinely isolated: the
-     * `testing` environment on an in-memory sqlite database.
+     * Refuses to run any test unless it is genuinely isolated (see
+     * isolationProblems()).
      *
      * Why: tests use RefreshDatabase, which drops and recreates every
      * table. If phpunit.xml's environment is ignored -- most easily by a
@@ -25,22 +25,14 @@ abstract class TestCase extends BaseTestCase
     {
         $app = parent::createApplication();
 
-        $problems = [];
-
-        if ($app->configurationIsCached()) {
-            $problems[] = 'the configuration is cached (bootstrap/cache/config.php), so phpunit.xml\'s test settings are ignored -- run `php artisan config:clear`';
-        }
-
-        if (! $app->environment('testing')) {
-            $problems[] = "the environment is '{$app->environment()}', not 'testing'";
-        }
-
         $connection = $app['config']->get('database.default');
-        $database = $app['config']->get("database.connections.{$connection}.database");
 
-        if ($connection !== 'sqlite' || $database !== ':memory:') {
-            $problems[] = "the database is connection '{$connection}' (database '{$database}'), not in-memory sqlite";
-        }
+        $problems = static::isolationProblems(
+            configurationIsCached: $app->configurationIsCached(),
+            environment: $app->environment(),
+            connection: $connection,
+            database: $app['config']->get("database.connections.{$connection}.database"),
+        );
 
         if ($problems !== []) {
             throw new RuntimeException(
@@ -50,5 +42,37 @@ abstract class TestCase extends BaseTestCase
         }
 
         return $app;
+    }
+
+    /**
+     * Everything that makes this run unsafe, or [] if it is isolated: the
+     * `testing` environment, no cached config, and a throwaway database --
+     * in-memory sqlite (local runs, phpunit.xml) or a database whose name
+     * ends in `_test` (CI's dedicated MySQL database, e.g.
+     * `parts_procurement_test`). A real dev/production database name never
+     * ends in `_test`, so it is refused.
+     *
+     * @return list<string>
+     */
+    public static function isolationProblems(bool $configurationIsCached, string $environment, ?string $connection, ?string $database): array
+    {
+        $problems = [];
+
+        if ($configurationIsCached) {
+            $problems[] = 'the configuration is cached (bootstrap/cache/config.php), so phpunit.xml\'s test settings are ignored -- run `php artisan config:clear`';
+        }
+
+        if ($environment !== 'testing') {
+            $problems[] = "the environment is '{$environment}', not 'testing'";
+        }
+
+        $inMemorySqlite = $connection === 'sqlite' && $database === ':memory:';
+        $dedicatedTestDatabase = $connection !== 'sqlite' && is_string($database) && str_ends_with($database, '_test');
+
+        if (! $inMemorySqlite && ! $dedicatedTestDatabase) {
+            $problems[] = "the database is connection '{$connection}' (database '{$database}'), not in-memory sqlite or a dedicated *_test database";
+        }
+
+        return $problems;
     }
 }
