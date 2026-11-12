@@ -43,6 +43,26 @@
                         {{ $partRequest->shipping_postal_code }}, {{ $partRequest->shipping_country }}@if ($partRequest->shipping_state), {{ $partRequest->shipping_state }}@endif, {{ $partRequest->shipping_city }}, {{ $partRequest->shipping_address_line1 }}@if ($partRequest->shipping_address_line2), {{ $partRequest->shipping_address_line2 }}@endif
                     </span>
                 </p>
+
+                {{-- Why shipping can't be changed here, and the way out:
+                cancel this payment (Checkout::cancelPayment ->
+                CancelCheckoutAction, which refuses money already taken or
+                in flight) and check out again. --}}
+                <div class="mt-4 rounded-md border border-amber-200 bg-amber-50 p-4">
+                    <p class="text-sm font-semibold text-amber-900">{{ __('buyer.checkout.resume_locked_heading') }}</p>
+                    <p class="mt-1 text-sm text-amber-800">{{ __('buyer.checkout.resume_locked_body', ['total' => number_format($partRequest->buyer_price + $partRequest->shipping_fee)]) }}</p>
+                    <button
+                        type="button"
+                        wire:click="cancelPayment"
+                        wire:confirm="{{ __('buyer.checkout.cancel_and_restart_confirm') }}"
+                        wire:loading.attr="disabled"
+                        wire:target="cancelPayment"
+                        :disabled="processing"
+                        class="mt-3 rounded-md border border-amber-300 bg-surface px-3 py-1.5 text-sm font-semibold text-amber-900 shadow-sm transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                        {{ __('buyer.checkout.cancel_and_restart_button') }}
+                    </button>
+                </div>
             </div>
 
             <div class="rounded-lg border border-line bg-surface p-6 shadow-sm">
@@ -89,6 +109,16 @@
                 class="w-full rounded-md bg-brand-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50"
             >{{ __('buyer.checkout.pay_button') }}</button>
         </form>
+    @elseif ($paymentConfirming)
+        {{-- Stripe says the payment is genuinely in flight: never offer a
+        card form; the request page confirms it automatically. --}}
+        <div class="mt-6 rounded-lg border border-sky-200 bg-sky-50 p-5">
+            <h2 class="text-base font-semibold text-sky-900">{{ __('buyer.checkout.payment_confirming_heading') }}</h2>
+            <p class="mt-1 text-sm text-sky-800">{{ __('buyer.checkout.payment_confirming_body') }}</p>
+            <a href="{{ route('buyer.requests.show', $partRequest->id) }}" class="mt-3 inline-flex text-sm font-semibold text-brand-700 hover:underline">
+                {{ __('buyer.checkout.back_to_request') }} &rarr;
+            </a>
+        </div>
     @elseif (! $isEligible)
         <div class="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
             <p class="text-sm text-amber-800">
@@ -503,6 +533,14 @@
                         } catch (e) {
                             this.errorMessage = @js(__('buyer.checkout.error_generic'));
                             this.processing = false;
+                            return;
+                        }
+
+                        // Resume found the payment had already gone
+                        // through at Stripe (and recorded it): go to the
+                        // confirmed order -- never mount a card form.
+                        if (result && result.paid) {
+                            window.location.href = result.redirectUrl;
                             return;
                         }
 

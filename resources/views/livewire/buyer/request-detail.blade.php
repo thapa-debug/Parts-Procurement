@@ -14,7 +14,18 @@
     picks a quote -- present as soon as one's been chosen, free or paid
     alike, so this guard is really just hasBeenPaid() with a defensive
     null-check against a request paid for before that column existed. --}}
-    @if ($canResumePayment)
+    @if ($paymentConfirming)
+        {{-- Stripe says the payment is in flight (e.g. right after the
+        buyer paid): never "Complete payment". Re-asks Stripe every 10s
+        (reconcile) and flips to "Payment confirmed" by itself. --}}
+        <div class="mt-6 rounded-lg border border-sky-200 bg-sky-50 p-5" wire:poll.10s="refreshPaymentStatus">
+            <h2 class="flex items-center gap-2 text-base font-semibold text-sky-900">
+                <svg class="size-4 animate-spin text-sky-700" viewBox="0 0 24 24" fill="none" aria-hidden="true"><circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3" class="opacity-25"/><path d="M22 12a10 10 0 0 0-10-10" stroke="currentColor" stroke-width="3" stroke-linecap="round"/></svg>
+                {{ __('buyer.request_detail.payment_confirming_heading') }}
+            </h2>
+            <p class="mt-1 text-sm text-sky-800">{{ __('buyer.request_detail.payment_confirming_body') }}</p>
+        </div>
+    @elseif ($canResumePayment)
         {{-- Abandoned mid-payment: the way back to finish it. Links to the
         checkout page, whose resume form mounts the card form on the SAME
         PaymentIntent (ResumeStripePaymentAction) -- never a second charge. --}}

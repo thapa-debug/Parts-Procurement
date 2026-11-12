@@ -394,6 +394,11 @@ function abandonedCheckoutOnRequestPage(PaymentStatus $paymentStatus = PaymentSt
         'status' => $paymentStatus,
     ]);
 
+    // Opening the page asks Stripe first (reconcile): this buyer hasn't paid.
+    if ($intentId !== null) {
+        fakeStripeRoutes(["get /v1/payment_intents/{$intentId}" => stripeIntent($intentId, 'requires_payment_method', $request->buyer_price + $request->shipping_fee)]);
+    }
+
     return [$owner, $request->fresh()];
 }
 
@@ -484,7 +489,9 @@ it('takes the buyer from "Complete payment" to the resume card form on the SAME 
         ->call('resumePayment')
         ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_abandoned_secret');
 
-    expect($stripe->calls)->toBe(['get /v1/payment_intents/pi_abandoned']);
+    // Reads only (the checkout page asking Stripe on open, then the resume)
+    // -- never a create.
+    expect($stripe->calls)->toBe(['get /v1/payment_intents/pi_abandoned', 'get /v1/payment_intents/pi_abandoned']);
 
     // 4. The buyer pays; Stripe's webhook confirms that one intent.
     app(ConfirmStripePaymentAction::class)->execute('pi_abandoned');
@@ -505,4 +512,72 @@ it('never shows another buyer the "Complete payment" entry point', function () {
     Livewire::actingAs($intruder)
         ->test(RequestDetail::class, ['partRequest' => $request])
         ->assertForbidden();
+});
+
+// --- the page reflects what Stripe says, never a stale "Complete payment" ------------
+
+it('NEVER shows "Complete payment" once the buyer has paid -- even before the webhook arrives', function () {
+    // Just paid: our record still says pending (webhook not here yet), but
+    // Stripe says succeeded. Opening the page reconciles it.
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    $total = $request->buyer_price + $request->shipping_fee;
+    fakeStripeRoutes(['get /v1/payment_intents/pi_abandoned' => stripeIntent('pi_abandoned', 'succeeded', $total)]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'))
+        ->assertDontSee(__('buyer.request_detail.resume_payment_body'))
+        ->assertDontSee(__('buyer.request_detail.awaiting_payment_heading'));
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid)
+        ->and(Payment::where('part_request_id', $request->id)->sole()->status)->toBe(PaymentStatus::Confirmed);
+});
+
+it('shows "Payment received -- confirming" (not "Complete payment") while Stripe is still processing, then flips to confirmed', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $stripeSays = 'processing';
+    fakeStripeRoutes(['get /v1/payment_intents/pi_abandoned' => function () use (&$stripeSays, $total) {
+        return stripeIntent('pi_abandoned', $stripeSays, $total);
+    }]);
+
+    $component = Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.request_detail.payment_confirming_heading'))
+        ->assertSeeHtml('wire:poll.10s="refreshPaymentStatus"')
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'));
+
+    // The poll asks again once Stripe has finished.
+    $stripeSays = 'succeeded';
+    $component->call('refreshPaymentStatus')
+        ->assertSee(__('buyer.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('buyer.request_detail.payment_confirming_heading'));
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('never invites the buyer to pay again when Stripe took a different amount -- shows the contact-us note', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    fakeStripeRoutes(['get /v1/payment_intents/pi_abandoned' => stripeIntent('pi_abandoned', 'succeeded', 1)]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'))
+        ->assertSee(__('buyer.request_detail.awaiting_payment_heading'));
+
+    expect($request->fresh()->status)->toBe(RequestStatus::AwaitingPayment);
+});
+
+it('does not ask Stripe at all for a request that is already paid', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    app(ConfirmStripePaymentAction::class)->execute('pi_abandoned');
+    $stripe = fakeStripeRoutes([]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('buyer.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'));
+
+    expect($stripe->calls)->toBe([]);
 });

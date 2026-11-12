@@ -623,6 +623,7 @@ function fakeResumableIntent(PartRequest $request, string $status = 'requires_pa
 
 it('shows a returning buyer the resume-payment form, with their snapshotted shipping address and the total', function () {
     [$owner, $request] = abandonedCheckoutForResume();
+    fakeResumableIntent($request); // opening the page asks Stripe first: not paid
 
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request])
@@ -646,7 +647,9 @@ it('resumePayment() returns the SAME PaymentIntent\'s client secret and never cr
         ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_resume_ui_secret'
             && $data['redirectUrl'] === route('buyer.requests.show', $request->id));
 
-    expect($stripe->methods)->toBe(['get'])
+    // Two reads only (the page asking Stripe on open, then the resume
+    // itself) -- never a create.
+    expect($stripe->methods)->toBe(['get', 'get'])
         ->and(Payment::where('part_request_id', $request->id)->count())->toBe(1)
         ->and($request->fresh()->status)->toBe(RequestStatus::AwaitingPayment);
 });
@@ -664,8 +667,10 @@ it('tells the buyer their payment is already being processed when the intent is 
 it('lets the buyer pay on one replacement intent when the stored intent was canceled at Stripe', function () {
     [$owner, $request] = abandonedCheckoutForResume();
     $total = $request->buyer_price + $request->shipping_fee;
+    $dead = ['id' => 'pi_resume_ui', 'object' => 'payment_intent', 'status' => 'canceled', 'amount' => $total, 'currency' => 'jpy'];
     $stripe = new RecordingFakeStripeHttpClientForCheckoutResume(
-        ['id' => 'pi_resume_ui', 'object' => 'payment_intent', 'status' => 'canceled', 'amount' => $total, 'currency' => 'jpy'],
+        $dead, // the page asks Stripe on open: not paid
+        $dead, // the resume retrieves it: dead -> replace
         ['id' => 'pi_resume_ui_new', 'object' => 'payment_intent', 'status' => 'requires_payment_method', 'amount' => $total, 'currency' => 'jpy', 'client_secret' => 'pi_resume_ui_new_secret'],
     );
     ApiRequestor::setHttpClient($stripe);
@@ -675,8 +680,8 @@ it('lets the buyer pay on one replacement intent when the stored intent was canc
         ->call('resumePayment')
         ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_resume_ui_new_secret');
 
-    // One GET (the dead intent, already canceled) and exactly one create.
-    expect($stripe->methods)->toBe(['get', 'post'])
+    // Two reads of the dead intent (already canceled) and exactly one create.
+    expect($stripe->methods)->toBe(['get', 'get', 'post'])
         ->and(Payment::where('part_request_id', $request->id)->pluck('status', 'gateway_reference')->all())
         ->toBe(['pi_resume_ui' => PaymentStatus::Failed, 'pi_resume_ui_new' => PaymentStatus::Pending]);
 });
@@ -694,6 +699,7 @@ it('does not let another buyer resume someone else\'s payment', function () {
 it('shows the snapshotted shipping method on the resume form -- read-only', function () {
     [$owner, $request] = abandonedCheckoutForResume();
     $request->update(['shipping_method' => ShippingMethod::Dhl, 'shipping_fee' => DhlRateCalculator::DUMMY_FEE]);
+    fakeResumableIntent($request->fresh()); // opening the page asks Stripe first: not paid
 
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request->fresh()])
@@ -870,4 +876,121 @@ it('shows no shipping-method choice on a free (無償) order', function () {
     Livewire::actingAs($owner)
         ->test(Checkout::class, ['partRequest' => $request])
         ->assertDontSee(__('buyer.checkout.shipping_method_section'));
+});
+
+// --- reconcile on open, lock explanation, cancel and start over ----------------------------
+
+it('sends a buyer who already paid (webhook missed) to their confirmed order -- never a card form', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    fakeStripeRoutes(['get /v1/payment_intents/pi_resume_ui' => stripeIntent('pi_resume_ui', 'succeeded', $total)]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertRedirect(route('buyer.requests.show', $request->id));
+
+    expect(session('status'))->toBe(__('buyer.checkout.already_paid', ['code' => $request->request_code]))
+        ->and($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('shows "Payment received -- confirming" instead of the card form while Stripe is processing', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    fakeStripeRoutes(['get /v1/payment_intents/pi_resume_ui' => stripeIntent('pi_resume_ui', 'processing', $request->buyer_price + $request->shipping_fee)]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.payment_confirming_heading'))
+        ->assertDontSee(__('buyer.checkout.resume_help'))
+        ->assertDontSee(__('buyer.checkout.cancel_and_restart_button'));
+});
+
+it('explains on the resume form why shipping is locked, and offers to cancel and start over', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    fakeResumableIntent($request);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.checkout.resume_locked_heading'))
+        ->assertSee(__('buyer.checkout.resume_locked_body', ['total' => number_format($request->buyer_price + $request->shipping_fee)]))
+        ->assertSee(__('buyer.checkout.cancel_and_restart_button'))
+        ->assertSeeHtml('wire:click="cancelPayment"');
+});
+
+it('cancels the payment and starts over: intent canceled at Stripe, request back to quoted, fresh checkout', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $stripe = fakeStripeRoutes([
+        'get /v1/payment_intents/pi_resume_ui' => stripeIntent('pi_resume_ui', 'requires_payment_method', $total),
+        'post /v1/payment_intents/pi_resume_ui/cancel' => stripeIntent('pi_resume_ui', 'canceled', $total),
+    ]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('cancelPayment')
+        ->assertRedirect(route('buyer.requests.checkout', $request->id));
+
+    expect(session('status'))->toBe(__('buyer.checkout.payment_cancelled'))
+        ->and($request->fresh()->status)->toBe(RequestStatus::Quoted)
+        ->and(Payment::where('part_request_id', $request->id)->sole()->status)->toBe(PaymentStatus::Failed)
+        ->and($stripe->calls)->toContain('post /v1/payment_intents/pi_resume_ui/cancel');
+
+    // Back to a normal checkout -- address and shipping method choosable again.
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('buyer.checkout.shipping_method_section'))
+        ->assertDontSee(__('buyer.checkout.resume_help'));
+});
+
+it('never cancels a payment that went through meanwhile -- records it and shows the confirmed order', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $reads = 0;
+    // Unpaid when the page opened; paid by the time "cancel" is clicked.
+    // No cancel route: a cancel call would throw.
+    fakeStripeRoutes(['get /v1/payment_intents/pi_resume_ui' => function () use (&$reads, $total) {
+        return stripeIntent('pi_resume_ui', ++$reads === 1 ? 'requires_payment_method' : 'succeeded', $total);
+    }]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('cancelPayment')
+        ->assertRedirect(route('buyer.requests.show', $request->id));
+
+    expect(session('status'))->toBe(__('buyer.checkout.already_paid', ['code' => $request->request_code]))
+        ->and($request->fresh()->status)->toBe(RequestStatus::Paid);
+});
+
+it('refuses to cancel a payment in flight, with a clear message', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $reads = 0;
+    fakeStripeRoutes(['get /v1/payment_intents/pi_resume_ui' => function () use (&$reads, $total) {
+        return stripeIntent('pi_resume_ui', ++$reads === 1 ? 'requires_payment_method' : 'processing', $total);
+    }]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('cancelPayment')
+        ->assertRedirect(route('buyer.requests.show', $request->id));
+
+    expect(session('error'))->toBe(__('buyer.checkout.cancel_in_progress'))
+        ->and($request->fresh()->status)->toBe(RequestStatus::AwaitingPayment);
+});
+
+it('resume finding the payment already succeeded records it and sends the buyer to the confirmed order', function () {
+    [$owner, $request] = abandonedCheckoutForResume();
+    $total = $request->buyer_price + $request->shipping_fee;
+    $reads = 0;
+    // Unpaid when the page opened; paid by the time the card form asks.
+    fakeStripeRoutes(['get /v1/payment_intents/pi_resume_ui' => function () use (&$reads, $total) {
+        return stripeIntent('pi_resume_ui', ++$reads === 1 ? 'requires_payment_method' : 'succeeded', $total);
+    }]);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('resumePayment')
+        ->assertReturned(fn ($data) => $data['paid'] === true
+            && $data['redirectUrl'] === route('buyer.requests.show', $request->id));
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
 });

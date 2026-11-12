@@ -2,8 +2,11 @@
 
 namespace App\Livewire\Buyer;
 
+use App\Actions\ReconcileStripePaymentAction;
 use App\Actions\SelectQuoteAction;
+use App\Enums\PaymentReconciliation;
 use App\Enums\QualityRank;
+use App\Enums\RequestStatus;
 use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
@@ -25,6 +28,12 @@ class RequestDetail extends Component
      */
     public int $partRequestId;
 
+    /**
+     * What Stripe said about an awaiting_payment request when the page
+     * opened (a PaymentReconciliation value), or null.
+     */
+    public ?string $reconciliation = null;
+
     public function mount(PartRequest $partRequest): void
     {
         // Not view(): that also permits an admin (correctly, for the
@@ -35,6 +44,40 @@ class RequestDetail extends Component
         $this->authorize('viewOwn', $partRequest);
 
         $this->partRequestId = $partRequest->id;
+
+        // Never show "Complete payment" for money Stripe already took (the
+        // webhook may have been missed, or not arrived yet right after the
+        // buyer paid): ask Stripe once on open.
+        $this->checkPaymentWithStripe();
+    }
+
+    /**
+     * Polled every few seconds while the payment shows "confirming", so
+     * the page flips to "Payment confirmed" by itself.
+     */
+    public function refreshPaymentStatus(): void
+    {
+        $this->authorize('viewOwn', PartRequest::findOrFail($this->partRequestId));
+
+        $this->checkPaymentWithStripe();
+    }
+
+    /**
+     * Reconciles an awaiting_payment Stripe request (confirming it through
+     * the single webhook path if Stripe says it succeeded) and remembers
+     * what Stripe said, for render().
+     */
+    protected function checkPaymentWithStripe(): void
+    {
+        $partRequest = PartRequest::query()->select(['id', 'status', 'is_free'])->findOrFail($this->partRequestId);
+
+        if (app(PaymentGateway::class)->name() !== 'stripe' || $partRequest->status !== RequestStatus::AwaitingPayment || $partRequest->is_free) {
+            $this->reconciliation = null;
+
+            return;
+        }
+
+        $this->reconciliation = app(ReconcileStripePaymentAction::class)->execute($partRequest)->value;
     }
 
     /**
@@ -94,7 +137,15 @@ class RequestDetail extends Component
             // The "Complete payment" entry point: shown exactly when the
             // checkout page would show its resume form (same condition as
             // Checkout::render()'s $canResumePayment).
-            'canResumePayment' => app(PaymentGateway::class)->name() === 'stripe' && $partRequest->hasResumablePayment(),
+            'canResumePayment' => app(PaymentGateway::class)->name() === 'stripe'
+                && $partRequest->hasResumablePayment()
+                // ...and only while Stripe hasn't taken (or isn't taking)
+                // the money -- never "Complete payment" for a paid order.
+                && ! in_array($this->reconciliation, [PaymentReconciliation::Processing->value, PaymentReconciliation::AmountMismatch->value], true),
+            // Paid, final confirmation pending: "Payment received --
+            // confirming", polled until it flips to confirmed.
+            'paymentConfirming' => $partRequest->status === RequestStatus::AwaitingPayment
+                && $this->reconciliation === PaymentReconciliation::Processing->value,
         ])->title($partRequest->request_code);
     }
 
