@@ -198,6 +198,26 @@ class PartRequest extends Model
      * on, not just once paid -- the payment was started for the selected
      * quote's amount, so the selection must not change underneath it.
      */
+    /**
+     * An abandoned Stripe checkout the buyer can come back and finish: the
+     * request is awaiting_payment, and its Stripe payment is still pending
+     * (or was declined) with a PaymentIntent on record. The single source
+     * of truth for both the buyer request page's "Complete payment" entry
+     * point and the checkout page's resume form -- a cheap DB check only;
+     * whether Stripe still lets the intent be paid is decided by
+     * ResumeStripePaymentAction when the card form asks for it.
+     */
+    public function hasResumablePayment(): bool
+    {
+        return $this->status === RequestStatus::AwaitingPayment
+            && ! $this->is_free
+            && $this->payments()
+                ->where('gateway', 'stripe')
+                ->whereIn('status', [PaymentStatus::Pending, PaymentStatus::Failed])
+                ->whereNotNull('gateway_reference')
+                ->exists();
+    }
+
     public function quoteChoiceLocked(): bool
     {
         return $this->status === RequestStatus::AwaitingPayment || $this->hasBeenPaid();

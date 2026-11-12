@@ -14,7 +14,26 @@
     picks a quote -- present as soon as one's been chosen, free or paid
     alike, so this guard is really just hasBeenPaid() with a defensive
     null-check against a request paid for before that column existed. --}}
-    @if ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+    @if ($canResumePayment)
+        {{-- Abandoned mid-payment: the way back to finish it. Links to the
+        checkout page, whose resume form mounts the card form on the SAME
+        PaymentIntent (ResumeStripePaymentAction) -- never a second charge. --}}
+        <div class="mt-6 flex flex-wrap items-center justify-between gap-4 rounded-lg border border-brand-200 bg-brand-50 p-5">
+            <div class="max-w-xl">
+                <h2 class="text-base font-semibold text-brand-900">{{ __('buyer.request_detail.resume_payment_heading') }}</h2>
+                <p class="mt-1 text-sm text-brand-800">{{ __('buyer.request_detail.resume_payment_body') }}</p>
+            </div>
+            <a
+                href="{{ route('buyer.requests.checkout', $partRequest->id) }}"
+                class="inline-flex shrink-0 items-center gap-1.5 rounded-md bg-brand-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+            >
+                {{ __('buyer.request_detail.resume_payment_button') }}
+                <span aria-hidden="true">&rarr;</span>
+            </a>
+        </div>
+    @elseif ($partRequest->status === \App\Enums\RequestStatus::AwaitingPayment)
+        {{-- Awaiting payment but nothing left to resume from here (e.g. the
+        payment is already going through): just say so. --}}
         <div class="mt-6 rounded-lg border border-sky-200 bg-sky-50 p-5">
             <h2 class="text-sm font-semibold text-sky-900">{{ __('buyer.request_detail.awaiting_payment_heading') }}</h2>
             <p class="mt-1 text-sm text-sky-800">{{ __('buyer.request_detail.awaiting_payment_body') }}</p>
@@ -200,6 +219,18 @@
                         class="inline-flex rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
                     >
                         {{ $partRequest->is_free ? __('buyer.request_detail.checkout_button_free') : __('buyer.request_detail.checkout_button') }}
+                    </a>
+                </div>
+            @elseif ($canResumePayment)
+                {{-- Where "Proceed to checkout" was: the same way back to
+                finish the payment as the banner at the top. --}}
+                <div class="mt-4">
+                    <a
+                        href="{{ route('buyer.requests.checkout', $partRequest->id) }}"
+                        class="inline-flex items-center gap-1.5 rounded-md bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-brand-700"
+                    >
+                        {{ __('buyer.request_detail.resume_payment_button') }}
+                        <span aria-hidden="true">&rarr;</span>
                     </a>
                 </div>
             @endif

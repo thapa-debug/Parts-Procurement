@@ -108,6 +108,9 @@ return [
 
         'awaiting_payment_heading' => 'Awaiting payment confirmation',
         'awaiting_payment_body' => 'We haven\'t received confirmation of your payment yet. If you\'ve just paid, this usually updates within a few minutes. If you didn\'t complete the payment, please contact us.',
+        'resume_payment_heading' => 'Complete your payment',
+        'resume_payment_body' => 'You started paying for this order but the payment wasn\'t completed. Pick up where you left off -- it\'s the same payment, so you won\'t be charged twice. If you\'ve just paid, this page updates within a few minutes.',
+        'resume_payment_button' => 'Complete payment',
         'paid_banner_heading' => 'Payment confirmed',
         'paid_banner_body' => 'Your order is being processed -- we\'ll notify you when it ships.',
         'paid_banner_heading_free' => 'Free order confirmed',

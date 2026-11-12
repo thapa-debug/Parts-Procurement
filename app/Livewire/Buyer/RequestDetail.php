@@ -8,6 +8,7 @@ use App\Exceptions\SelectQuoteNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
 use App\Models\VendorResponse;
+use App\Payments\PaymentGateway;
 use Illuminate\Contracts\View\View;
 use Livewire\Component;
 
@@ -90,6 +91,10 @@ class RequestDetail extends Component
         return view('livewire.buyer.request-detail', [
             'partRequest' => $partRequest,
             'options' => $options,
+            // The "Complete payment" entry point: shown exactly when the
+            // checkout page would show its resume form (same condition as
+            // Checkout::render()'s $canResumePayment).
+            'canResumePayment' => app(PaymentGateway::class)->name() === 'stripe' && $partRequest->hasResumablePayment(),
         ])->title($partRequest->request_code);
     }
 
