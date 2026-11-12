@@ -7,6 +7,7 @@ return [
     'logout' => 'Log out',
 
     'nav' => [
+        'dashboard' => 'Dashboard',
         'requests' => 'Requests',
         'vendors' => 'Vendors',
         'buyers' => 'Buyers',

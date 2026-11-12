@@ -293,6 +293,35 @@ return [
         'delete_company_address_confirm' => 'Delete ":label"? Orders already confirmed to this address keep their own copy of it.',
     ],
 
+    'dashboard' => [
+        'title' => 'Dashboard',
+        'subheading' => 'Sales and margin from orders with a confirmed payment.',
+        'period_label' => 'Reporting period',
+        'periods' => [
+            'today' => 'Today',
+            '7d' => '7D',
+            '30d' => '30D',
+            'qtd' => 'QTD',
+            'ytd' => 'YTD',
+        ],
+        'range' => ':from – :to',
+        'compared_with' => 'vs :from – :to',
+
+        'cards' => [
+            'sales_revenue' => 'Sales revenue',
+            'gross_margin' => 'Gross margin earned',
+            'completed_orders' => 'Completed orders',
+            'average_order_value' => 'Avg order value',
+            'average_margin_per_order' => 'Avg margin / order',
+            'shipping_fees' => 'Shipping fees collected',
+        ],
+        'margin_of_sales' => ':percent% of sales',
+        'free_orders_note' => '{1} incl. :count free order (¥:amount absorbed)|[2,*] incl. :count free orders (¥:amount absorbed)',
+        'paid_orders_only' => 'Paid orders only (free orders excluded)',
+        'vs_previous' => 'vs previous',
+        'no_comparison' => '— no previous figure to compare',
+    ],
+
     'request_board' => [
         'title' => 'Requests',
         'subheading' => 'Every part request submitted by a buyer, across every stage of the pipeline.',

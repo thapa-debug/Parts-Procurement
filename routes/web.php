@@ -6,6 +6,7 @@ use App\Http\Controllers\Auth\VerifyEmailController;
 use App\Http\Controllers\StripeWebhookController;
 use App\Livewire\Admin\BuyerDetail;
 use App\Livewire\Admin\BuyerMaster;
+use App\Livewire\Admin\Dashboard;
 use App\Livewire\Admin\RequestBoard;
 use App\Livewire\Admin\RequestDetail;
 use App\Livewire\Admin\Settings;
@@ -32,6 +33,11 @@ Route::get('/', function () {
     // users can log in and browse, just not act).
     if (auth()->check() && auth()->user()->isVendor()) {
         return redirect()->route('vendor.inbox');
+    }
+
+    // Likewise, an admin's home is the dashboard.
+    if (auth()->check() && auth()->user()->isAdmin()) {
+        return redirect()->route('admin.dashboard');
     }
 
     return view('welcome');
@@ -62,6 +68,7 @@ Route::post('/email/verification-notification', [EmailVerificationNotificationCo
     ->name('verification.send');
 
 Route::prefix('admin')->name('admin.')->middleware(['auth', 'admin'])->group(function () {
+    Route::get('/', Dashboard::class)->name('dashboard');
     Route::get('/vendors', VendorMaster::class)->name('vendors.index');
     Route::get('/vendors/{vendorProfile}', VendorDetail::class)->name('vendors.show');
     Route::get('/buyers', BuyerMaster::class)->name('buyers.index');
