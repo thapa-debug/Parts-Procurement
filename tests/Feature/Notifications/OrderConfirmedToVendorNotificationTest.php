@@ -21,6 +21,15 @@ use Illuminate\Support\Facades\Notification;
 
 uses(RefreshDatabase::class);
 
+// The Japanese-email test does a real send and reads the 'array' mailer.
+// Pinned here rather than trusted from phpunit.xml: CI's test job sets its
+// own MAIL_MAILER (log) and QUEUE_CONNECTION (redis), which override
+// phpunit.xml -- the (ShouldQueue) notification would be queued, never
+// reaching the array mailer.
+beforeEach(function () {
+    config(['mail.default' => 'array', 'queue.default' => 'sync']);
+});
+
 // 発注確定: the confirmed vendor learns they were chosen, and where to
 // deliver. Same isolation discipline as the vendor's own confirmed-order
 // view (Vendor\RequestResponse) -- the company receiving address only,
