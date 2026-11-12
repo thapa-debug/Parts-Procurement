@@ -1,19 +1,25 @@
 <?php
 
+use App\Actions\ConfirmStripePaymentAction;
 use App\Actions\PresentQuoteAction;
 use App\Actions\SelectQuoteAction;
+use App\Enums\PaymentStatus;
 use App\Enums\QualityRank;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
+use App\Livewire\Buyer\Checkout;
 use App\Livewire\Buyer\RequestDetail;
 use App\Models\BuyerProfile;
 use App\Models\PartRequest;
+use App\Models\Payment;
 use App\Models\ResponsePhoto;
 use App\Models\User;
 use App\Models\VendorProfile;
 use App\Models\VendorResponse;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Livewire\Livewire;
+use Stripe\ApiRequestor;
+use Stripe\HttpClient\ClientInterface;
 
 uses(RefreshDatabase::class);
 
@@ -339,4 +345,164 @@ it('locks the quote choice while awaiting payment -- no select buttons', functio
         ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
         ->assertDontSee(__('buyer.request_detail.select_quote_button'))
         ->assertSee(__('buyer.request_detail.quote_awaiting_payment_help'));
+});
+
+// --- "Complete payment": the way back to an abandoned checkout ---------------------------
+
+class FakeStripeHttpClientForBuyerResumeEntry implements ClientInterface
+{
+    /** @var list<string> */
+    public array $calls = [];
+
+    public function __construct(private readonly array $body) {}
+
+    public function request($method, $absUrl, $headers, $params, $hasFile, $apiMode = 'v1', $maxNetworkRetries = null)
+    {
+        $this->calls[] = strtolower($method).' '.parse_url($absUrl, PHP_URL_PATH);
+
+        return [json_encode($this->body), 200, []];
+    }
+}
+
+/**
+ * A buyer who picked a quote, clicked "Proceed to payment" (stripe intent
+ * pi_abandoned created) and left the card form: awaiting_payment.
+ *
+ * @return array{0: User, 1: PartRequest}
+ */
+function abandonedCheckoutOnRequestPage(PaymentStatus $paymentStatus = PaymentStatus::Pending, ?string $intentId = 'pi_abandoned'): array
+{
+    config(['payments.gateway' => 'stripe']);
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create(['part_request_id' => $request->id, 'vendor_id' => VendorProfile::factory()->create()->id, 'cost_price' => 45_000, 'weight_kg' => 12]);
+    $quote = app(PresentQuoteAction::class)->execute($request, $response);
+    app(SelectQuoteAction::class)->execute($request->fresh(), $quote);
+    $request = $request->fresh();
+    $request->update([
+        'status' => RequestStatus::AwaitingPayment,
+        'shipping_recipient_name' => 'Jane Doe',
+        'shipping_address_line1' => '123 Main St',
+    ]);
+    Payment::factory()->create([
+        'part_request_id' => $request->id,
+        'amount' => $request->buyer_price + $request->shipping_fee,
+        'currency' => 'JPY',
+        'gateway' => 'stripe',
+        'gateway_reference' => $intentId,
+        'status' => $paymentStatus,
+    ]);
+
+    return [$owner, $request->fresh()];
+}
+
+afterEach(function () {
+    ApiRequestor::setHttpClient(null);
+});
+
+it('shows a prominent "Complete payment" entry point, linking to checkout, on an abandoned checkout', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    $checkoutUrl = route('buyer.requests.checkout', $request->id);
+
+    $html = Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.request_detail.resume_payment_heading'))
+        ->assertSee(__('buyer.request_detail.resume_payment_body'))
+        ->assertSee(__('buyer.request_detail.resume_payment_button'))
+        ->assertDontSee(__('buyer.request_detail.awaiting_payment_heading'))
+        ->html();
+
+    // Once in the banner at the top, once where "Proceed to checkout" was.
+    expect(substr_count($html, 'href="'.$checkoutUrl.'"'))->toBe(2);
+});
+
+it('also offers "Complete payment" after a declined card -- the same intent takes another card', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage(PaymentStatus::Failed);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSee(__('buyer.request_detail.resume_payment_button'));
+});
+
+it('shows no "Complete payment" when there is nothing to resume -- just the awaiting-confirmation note', function () {
+    // No PaymentIntent on record (e.g. its creation failed).
+    [$owner, $request] = abandonedCheckoutOnRequestPage(intentId: null);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'))
+        ->assertSee(__('buyer.request_detail.awaiting_payment_heading'));
+});
+
+it('shows no "Complete payment" unless the stripe gateway is active -- matching the checkout page', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    config(['payments.gateway' => 'stub']);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'));
+});
+
+it('keeps "Proceed to checkout", not "Complete payment", on a request that has not started paying', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    $request->update(['status' => RequestStatus::Quoted]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('buyer.request_detail.checkout_button'))
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'));
+});
+
+it('takes the buyer from "Complete payment" to the resume card form on the SAME intent, then to paid once the webhook confirms', function () {
+    [$owner, $request] = abandonedCheckoutOnRequestPage();
+    $total = $request->buyer_price + $request->shipping_fee;
+
+    // 1. The request page shows the way back.
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeHtml('href="'.route('buyer.requests.checkout', $request->id).'"');
+
+    // 2. Following it lands on the checkout page's resume form (card form + Stripe.js).
+    $this->actingAs($owner)
+        ->get(route('buyer.requests.checkout', $request->id))
+        ->assertOk()
+        ->assertSee(__('buyer.checkout.resume_help'))
+        ->assertSee('Jane Doe')
+        ->assertSee(number_format($total))
+        ->assertSee('js.stripe.com');
+
+    // 3. The card form mounts on the stored intent -- only ever retrieved.
+    $stripe = new FakeStripeHttpClientForBuyerResumeEntry([
+        'id' => 'pi_abandoned', 'object' => 'payment_intent', 'status' => 'requires_payment_method',
+        'amount' => $total, 'currency' => 'jpy', 'client_secret' => 'pi_abandoned_secret',
+    ]);
+    ApiRequestor::setHttpClient($stripe);
+
+    Livewire::actingAs($owner)
+        ->test(Checkout::class, ['partRequest' => $request])
+        ->call('resumePayment')
+        ->assertReturned(fn ($data) => $data['clientSecret'] === 'pi_abandoned_secret');
+
+    expect($stripe->calls)->toBe(['get /v1/payment_intents/pi_abandoned']);
+
+    // 4. The buyer pays; Stripe's webhook confirms that one intent.
+    app(ConfirmStripePaymentAction::class)->execute('pi_abandoned');
+
+    expect($request->fresh()->status)->toBe(RequestStatus::Paid);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('buyer.request_detail.paid_banner_heading'))
+        ->assertDontSee(__('buyer.request_detail.resume_payment_button'));
+});
+
+it('never shows another buyer the "Complete payment" entry point', function () {
+    [, $request] = abandonedCheckoutOnRequestPage();
+    $intruder = User::factory()->buyer()->create();
+    BuyerProfile::factory()->for($intruder)->create();
+
+    Livewire::actingAs($intruder)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertForbidden();
 });

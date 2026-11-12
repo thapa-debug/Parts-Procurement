@@ -6,7 +6,6 @@ use App\Actions\CheckoutAction;
 use App\Actions\ConfirmFreeOrderAction;
 use App\Actions\CreateBuyerAddressAction;
 use App\Actions\ResumeStripePaymentAction;
-use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
 use App\Exceptions\CheckoutNotAllowedException;
@@ -492,15 +491,7 @@ class Checkout extends Component
         // An abandoned Stripe checkout the buyer can finish: a cheap DB
         // check only -- whether Stripe still lets the intent be paid is
         // decided by resumePayment() when the card form asks for it.
-        $canResumePayment = $isStripeGateway
-            && $partRequest->status === RequestStatus::AwaitingPayment
-            && ! $partRequest->is_free
-            && Payment::query()
-                ->where('part_request_id', $partRequest->id)
-                ->where('gateway', 'stripe')
-                ->whereIn('status', [PaymentStatus::Pending, PaymentStatus::Failed])
-                ->whereNotNull('gateway_reference')
-                ->exists();
+        $canResumePayment = $isStripeGateway && $partRequest->hasResumablePayment();
 
         $shippingFees = $isEligible && ! $partRequest->is_free ? $this->shippingFees() : [];
         $chosenMethod = ShippingMethod::tryFrom($this->shippingMethod) ?? ShippingMethod::Standard;
