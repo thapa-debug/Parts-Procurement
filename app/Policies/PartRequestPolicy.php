@@ -199,6 +199,29 @@ class PartRequestPolicy
     }
 
     /**
+     * Sourcing a request from its reference URL and pricing it
+     * (SetUrlPriceAction) -- operational admin work today, the same
+     * owner/staff permission slot as presentQuote(). It sets the margin
+     * snapshot but not the margin rate itself (that's Settings), so it is
+     * presentQuote()'s equivalent, not an owner-only action. Eligibility
+     * (new, has a reference URL) is the action's business rule.
+     */
+    public function setUrlPrice(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
+     * Marking a URL-sourced request purchased (MarkPurchasedFromUrlAction)
+     * -- confirmOrderToVendor()'s counterpart, same admin-only slot. The
+     * §6.3 payment gate is the action's own check, not a role check.
+     */
+    public function markPurchasedFromUrl(User $user, PartRequest $partRequest): bool
+    {
+        return $user->isAdmin();
+    }
+
+    /**
      * No direct field-level edits are planned -- every status transition
      * is owned by a guarded Action (CLAUDE.md §5), not a raw model update.
      * Defined (false) for completeness/consistency with the other policies

@@ -14,8 +14,8 @@ class CheckoutNotAllowedException extends RuntimeException
     public static function noQuoteSelected(PartRequest $partRequest): self
     {
         return new self(
-            "Request {$partRequest->request_code} cannot be checked out -- the buyer must have a ".
-            'presented quote selected (status quoted, with a selected_response_id) before paying.'
+            "Request {$partRequest->request_code} cannot be checked out -- it must be quoted with a ".
+            'priced quote (a selected presented quote, or a reference-URL price) before paying.'
         );
     }
 

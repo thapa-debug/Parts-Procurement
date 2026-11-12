@@ -154,7 +154,9 @@ class CheckoutAction
             throw CheckoutNotAllowedException::isFreeRequest($partRequest);
         }
 
-        if ($partRequest->status !== RequestStatus::Quoted || $partRequest->selected_response_id === null) {
+        // A selected presented quote (vendor flow) or the admin's own
+        // price (reference-URL flow) -- see PartRequest::hasPricedQuote().
+        if ($partRequest->status !== RequestStatus::Quoted || ! $partRequest->hasPricedQuote()) {
             throw CheckoutNotAllowedException::noQuoteSelected($partRequest);
         }
 

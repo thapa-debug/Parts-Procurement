@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\RequestStatus;
 use App\Exceptions\PaymentNotConfirmedException;
+use App\Exceptions\UrlSourcingNotAllowedException;
 use App\Models\CompanyAddress;
 use App\Models\PartRequest;
 use App\Notifications\OrderConfirmedToVendorNotification;
@@ -28,11 +29,18 @@ use Throwable;
  *
  * Once committed, the confirmed vendor is notified (発注確定, in-app +
  * mail) -- how they learn they were chosen and where to deliver.
+ *
+ * A reference-URL (admin-sourced) request has no vendor to confirm to:
+ * it is refused here and goes through MarkPurchasedFromUrlAction instead.
  */
 class ConfirmOrderToVendorAction
 {
     public function execute(PartRequest $partRequest, CompanyAddress $receivingAddress): PartRequest
     {
+        if ($partRequest->is_url_sourced) {
+            throw UrlSourcingNotAllowedException::isUrlSourced($partRequest);
+        }
+
         if (! $partRequest->paymentGateOpen()) {
             throw PaymentNotConfirmedException::forRequest($partRequest);
         }

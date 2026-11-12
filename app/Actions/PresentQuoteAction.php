@@ -4,6 +4,7 @@ namespace App\Actions;
 
 use App\Enums\RequestStatus;
 use App\Exceptions\PresentQuoteNotAllowedException;
+use App\Exceptions\UrlSourcingNotAllowedException;
 use App\Models\PartRequest;
 use App\Models\PresentedQuote;
 use App\Models\VendorResponse;
@@ -76,6 +77,12 @@ class PresentQuoteAction
             [RequestStatus::VendorInquiry, RequestStatus::Quoted],
             true,
         );
+
+        // Defense in depth: a URL-sourced request is never broadcast, so it
+        // has no vendor responses -- but it is `quoted`, so say so plainly.
+        if ($partRequest->is_url_sourced) {
+            throw UrlSourcingNotAllowedException::isUrlSourced($partRequest);
+        }
 
         if (! $statusAllowsPresenting || $partRequest->hasBeenPaid()) {
             throw PresentQuoteNotAllowedException::wrongStatus($partRequest);

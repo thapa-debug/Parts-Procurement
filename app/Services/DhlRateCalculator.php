@@ -26,4 +26,15 @@ class DhlRateCalculator
     {
         return self::DUMMY_FEE;
     }
+
+    /**
+     * A reference-URL (admin-sourced) request has no vendor response --
+     * only the weight the admin entered when pricing it
+     * (part_requests.url_weight_kg), and no dimensions. Same placeholder
+     * until the real DHL Rating API lands.
+     */
+    public function calculateForWeight(float $weightKg, BuyerAddress $destination): int
+    {
+        return self::DUMMY_FEE;
+    }
 }

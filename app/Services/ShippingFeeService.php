@@ -21,6 +21,11 @@ use App\Models\VendorResponse;
  * override), read back from that row -- the same never-recompute
  * discipline as pricing (CLAUDE.md §6.2). DHL comes from
  * DhlRateCalculator (a dummy fixed fee for now).
+ *
+ * A reference-URL (admin-sourced) request has no presented quote or
+ * vendor response: its Regular fee is the one SetUrlPriceAction
+ * snapshotted on url_shipping_fee, and DHL is rated from the weight the
+ * admin entered (url_weight_kg). Same rules, different snapshot home.
  */
 class ShippingFeeService
 {
@@ -30,7 +35,9 @@ class ShippingFeeService
     {
         return match ($method) {
             ShippingMethod::Standard => $this->regularFee($partRequest),
-            ShippingMethod::Dhl => $this->dhl->calculate($this->selectedResponse($partRequest), $destination),
+            ShippingMethod::Dhl => $partRequest->is_url_sourced
+                ? $this->dhl->calculateForWeight((float) $partRequest->url_weight_kg, $destination)
+                : $this->dhl->calculate($this->selectedResponse($partRequest), $destination),
         };
     }
 
@@ -57,10 +64,12 @@ class ShippingFeeService
      */
     public function regularFee(PartRequest $partRequest): int
     {
-        $fee = PresentedQuote::query()
-            ->where('part_request_id', $partRequest->id)
-            ->where('vendor_response_id', $partRequest->selected_response_id)
-            ->value('shipping_fee');
+        $fee = $partRequest->is_url_sourced
+            ? $partRequest->url_shipping_fee
+            : PresentedQuote::query()
+                ->where('part_request_id', $partRequest->id)
+                ->where('vendor_response_id', $partRequest->selected_response_id)
+                ->value('shipping_fee');
 
         if ($fee === null) {
             throw CheckoutNotAllowedException::shippingFeeMissing($partRequest);

@@ -28,6 +28,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
     'receiving_address_id', 'receiving_label', 'receiving_recipient_name',
     'receiving_phone', 'receiving_postal_code', 'receiving_prefecture',
     'receiving_city', 'receiving_address_line1', 'receiving_address_line2',
+    'is_url_sourced', 'url_weight_kg', 'url_shipping_fee', 'url_shipping_fee_overridden',
+    'url_shipping_fee_override_reason', 'url_purchase_reference',
 ])]
 class PartRequest extends Model
 {
@@ -42,6 +44,9 @@ class PartRequest extends Model
         'status' => RequestStatus::class,
         'shipping_method' => ShippingMethod::class,
         'is_free' => 'boolean',
+        'is_url_sourced' => 'boolean',
+        'url_weight_kg' => 'decimal:2',
+        'url_shipping_fee_overridden' => 'boolean',
     ];
 
     /**
@@ -192,13 +197,6 @@ class PartRequest extends Model
     }
 
     /**
-     * The universal "still open to admin/buyer changes" gate (client
-     * revision): presenting, and selecting/re-selecting a quote, are
-     * allowed until the buyer starts paying. Locked from AwaitingPayment
-     * on, not just once paid -- the payment was started for the selected
-     * quote's amount, so the selection must not change underneath it.
-     */
-    /**
      * An abandoned Stripe checkout the buyer can come back and finish: the
      * request is awaiting_payment, and its Stripe payment is still pending
      * (or was declined) with a PaymentIntent on record. The single source
@@ -218,6 +216,27 @@ class PartRequest extends Model
                 ->exists();
     }
 
+    /**
+     * Whether the buyer has a priced quote to check out: a selected
+     * presented quote (vendor flow), or the admin's own price (reference-
+     * URL flow, SetUrlPriceAction -- there is no vendor response to select,
+     * so selected_response_id stays null). The one place CheckoutAction
+     * asks, so it never has to know which front half priced the request.
+     */
+    public function hasPricedQuote(): bool
+    {
+        return $this->is_url_sourced
+            ? $this->buyer_price !== null
+            : $this->selected_response_id !== null;
+    }
+
+    /**
+     * The universal "still open to admin/buyer changes" gate (client
+     * revision): presenting, and selecting/re-selecting a quote, are
+     * allowed until the buyer starts paying. Locked from AwaitingPayment
+     * on, not just once paid -- the payment was started for the selected
+     * quote's amount, so the selection must not change underneath it.
+     */
     public function quoteChoiceLocked(): bool
     {
         return $this->status === RequestStatus::AwaitingPayment || $this->hasBeenPaid();
