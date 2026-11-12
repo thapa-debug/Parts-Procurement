@@ -13,9 +13,22 @@ use RuntimeException;
  */
 class PaymentResumeNotAllowedException extends RuntimeException
 {
-    public function __construct(string $message, public readonly bool $inProgress = false)
+    /**
+     * $alreadyPaid: Stripe says the intent succeeded -- the buyer has paid,
+     * the caller reconciles (ReconcileStripePaymentAction) rather than
+     * telling them anything is still "processing".
+     */
+    public function __construct(string $message, public readonly bool $inProgress = false, public readonly bool $alreadyPaid = false)
     {
         parent::__construct($message);
+    }
+
+    public static function alreadyPaid(PartRequest $partRequest): self
+    {
+        return new self(
+            "Request {$partRequest->request_code}'s PaymentIntent has succeeded -- already paid; reconcile it.",
+            alreadyPaid: true,
+        );
     }
 
     public static function notAwaitingPayment(PartRequest $partRequest): self

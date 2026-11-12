@@ -2,12 +2,16 @@
 
 namespace App\Livewire\Buyer;
 
+use App\Actions\CancelCheckoutAction;
 use App\Actions\CheckoutAction;
 use App\Actions\ConfirmFreeOrderAction;
 use App\Actions\CreateBuyerAddressAction;
+use App\Actions\ReconcileStripePaymentAction;
 use App\Actions\ResumeStripePaymentAction;
+use App\Enums\PaymentReconciliation;
 use App\Enums\RequestStatus;
 use App\Enums\ShippingMethod;
+use App\Exceptions\CheckoutCancelNotAllowedException;
 use App\Exceptions\CheckoutNotAllowedException;
 use App\Exceptions\CheckoutTotalChangedException;
 use App\Exceptions\FreeOrderNotAllowedException;
@@ -67,6 +71,14 @@ class Checkout extends Component
      */
     public string $shippingMethod = ShippingMethod::Standard->value;
 
+    /**
+     * What Stripe said when this page opened on an awaiting_payment
+     * request (a PaymentReconciliation value), or null. Decides between the
+     * resume card form and "payment received, confirming" -- never a card
+     * form for money Stripe has already taken.
+     */
+    public ?string $reconciliation = null;
+
     public bool $showNewAddressForm = false;
 
     public string $recipient_name = '';
@@ -97,6 +109,22 @@ class Checkout extends Component
 
         $defaultAddressId = $this->buyer()->addresses()->where('is_default', true)->value('id');
         $this->selectedAddressId = $defaultAddressId;
+
+        // An abandoned checkout may in fact have been paid (the webhook
+        // never arrived): ask Stripe before offering any card form, so a
+        // buyer is never asked to pay for money Stripe already took.
+        if ($this->isStripeGateway() && $partRequest->status === RequestStatus::AwaitingPayment) {
+            $outcome = app(ReconcileStripePaymentAction::class)->execute($partRequest);
+
+            if (in_array($outcome, [PaymentReconciliation::Confirmed, PaymentReconciliation::AlreadyConfirmed], true)) {
+                session()->flash('status', __('buyer.checkout.already_paid', ['code' => $partRequest->request_code]));
+                $this->redirect(route('buyer.requests.show', $partRequest->id));
+
+                return;
+            }
+
+            $this->reconciliation = $outcome->value;
+        }
     }
 
     /**
@@ -307,7 +335,12 @@ class Checkout extends Component
      * pay() once the card form is in play: a re-render would wipe the
      * Payment Element mount point out from under the buyer.
      *
-     * @return array{clientSecret: string, redirectUrl: string}|array{error: string}
+     * Three answers: a client secret to mount the card form on; `paid` +
+     * redirectUrl when Stripe says the payment already succeeded (it has
+     * just been recorded -- the JS goes to the confirmed order instead of
+     * mounting a card form); or an error message.
+     *
+     * @return array{clientSecret: string, redirectUrl: string}|array{paid: true, redirectUrl: string}|array{error: string}
      */
     public function resumePayment(ResumeStripePaymentAction $action): array
     {
@@ -321,6 +354,16 @@ class Checkout extends Component
         } catch (PaymentResumeNotAllowedException $e) {
             report($e);
 
+            // Stripe already took the money (webhook missed): record it
+            // and send the buyer to their confirmed order -- never ask
+            // them to pay again.
+            if ($e->alreadyPaid) {
+                app(ReconcileStripePaymentAction::class)->execute($partRequest);
+                session()->flash('status', __('buyer.checkout.already_paid', ['code' => $partRequest->request_code]));
+
+                return ['paid' => true, 'redirectUrl' => route('buyer.requests.show', $partRequest->id)];
+            }
+
             return ['error' => $e->inProgress ? __('buyer.checkout.resume_in_progress') : __('buyer.checkout.resume_unavailable')];
         } catch (Throwable $e) {
             report($e);
@@ -332,6 +375,49 @@ class Checkout extends Component
             'clientSecret' => $clientSecret,
             'redirectUrl' => route('buyer.requests.show', $partRequest->id),
         ];
+    }
+
+    /**
+     * "Cancel payment and start over" on the resume form -- the way to
+     * change the (locked) shipping address/method. CancelCheckoutAction
+     * cancels the PaymentIntent at Stripe and takes the request back to
+     * quoted; it refuses money that is already taken or in flight. Every
+     * outcome redirects with a message, so the mounted card form is never
+     * left half re-rendered.
+     */
+    public function cancelPayment(CancelCheckoutAction $action): void
+    {
+        $partRequest = PartRequest::findOrFail($this->partRequestId);
+        $this->authorize('checkout', $partRequest);
+
+        try {
+            $action->execute($partRequest);
+        } catch (CheckoutCancelNotAllowedException $e) {
+            report($e);
+
+            if ($e->alreadyPaid) {
+                // Never cancel real money: they've paid -- record it.
+                app(ReconcileStripePaymentAction::class)->execute($partRequest);
+                session()->flash('status', __('buyer.checkout.already_paid', ['code' => $partRequest->request_code]));
+                $this->redirect(route('buyer.requests.show', $partRequest->id));
+
+                return;
+            }
+
+            session()->flash('error', $e->inProgress ? __('buyer.checkout.cancel_in_progress') : __('buyer.checkout.cancel_failed'));
+            $this->redirect(route($e->inProgress ? 'buyer.requests.show' : 'buyer.requests.checkout', $partRequest->id));
+
+            return;
+        } catch (Throwable $e) {
+            report($e);
+            session()->flash('error', __('buyer.checkout.cancel_failed'));
+            $this->redirect(route('buyer.requests.checkout', $partRequest->id));
+
+            return;
+        }
+
+        session()->flash('status', __('buyer.checkout.payment_cancelled'));
+        $this->redirect(route('buyer.requests.checkout', $partRequest->id));
     }
 
     /**
@@ -491,7 +577,13 @@ class Checkout extends Component
         // An abandoned Stripe checkout the buyer can finish: a cheap DB
         // check only -- whether Stripe still lets the intent be paid is
         // decided by resumePayment() when the card form asks for it.
-        $canResumePayment = $isStripeGateway && $partRequest->hasResumablePayment();
+        // ...and only if Stripe hasn't taken (or isn't taking) the money:
+        // a payment in flight shows "confirming" instead, an amount
+        // mismatch shows the contact-us note (never a card form).
+        $paymentConfirming = $this->reconciliation === PaymentReconciliation::Processing->value;
+        $canResumePayment = $isStripeGateway
+            && $partRequest->hasResumablePayment()
+            && ! in_array($this->reconciliation, [PaymentReconciliation::Processing->value, PaymentReconciliation::AmountMismatch->value], true);
 
         $shippingFees = $isEligible && ! $partRequest->is_free ? $this->shippingFees() : [];
         $chosenMethod = ShippingMethod::tryFrom($this->shippingMethod) ?? ShippingMethod::Standard;
@@ -510,6 +602,7 @@ class Checkout extends Component
             'countryOptions' => Country::query()->where('is_active', true)->orderBy('name')->pluck('name', 'id'),
             'isStripeGateway' => $isStripeGateway,
             'canResumePayment' => $canResumePayment,
+            'paymentConfirming' => $paymentConfirming,
             // Everywhere the view needs to know whether the card step is
             // reachable (the address radios' binding mode, the form's
             // x-data, the card section itself, the submit button) reads

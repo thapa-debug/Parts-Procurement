@@ -44,8 +44,8 @@ class ResumeStripePaymentAction
     /** Stripe PaymentIntent statuses that can still take the buyer's card. */
     private const RESUMABLE = ['requires_payment_method', 'requires_confirmation', 'requires_action'];
 
-    /** Stripe statuses where the payment is already going through. */
-    private const IN_PROGRESS = ['processing', 'requires_capture', 'succeeded'];
+    /** Stripe statuses where the payment is genuinely in flight. */
+    private const IN_PROGRESS = ['processing', 'requires_capture'];
 
     public function __construct(
         private readonly StripeClient $stripe,
@@ -85,6 +85,12 @@ class ResumeStripePaymentAction
             }
 
             $intent = $this->stripe->paymentIntents->retrieve($payment->gateway_reference);
+
+            // Already paid at Stripe (e.g. the webhook never arrived): never
+            // resume or replace it -- the caller reconciles instead.
+            if ($intent->status === PaymentIntent::STATUS_SUCCEEDED) {
+                throw PaymentResumeNotAllowedException::alreadyPaid($partRequest);
+            }
 
             if (in_array($intent->status, self::IN_PROGRESS, true)) {
                 throw PaymentResumeNotAllowedException::paymentInProgress($partRequest, $intent->status);

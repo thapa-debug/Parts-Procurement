@@ -99,6 +99,14 @@
                 </div>
             @endif
 
+            {{-- A flashed problem after a redirect (e.g. a payment that
+            couldn't be cancelled) -- the counterpart of 'status'. --}}
+            @if (session('error'))
+                <div class="mb-6 rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" role="alert">
+                    {{ session('error') }}
+                </div>
+            @endif
+
             {{ $slot }}
         </main>
 

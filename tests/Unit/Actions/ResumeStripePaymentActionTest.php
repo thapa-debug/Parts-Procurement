@@ -137,14 +137,27 @@ it('resumes after a declined attempt -- the same intent takes a different card',
         ->and(collect($stripe->requests)->where('method', 'post'))->toBeEmpty();
 });
 
-it('refuses to resume an intent that is already being paid -- the webhook will confirm it', function (string $intentStatus) {
+it('refuses to resume an intent that is genuinely in flight -- the webhook will confirm it', function (string $intentStatus) {
     [$request] = abandonedStripeCheckout();
     $stripe = fakeStripeIntent($intentStatus);
 
     expect(fn () => app(ResumeStripePaymentAction::class)->execute($request))
-        ->toThrow(fn (PaymentResumeNotAllowedException $e) => expect($e->inProgress)->toBeTrue());
+        ->toThrow(fn (PaymentResumeNotAllowedException $e) => expect($e->inProgress)->toBeTrue()->and($e->alreadyPaid)->toBeFalse());
     expect(collect($stripe->requests)->where('method', 'post'))->toBeEmpty();
-})->with(['processing', 'succeeded']);
+})->with(['processing', 'requires_capture']);
+
+it('reports an intent Stripe says succeeded as ALREADY PAID, never "processing" -- and never cancels or replaces it', function () {
+    // e.g. a month-old request whose webhook never arrived: the buyer paid.
+    [$request, $payment] = abandonedStripeCheckout();
+    $stripe = fakeStripeIntent('succeeded');
+
+    expect(fn () => app(ResumeStripePaymentAction::class)->execute($request))
+        ->toThrow(fn (PaymentResumeNotAllowedException $e) => expect($e->alreadyPaid)->toBeTrue()->and($e->inProgress)->toBeFalse());
+
+    expect(collect($stripe->requests)->where('method', 'post'))->toBeEmpty()
+        ->and(Payment::where('part_request_id', $request->id)->count())->toBe(1)
+        ->and($payment->refresh()->status)->toBe(PaymentStatus::Pending);
+});
 
 it('replaces a canceled intent with exactly one fresh intent -- nothing left to cancel, old payment kept', function () {
     [$request, $payment] = abandonedStripeCheckout();
