@@ -48,7 +48,6 @@ class TelescopeServiceProvider extends TelescopeApplicationServiceProvider
             'x-xsrf-token',
         ]);
     }
-
     /**
      * Register the Telescope gate.
      *

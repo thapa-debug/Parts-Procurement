@@ -140,9 +140,9 @@ class RequestDetail extends Component
             // A request the admin priced directly from its reference URL
             // (SetUrlPriceAction) has one fixed quote and nothing to choose
             // between. Passed as a plain flag -- never is_url_sourced
-            // itself: the buyer isn't told how the part was sourced
-            // (same wording as a presented quote, see
-            // UrlQuotePricedNotification).
+            // itself: the buyer isn't told how the part was sourced. Its
+            // help text (quote_single_help) explains pay-then-ship, matching
+            // UrlQuotePricedNotification's quote_ready wording.
             'hasSingleQuote' => $internal->is_url_sourced && $internal->buyer_price !== null,
             // The "Complete payment" entry point: shown exactly when the
             // checkout page would show its resume form (same condition as

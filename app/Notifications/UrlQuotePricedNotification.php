@@ -11,9 +11,10 @@ use Illuminate\Notifications\Notification;
 /**
  * Notifies the buyer that their URL-sourced request has a price
  * (SetUrlPriceAction) -- the reference-URL flow's counterpart of
- * QuotePresentedNotification. To the buyer it is the same news ("a quote
- * is ready"), so it reuses that notification's type and wording: the
- * buyer is never told how the part was sourced.
+ * QuotePresentedNotification. It has its own buyer-friendly wording
+ * (notifications.*.quote_ready): the part is priced and ready to buy, and
+ * once paid it will be ordered and shipped. The wording never says how the
+ * part was sourced -- the buyer only learns that it is ready to purchase.
  *
  * Isolation (CLAUDE.md §4): carries only the request and the marked-up
  * buyer_price -- never cost_price, the rate/margin, or the weight/shipping
@@ -48,9 +49,10 @@ class UrlQuotePricedNotification extends Notification implements ShouldQueue
     public function toArray(object $notifiable): array
     {
         return [
-            'type' => 'quote_presented',
+            'type' => 'quote_ready',
             'request_id' => $this->partRequest->id,
             'request_code' => $this->partRequest->request_code,
+            'part_name' => $this->partRequest->part_name,
             'buyer_price' => $this->partRequest->buyer_price,
             'url' => route('buyer.requests.show', $this->partRequest->id),
         ];
@@ -58,13 +60,19 @@ class UrlQuotePricedNotification extends Notification implements ShouldQueue
 
     public function toMail(object $notifiable): MailMessage
     {
-        $requestCode = $this->partRequest->request_code;
-        $buyerPrice = number_format((int) $this->partRequest->buyer_price);
+        $params = [
+            'request_code' => $this->partRequest->request_code,
+            'part_name' => $this->partRequest->part_name,
+            'buyer_price' => number_format((int) $this->partRequest->buyer_price),
+        ];
 
         return (new MailMessage)
-            ->subject(__('notifications.mail.quote_presented.subject', ['request_code' => $requestCode]))
-            ->line(__('notifications.mail.quote_presented.line', ['request_code' => $requestCode, 'buyer_price' => $buyerPrice]))
-            ->action(__('notifications.mail.quote_presented.action'), route('buyer.requests.show', $this->partRequest->id))
+            ->subject(__('notifications.mail.quote_ready.subject', $params))
+            ->line(__('notifications.mail.quote_ready.intro', $params))
+            ->line(__('notifications.mail.quote_ready.price', $params))
+            ->line(__('notifications.mail.quote_ready.next_steps'))
+            ->action(__('notifications.mail.quote_ready.action'), route('buyer.requests.show', $this->partRequest->id))
+            ->line(__('notifications.mail.quote_ready.after_payment'))
             ->line(__('notifications.mail.no_reply_notice'));
     }
 }

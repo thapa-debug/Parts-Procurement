@@ -21,6 +21,9 @@ return [
         'order_confirmed_to_vendor' => 'Order confirmed: :part_name (:request_code) -- please deliver to :receiving_label.',
         'vendor_response_submitted' => ':vendor_company_name responded to :request_code.',
         'quote_presented' => 'A new quote is available for :request_code -- ¥:buyer_price.',
+        // Buyer-facing only: the single-price quote (UrlQuotePricedNotification).
+        // Never mentions how the part was sourced, the cost, or the margin.
+        'quote_ready' => 'Your part :part_name (:request_code) is ready to purchase -- ¥:buyer_price. Pay to place your order.',
         'quote_selected' => ':buyer_company_name selected a quote for :request_code.',
         'buyer_registered' => ':buyer_company_name registered and is awaiting approval.',
         'buyer_approved' => 'Your account has been approved -- you can now submit requests.',
@@ -75,6 +78,18 @@ return [
             'subject' => 'A new quote is ready for :request_code',
             'line' => 'A new quote is now available for your request :request_code -- ¥:buyer_price.',
             'action' => 'View your quote',
+        ],
+
+        // Buyer-facing only: the single-price quote (UrlQuotePricedNotification)
+        // -- warmer than quote_presented, explaining the pay-then-ship flow.
+        // Never mentions how the part was sourced, the cost, or the margin.
+        'quote_ready' => [
+            'subject' => 'Your part is ready to purchase (:request_code)',
+            'intro' => 'Good news -- the part you requested, :part_name (request :request_code), has been priced and is ready for you to purchase.',
+            'price' => 'Part price: ¥:buyer_price (shipping is calculated separately and shown at checkout, before you pay).',
+            'next_steps' => 'To go ahead, open your request, choose your shipping method and complete payment.',
+            'after_payment' => 'As soon as your payment is confirmed, we will place the order for your part and ship it to you. We will let you know when it is on its way.',
+            'action' => 'Review and pay',
         ],
 
         'quote_selected' => [
