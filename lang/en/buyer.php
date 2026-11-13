@@ -93,12 +93,12 @@ return [
         'quote_options_help' => "Compare the options below and select the one you'd like to purchase. You can change your selection any time before you pay.",
         // The single-price quote (admin-priced request). Never mentions how
         // the part was sourced, the cost, or the margin.
-        'quote_single_help' => 'Good news -- the part you requested has been priced and is ready to purchase. Proceed to checkout to choose your shipping method and pay. As soon as your payment is confirmed, we'll place the order for your part and ship it to you -- we'll keep you updated along the way.',
+        'quote_single_help' => 'As soon as your payment is confirmed, we\'ll place the order and ship it to you.',
         'quote_locked_help' => 'You\'ve paid for the option below -- it can no longer be changed.',
         'quote_awaiting_payment_help' => 'Payment for the option below has been started -- it can no longer be changed.',
         'quote_locked_help_free' => 'This free (無償) option is confirmed -- it can no longer be changed.',
         'quote_price_label' => 'Price',
-        'quote_price_excludes_shipping' => 'Price excludes shipping -- your shipping fee has already been calculated and will be shown, along with the total, before you pay.',
+        'quote_price_excludes_shipping' => 'Price excludes shipping -- your shipping fee will be shown, along with the total, before you pay.',
         'quote_quality_label' => 'Quality rank',
         'quote_selected_badge' => 'Selected',
         'quote_free_badge' => 'Free (無償)',
