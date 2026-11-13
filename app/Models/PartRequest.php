@@ -16,6 +16,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Facades\Lang;
 
 #[Fillable([
     'buyer_id', 'request_code', 'part_type', 'maker_id', 'car_model', 'vin',
@@ -240,6 +241,25 @@ class PartRequest extends Model
     public function quoteChoiceLocked(): bool
     {
         return $this->status === RequestStatus::AwaitingPayment || $this->hasBeenPaid();
+    }
+
+    /**
+     * The status label the ADMIN sees (board, request page). A URL-sourced
+     * request shares the vendor flow's statuses (MarkPurchasedFromUrlAction
+     * moves it to ordered_to_vendor) but has no vendor, so any status with
+     * an entry under admin.request_board.status_url reads that instead.
+     * Admin-only -- the buyer portal has its own neutral labels
+     * (buyer.request_list.status) and is never told how a part was sourced.
+     */
+    public function adminStatusLabel(): string
+    {
+        $urlKey = 'admin.request_board.status_url.'.$this->status->value;
+
+        if ($this->is_url_sourced && Lang::has($urlKey)) {
+            return __($urlKey);
+        }
+
+        return __('admin.request_board.status.'.$this->status->value);
     }
 
     /**

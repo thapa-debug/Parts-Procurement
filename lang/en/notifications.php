@@ -32,6 +32,8 @@ return [
         'payment_confirmed_free' => 'Your free (無償) order for :request_code is confirmed -- your order is being processed.',
         'payment_confirmed_admin' => ':buyer_company_name paid for request :request_code -- ready to confirm the order to the vendor.',
         'payment_confirmed_admin_free' => ':buyer_company_name\'s free (無償) order for :request_code is confirmed -- ready to confirm the order to the vendor.',
+        // Admin-only: a URL-sourced order has no vendor to confirm to.
+        'payment_confirmed_admin_url' => ':buyer_company_name paid for request :request_code -- ready to purchase the part from the reference URL.',
     ],
 
     // Phase 3 Slice 2: email copy for each Notification class's toMail().
@@ -131,6 +133,14 @@ return [
         'payment_confirmed_admin' => [
             'subject' => ':buyer_company_name paid for :request_code',
             'line' => ':buyer_company_name paid ¥:amount for request :request_code -- the order is now ready to confirm to the vendor.',
+            'action' => 'View request',
+        ],
+
+        // Admin-only: a URL-sourced order has no vendor -- the admin buys
+        // the part from the request's reference URL instead.
+        'payment_confirmed_admin_url' => [
+            'subject' => ':buyer_company_name paid for :request_code',
+            'line' => ':buyer_company_name paid ¥:amount for request :request_code -- the part is now ready to purchase from the reference URL.',
             'action' => 'View request',
         ],
 

@@ -68,7 +68,7 @@
                         <td class="px-4 py-3">
                             <div class="flex flex-wrap items-center gap-1.5">
                                 <span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium {{ $request->status->badgeClasses() }}">
-                                    {{ __('admin.request_board.status.'.$request->status->value) }}
+                                    {{ $request->adminStatusLabel() }}
                                 </span>
 
                                 {{-- How many invited vendors have quoted so

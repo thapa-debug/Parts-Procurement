@@ -4,6 +4,7 @@ use App\Actions\CheckoutAction;
 use App\Actions\SetUrlPriceAction;
 use App\Enums\PaymentStatus;
 use App\Enums\RequestStatus;
+use App\Enums\ShippingMethod;
 use App\Livewire\Admin\RequestBoard;
 use App\Livewire\Admin\RequestDetail as AdminRequestDetail;
 use App\Livewire\Buyer\Checkout;
@@ -281,7 +282,8 @@ it('disables mark-purchased while the payment is pending, and refuses a forced c
 
     $component = Livewire::actingAs($admin)
         ->test(AdminRequestDetail::class, ['partRequest' => $request])
-        ->assertSee(__('admin.request_detail.confirm_order_payment_pending'));
+        ->assertSee(__('admin.request_detail.url_purchase_payment_pending'))
+        ->assertDontSee(__('admin.request_detail.confirm_order_payment_pending'));
 
     expect($component->html())->toMatch(MARK_PURCHASED_BUTTON_DISABLED);
 
@@ -380,6 +382,73 @@ it('never shows the skipped caption on a vendor-flow request', function () {
     Livewire::actingAs($admin)
         ->test(AdminRequestDetail::class, ['partRequest' => $request])
         ->assertDontSee(__('admin.request_detail.stepper.skipped_url_sourced'));
+});
+
+it('labels the order step "Purchased from URL" on a URL-sourced request, and dashes the bypassed vendor step', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidUrlRequestOnScreen();
+
+    $html = Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request])
+        ->html();
+
+    expect($html)->toContain(__('admin.request_detail.stepper.order_confirmed_url'))
+        ->and($html)->not->toContain(__('admin.request_detail.stepper.order_confirmed'))
+        // The two connectors either side of the skipped Vendor inquiry step.
+        ->and(substr_count($html, 'border-dashed border-brand-600'))->toBe(2);
+});
+
+it('keeps "Order confirmed" and solid connectors on a vendor-flow request', function () {
+    $admin = User::factory()->admin()->create();
+    $request = PartRequest::factory()->create(['status' => RequestStatus::Paid]);
+
+    $html = Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request])
+        ->html();
+
+    expect($html)->toContain(__('admin.request_detail.stepper.order_confirmed'))
+        ->and($html)->not->toContain(__('admin.request_detail.stepper.order_confirmed_url'))
+        ->and($html)->not->toContain('h-0 border-t border-dashed');
+});
+
+// --- admin: status label + paid banner ------------------------------------------------------
+
+it('shows "Purchased from URL", not "Ordered to vendor", once a URL request is purchased -- on the request page and the board', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidUrlRequestOnScreen();
+    $request->update(['status' => RequestStatus::OrderedToVendor]);
+    // A vendor-flow request at the same status keeps the vendor label.
+    PartRequest::factory()->create(['status' => RequestStatus::OrderedToVendor]);
+
+    Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(__('admin.request_board.status_url.ordered_to_vendor'))
+        ->assertDontSee(__('admin.request_board.status.ordered_to_vendor'));
+
+    $html = Livewire::actingAs($admin)->test(RequestBoard::class)->html();
+
+    expect(substr_count($html, __('admin.request_board.status_url.ordered_to_vendor')))->toBe(1)
+        ->and(substr_count($html, __('admin.request_board.status.ordered_to_vendor')))->toBe(1);
+});
+
+it('reads the shared label for every other status of a URL request', function (RequestStatus $status) {
+    $request = PartRequest::factory()->make(['status' => $status, 'is_url_sourced' => true]);
+
+    expect($request->adminStatusLabel())->toBe(__('admin.request_board.status.'.$status->value));
+})->with(fn () => collect(RequestStatus::cases())
+    ->reject(fn (RequestStatus $status) => $status === RequestStatus::OrderedToVendor)
+    ->map(fn (RequestStatus $status) => [$status])
+    ->all());
+
+it('tells the admin to buy from the reference URL, not confirm to a vendor, once a URL request is paid', function () {
+    $admin = User::factory()->admin()->create();
+    $request = paidUrlRequestOnScreen();
+    $request->update(['shipping_method' => ShippingMethod::Standard, 'shipping_fee' => 8_000]);
+
+    Livewire::actingAs($admin)
+        ->test(AdminRequestDetail::class, ['partRequest' => $request->fresh()])
+        ->assertSee(explode(':date', __('admin.request_detail.paid_banner_body_url'))[1])
+        ->assertDontSee(explode(':date', __('admin.request_detail.paid_banner_body'))[1]);
 });
 
 // --- admin: request board badges ------------------------------------------------------------

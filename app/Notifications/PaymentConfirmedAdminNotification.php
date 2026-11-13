@@ -25,6 +25,9 @@ use Illuminate\Notifications\Notification;
  * `type` (and mail copy) branches on $partRequest->is_free the same way
  * PaymentConfirmedNotification's does -- "paid" would simply be
  * inaccurate wording for a 無償 request nothing was actually charged for.
+ * A URL-sourced request (SetUrlPriceAction) gets its own copy as well:
+ * there is no vendor to confirm to -- the admin buys from the reference
+ * URL instead (MarkPurchasedFromUrlAction). See type().
  */
 class PaymentConfirmedAdminNotification extends Notification implements ShouldQueue
 {
@@ -56,7 +59,7 @@ class PaymentConfirmedAdminNotification extends Notification implements ShouldQu
         $partRequest = $this->payment->partRequest;
 
         return [
-            'type' => $partRequest->is_free ? 'payment_confirmed_admin_free' : 'payment_confirmed_admin',
+            'type' => $this->type(),
             'request_id' => $partRequest->id,
             'request_code' => $partRequest->request_code,
             'buyer_company_name' => $partRequest->buyer->company_name,
@@ -71,6 +74,21 @@ class PaymentConfirmedAdminNotification extends Notification implements ShouldQu
         $buyerCompanyName = $partRequest->buyer->company_name;
         $requestCode = $partRequest->request_code;
         $url = route('admin.requests.show', $partRequest->id);
+
+        if ($partRequest->is_url_sourced) {
+            return (new MailMessage)
+                ->subject(__('notifications.mail.payment_confirmed_admin_url.subject', [
+                    'buyer_company_name' => $buyerCompanyName,
+                    'request_code' => $requestCode,
+                ]))
+                ->line(__('notifications.mail.payment_confirmed_admin_url.line', [
+                    'buyer_company_name' => $buyerCompanyName,
+                    'request_code' => $requestCode,
+                    'amount' => number_format($this->payment->amount),
+                ]))
+                ->action(__('notifications.mail.payment_confirmed_admin_url.action'), $url)
+                ->line(__('notifications.mail.no_reply_notice'));
+        }
 
         if ($partRequest->is_free) {
             return (new MailMessage)
@@ -95,5 +113,23 @@ class PaymentConfirmedAdminNotification extends Notification implements ShouldQu
             ]))
             ->action(__('notifications.mail.payment_confirmed_admin.action'), $url)
             ->line(__('notifications.mail.no_reply_notice'));
+    }
+
+    /**
+     * Which copy this notification uses. A URL-sourced order has no vendor
+     * (the admin buys from the reference URL), so it gets its own wording
+     * rather than "confirm the order to the vendor". The URL flow is never
+     * free, but URL is checked first so that wording can't regress if it
+     * ever is.
+     */
+    private function type(): string
+    {
+        $partRequest = $this->payment->partRequest;
+
+        return match (true) {
+            (bool) $partRequest->is_url_sourced => 'payment_confirmed_admin_url',
+            (bool) $partRequest->is_free => 'payment_confirmed_admin_free',
+            default => 'payment_confirmed_admin',
+        };
     }
 }

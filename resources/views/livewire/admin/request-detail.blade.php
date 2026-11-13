@@ -21,7 +21,7 @@
         @if ($quotesToReview)
             <span
                 class="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700"
-                title="{{ __('admin.request_detail.status_title', ['status' => __('admin.request_board.status.'.$partRequest->status->value)]) }}"
+                title="{{ __('admin.request_detail.status_title', ['status' => $partRequest->adminStatusLabel()]) }}"
             >
                 <span class="size-1.5 rounded-full bg-amber-500" aria-hidden="true"></span>
                 {{ __('admin.request_detail.quotes_to_review') }}
@@ -29,7 +29,7 @@
         @else
             <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium {{ $partRequest->status->badgeClasses() }}">
                 <span class="size-1.5 rounded-full bg-current" aria-hidden="true"></span>
-                {{ __('admin.request_board.status.'.$partRequest->status->value) }}
+                {{ $partRequest->adminStatusLabel() }}
             </span>
         @endif
 
@@ -64,7 +64,7 @@
     @if ($confirmedPayment && $partRequest->shipping_method)
         <x-paid-status-banner
             :heading="__('admin.request_detail.paid_banner_heading')"
-            :body="__('admin.request_detail.paid_banner_body', ['date' => $confirmedPayment->paid_at->format('Y-m-d H:i')])"
+            :body="__($partRequest->is_url_sourced ? 'admin.request_detail.paid_banner_body_url' : 'admin.request_detail.paid_banner_body', ['date' => $confirmedPayment->paid_at->format('Y-m-d H:i')])"
         />
 
         <div class="mt-6 rounded-lg border border-line bg-surface p-6 shadow-sm">
@@ -190,7 +190,7 @@
 
             @unless ($paymentGateOpen)
                 <p class="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
-                    {{ __('admin.request_detail.confirm_order_payment_pending') }}
+                    {{ __('admin.request_detail.url_purchase_payment_pending') }}
                 </p>
             @endunless
 

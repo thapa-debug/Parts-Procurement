@@ -366,6 +366,12 @@ return [
             'shipped' => 'Shipped',
             'received' => 'Received',
         ],
+        // Overrides for a URL-sourced request (PartRequest::adminStatusLabel()):
+        // it shares the statuses above but has no vendor. Statuses not
+        // listed here read the same as above.
+        'status_url' => [
+            'ordered_to_vendor' => 'Purchased from URL',
+        ],
 
         'free_badge' => 'Free (無償)',
         // A `new` request with a reference URL -- the admin can source it
@@ -391,6 +397,7 @@ return [
         'stepper' => [
             'aria_label' => 'Request progress',
             'order_confirmed' => 'Order confirmed',
+            'order_confirmed_url' => 'Purchased from URL',
             'skipped_url_sourced' => 'Skipped -- sourced from URL',
         ],
 
@@ -408,6 +415,7 @@ return [
 
         'paid_banner_heading' => 'Payment confirmed',
         'paid_banner_body' => 'Paid :date. The vendor purchase can now be confirmed.',
+        'paid_banner_body_url' => 'Paid :date. You can now buy the part from the reference URL and mark it as purchased.',
 
         'payment_summary_section' => 'Payment summary',
         'payment_summary_amount' => 'Amount charged',
@@ -460,6 +468,7 @@ return [
 
         'url_purchase_section' => 'Mark purchased from URL',
         'url_purchase_help' => 'Buy the part from the reference URL, then record it here. Shipping to the buyer follows as for any order.',
+        'url_purchase_payment_pending' => 'Waiting for the buyer\'s payment to be confirmed. You can mark the part as purchased once it is.',
         'url_purchase_reference_label' => 'Purchase reference',
         'url_purchase_reference_placeholder' => 'e.g. the site\'s order number (optional)',
         'url_purchase_reference_help' => 'Admin only -- never shown to the buyer.',

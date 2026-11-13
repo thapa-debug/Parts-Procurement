@@ -5,7 +5,10 @@ one. procurement_failed has no step of its own: it shows in red on
 derived "Quotes to review" caption under Vendor inquiry (a label over the
 real status, not a status). $urlSourced marks Vendor inquiry as skipped
 rather than done: a reference-URL request is priced straight from its URL
-(SetUrlPriceAction) and never goes to vendors. --}}
+(SetUrlPriceAction) and never goes to vendors -- its connectors are dashed
+too, so the path visibly bypasses that step -- and its order step reads
+"Purchased from URL" (MarkPurchasedFromUrlAction) instead of "Order
+confirmed". --}}
 @props(['status', 'quotesToReview' => false, 'urlSourced' => false])
 
 @php
@@ -15,7 +18,7 @@ rather than done: a reference-URL request is priced straight from its URL
         ['status' => \App\Enums\RequestStatus::Quoted, 'label' => __('admin.request_board.status.quoted')],
         ['status' => \App\Enums\RequestStatus::AwaitingPayment, 'label' => __('admin.request_board.status.awaiting_payment')],
         ['status' => \App\Enums\RequestStatus::Paid, 'label' => __('admin.request_board.status.paid')],
-        ['status' => \App\Enums\RequestStatus::OrderedToVendor, 'label' => __('admin.request_detail.stepper.order_confirmed')],
+        ['status' => \App\Enums\RequestStatus::OrderedToVendor, 'label' => $urlSourced ? __('admin.request_detail.stepper.order_confirmed_url') : __('admin.request_detail.stepper.order_confirmed')],
         ['status' => \App\Enums\RequestStatus::Shipped, 'label' => __('admin.request_board.status.shipped')],
         ['status' => \App\Enums\RequestStatus::Received, 'label' => __('admin.request_board.status.received')],
     ];
@@ -36,10 +39,18 @@ rather than done: a reference-URL request is priced straight from its URL
             @endphp
 
             @if ($index > 0)
+                @php
+                    // Either end of this connector is the skipped vendor step.
+                    $touchesSkipped = $urlSourced && in_array(\App\Enums\RequestStatus::VendorInquiry, [$steps[$index - 1]['status'], $step['status']], true);
+                @endphp
                 <li aria-hidden="true" @class([
-                    'h-px w-6 shrink-0 sm:w-10',
-                    'bg-brand-600' => $index <= $currentIndex,
-                    'bg-line' => $index > $currentIndex,
+                    'w-6 shrink-0 sm:w-10',
+                    'h-px' => ! $touchesSkipped,
+                    'h-0 border-t border-dashed' => $touchesSkipped,
+                    'bg-brand-600' => $index <= $currentIndex && ! $touchesSkipped,
+                    'bg-line' => $index > $currentIndex && ! $touchesSkipped,
+                    'border-brand-600' => $index <= $currentIndex && $touchesSkipped,
+                    'border-line' => $index > $currentIndex && $touchesSkipped,
                 ])></li>
             @endif
 
