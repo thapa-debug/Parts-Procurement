@@ -182,18 +182,27 @@
             @if ($hasSingleQuote)
                 {{-- One fixed quote, nothing to choose between: just the
                 marked-up price (the only price a buyer ever sees). --}}
-                <div class="mt-4 max-w-sm rounded-md border border-brand-500 bg-brand-50 p-4">
+                <div class="mt-4 max-w-sm rounded-md border p-4 {{ $paymentConfirmed ? 'border-green-500 bg-green-50' : 'border-brand-500 bg-brand-50' }}">
                     <dl class="text-sm">
                         <dt class="text-ink-muted">{{ __('buyer.request_detail.quote_price_label') }}</dt>
                         <dd class="mt-0.5 text-lg font-semibold text-ink">¥{{ number_format($partRequest->buyer_price) }}</dd>
                     </dl>
+
+                    @if ($paymentConfirmed)
+                        <x-buyer.paid-badge class="mt-3" :free="$partRequest->is_free" />
+                    @endif
                 </div>
             @endif
 
             @if (count($options) > 0)
             <div class="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                 @foreach ($options as $option)
-                    <div class="rounded-md border p-4 {{ $option['is_selected'] ? 'border-brand-500 bg-brand-50' : 'border-line' }}">
+                    <div @class([
+                        'rounded-md border p-4',
+                        'border-green-500 bg-green-50' => $option['is_selected'] && $paymentConfirmed,
+                        'border-brand-500 bg-brand-50' => $option['is_selected'] && ! $paymentConfirmed,
+                        'border-line' => ! $option['is_selected'],
+                    ])>
                         <x-photo-gallery :photos="$option['photos']" />
 
                         <dl class="mt-3 space-y-2 text-sm">
@@ -214,7 +223,9 @@
                                 </span>
                             @endif
 
-                            @if ($option['is_selected'])
+                            @if ($option['is_selected'] && $paymentConfirmed)
+                                <x-buyer.paid-badge :free="$option['is_free']" />
+                            @elseif ($option['is_selected'])
                                 <span class="inline-flex rounded-full bg-brand-100 px-2.5 py-1 text-xs font-medium text-brand-700">
                                     {{ __('buyer.request_detail.quote_selected_badge') }}
                                 </span>

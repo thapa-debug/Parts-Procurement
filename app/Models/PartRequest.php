@@ -198,6 +198,20 @@ class PartRequest extends Model
     }
 
     /**
+     * Paid AND backed by a genuinely confirmed payment record -- the same
+     * condition the admin request detail uses for its "Paid" indicator
+     * (hasBeenPaid() + a Confirmed payment). Never true at AwaitingPayment.
+     * Drives the buyer's "Paid" badge on their chosen quote. A 無償 free
+     * order passes too: ConfirmFreeOrderAction writes a real ¥0 Confirmed
+     * payment.
+     */
+    public function hasConfirmedPayment(): bool
+    {
+        return $this->hasBeenPaid()
+            && $this->payments()->where('status', PaymentStatus::Confirmed)->exists();
+    }
+
+    /**
      * An abandoned Stripe checkout the buyer can come back and finish: the
      * request is awaiting_payment, and its Stripe payment is still pending
      * (or was declined) with a PaymentIntent on record. The single source

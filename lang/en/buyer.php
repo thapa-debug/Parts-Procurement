@@ -32,7 +32,7 @@ return [
 
         'reference_url_label' => 'Reference URL',
         'reference_url_placeholder' => 'https://page.auctions.yahoo.co.jp/...',
-        'reference_url_help' => 'A listing or reference page for the part, if you have one.',
+        'reference_url_help' => 'A listing or reference page for the part you want to purchase, if you have one.',
 
         'memo_label' => 'Notes',
         'memo_placeholder' => 'e.g. specifications or your desired delivery date',
@@ -101,6 +101,10 @@ return [
         'quote_price_excludes_shipping' => 'Price excludes shipping -- your shipping fee will be shown, along with the total, before you pay.',
         'quote_quality_label' => 'Quality rank',
         'quote_selected_badge' => 'Selected',
+        // Replaces "Selected" on the chosen quote once the payment is
+        // genuinely confirmed (PartRequest::hasConfirmedPayment()).
+        'quote_paid_badge' => 'Paid',
+        'quote_free_confirmed_badge' => 'Confirmed -- no payment needed',
         'quote_free_badge' => 'Free (無償)',
         'select_quote_button' => 'Select this quote',
         'select_quote_confirm' => 'Select this quote (¥:price)? You can change your selection any time before you pay.',

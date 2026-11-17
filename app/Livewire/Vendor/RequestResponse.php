@@ -114,7 +114,7 @@ class RequestResponse extends Component
             'width_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'height_cm' => ['required', 'numeric', 'min:0.01', 'max:999999.99'],
             'photos' => ['required', 'array', 'min:1', 'max:'.$this->maxPhotos()],
-            'photos.*' => ['image', 'max:10240'],
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:10240'],
         ];
     }
 

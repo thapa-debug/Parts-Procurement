@@ -144,6 +144,9 @@ class RequestDetail extends Component
             // help text (quote_single_help) explains pay-then-ship, matching
             // UrlQuotePricedNotification's quote_ready wording.
             'hasSingleQuote' => $internal->is_url_sourced && $internal->buyer_price !== null,
+            // "Paid" badge on the chosen quote: a genuinely confirmed
+            // payment, never just the selection or a started checkout.
+            'paymentConfirmed' => $partRequest->hasConfirmedPayment(),
             // The "Complete payment" entry point: shown exactly when the
             // checkout page would show its resume form (same condition as
             // Checkout::render()'s $canResumePayment).

@@ -207,6 +207,108 @@ it('shows a prominent payment-confirmed banner and a payment summary once paid',
         ->assertSee('123 Main St');
 });
 
+// --- "Paid" badge on the chosen quote -----------------------------------
+
+/**
+ * A buyer's request with one presented quote, selected, at $status, with
+ * a payment in $paymentStatus (or none).
+ *
+ * @return array{0: PartRequest, 1: User}
+ */
+function selectedQuoteRequest(RequestStatus $status, ?PaymentStatus $paymentStatus, bool $isFree = false): array
+{
+    $owner = User::factory()->buyer()->create();
+    $ownerProfile = BuyerProfile::factory()->for($owner)->create();
+    $request = PartRequest::factory()->for($ownerProfile, 'buyer')->create(['status' => RequestStatus::VendorInquiry]);
+    $response = VendorResponse::factory()->create([
+        'part_request_id' => $request->id,
+        'vendor_id' => VendorProfile::factory()->create()->id,
+        'cost_price' => 45_000,
+    ]);
+
+    $presentedQuote = app(PresentQuoteAction::class)->execute($request, $response, isFree: $isFree);
+    app(SelectQuoteAction::class)->execute($request->fresh(), $presentedQuote);
+    $request->fresh()->update(['status' => $status]);
+
+    if ($paymentStatus !== null) {
+        Payment::factory()->create([
+            'part_request_id' => $request->id,
+            'amount' => $isFree ? 0 : 54_000,
+            'status' => $paymentStatus,
+            'paid_at' => $paymentStatus === PaymentStatus::Confirmed ? now() : null,
+        ]);
+    }
+
+    return [$request->fresh(), $owner];
+}
+
+const PAID_BADGE = 'data-quote-badge="paid"';
+
+it('shows a "Paid" badge, instead of "Selected", on the chosen quote once the payment is confirmed', function (RequestStatus $status) {
+    [$request, $owner] = selectedQuoteRequest($status, PaymentStatus::Confirmed);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_paid_badge'))
+        ->assertDontSee(__('buyer.request_detail.quote_selected_badge'))
+        ->assertDontSee(__('buyer.request_detail.quote_free_confirmed_badge'));
+})->with([RequestStatus::Paid, RequestStatus::OrderedToVendor, RequestStatus::Shipped, RequestStatus::Received]);
+
+it('never shows the "Paid" badge while awaiting payment -- the choice stays "Selected"', function (?PaymentStatus $paymentStatus) {
+    [$request, $owner] = selectedQuoteRequest(RequestStatus::AwaitingPayment, $paymentStatus);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_selected_badge'));
+})->with([PaymentStatus::Pending, PaymentStatus::Failed, null]);
+
+it('never shows the "Paid" badge without a confirmed payment record, even if the status says paid', function () {
+    [$request, $owner] = selectedQuoteRequest(RequestStatus::Paid, PaymentStatus::Pending);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_selected_badge'));
+});
+
+it('does not show the "Paid" badge on a selected quote before checkout', function () {
+    [$request, $owner] = selectedQuoteRequest(RequestStatus::Quoted, null);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertDontSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_selected_badge'));
+});
+
+it('shows "Confirmed -- no payment needed" on a confirmed free order\'s quote', function () {
+    [$request, $owner] = selectedQuoteRequest(RequestStatus::Paid, PaymentStatus::Confirmed, isFree: true);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_free_confirmed_badge'))
+        ->assertDontSee(__('buyer.request_detail.quote_selected_badge'));
+});
+
+it('shows the "Paid" badge on a paid single-price quote too', function () {
+    $owner = User::factory()->buyer()->create();
+    $request = PartRequest::factory()->for(BuyerProfile::factory()->for($owner), 'buyer')->create([
+        'status' => RequestStatus::Paid,
+        'is_url_sourced' => true,
+        'cost_price' => 45_000,
+        'buyer_price' => 54_000,
+    ]);
+    Payment::factory()->create(['part_request_id' => $request->id, 'status' => PaymentStatus::Confirmed, 'paid_at' => now()]);
+
+    Livewire::actingAs($owner)
+        ->test(RequestDetail::class, ['partRequest' => $request])
+        ->assertSeeHtml(PAID_BADGE)
+        ->assertSee(__('buyer.request_detail.quote_paid_badge'))
+        ->assertDontSee('45,000');
+});
+
 it('does not show the payment banner or summary before the request has been paid', function () {
     $owner = User::factory()->buyer()->create();
     $ownerProfile = BuyerProfile::factory()->for($owner)->create();
